@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: docflow
+  config:
+    # 저장소 루트의 .env(Git 미포함)를 선택적으로 읽는다. 실제 환경변수가 있으면 환경변수가 우선한다.
+    import: optional:file:../.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/docflow}
+    username: ${DB_USERNAME:docflow}
+    password: ${DB_PASSWORD}
+    hikari:
+      # DB 장애 시 기본값(30초) 동안 대기하지 않고 빠르게 실패한다. (health DOWN 응답 지연 방지)
+      connection-timeout: 5000
+  jpa:
+    open-in-view: false
+    hibernate:
+      # 스키마 변경은 Flyway migration으로만 수행한다.
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # health 외의 Actuator 엔드포인트는 HTTP로 노출하지 않는다.
+        include: health
+  endpoint:
+    health:
+      # 전체 상태(UP/DOWN)만 응답하고 구성 요소·DB 정보 등 상세 내용은 숨긴다.
+      show-components: never
+      show-details: never

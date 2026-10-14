@@ -1,0 +1,22 @@
+# 로컬 개발용 PostgreSQL. Backend·Frontend는 호스트에서 실행한다.
+# 값은 저장소 루트의 .env에서 읽는다. (cp .env.example .env)
+services:
+  postgres:
+    image: postgres:16
+    container_name: docflow-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-docflow}
+      POSTGRES_USER: ${POSTGRES_USER:-docflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - docflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  docflow-postgres-data:
