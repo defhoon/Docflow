@@ -78,7 +78,7 @@ GitHub Actions(`.github/workflows/ci.yml`)가 push·PR마다 같은 검증을 �
 
 ## 문서
 
-- [`spec.md`](./spec.md): 프로젝트 명세 (Draft v0.1)
+- [`spec.md`](./spec.md): 프로젝트 명세 (Draft v0.2)
 - [`CLAUDE.md`](./CLAUDE.md): Claude Code 개발 지침
 - [`docs/architecture.md`](./docs/architecture.md): 아키텍처 개요
 - [`docs/adr/`](./docs/adr): 아키텍처 결정 기록

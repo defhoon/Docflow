@@ -46,14 +46,17 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 
 ## 5. 기술 스택
 
-현재 `spec.md` Draft v0.1에 정의된 예정 기술은 다음과 같다.
+6주차 프로젝트 초기화에서 확정·설치한 버전은 다음과 같다. 상세 버전, 선택 이유 및 대안은 `spec.md` §11과 [`docs/adr/0001-technology-stack.md`](./docs/adr/0001-technology-stack.md)를 기준으로 한다.
 
-- **Frontend:** Next.js, React, TypeScript
-- **Backend:** Java, Spring Boot, Spring Data JPA
-- **Database:** PostgreSQL
-- **AI (Post-MVP):** Python, FastAPI, LLM API
+- **Frontend:** Node.js 22, npm, Next.js 16.4 (App Router), React 19.3, TypeScript 5.9, Tailwind CSS 4, ESLint CLI, Vitest
+- **Backend:** Java 21, Spring Boot 4.1.1, Gradle 9.8 (Groovy DSL), Spring Data JPA, Flyway
+- **Database:** PostgreSQL 16 (로컬은 Docker Compose)
+- **AI (Post-MVP):** Python, FastAPI, LLM API — 아직 설치하지 않음
 
-정확한 프레임워크·런타임 버전, 패키지 구조 및 실행 명령어는 **아직 확정되지 않았다.** 초기 아키텍처 설계 단계에서 호환되는 선택지를 제안하고 사용자 승인 후 결정 기록에 남긴다.
+- 패키지 구조는 `spec.md` §11.3과 [`docs/adr/0002-package-structure.md`](./docs/adr/0002-package-structure.md)를 따른다.
+- 실행·검증 명령어는 `spec.md` §15와 `README.md`를 따른다.
+- 버전 변경이나 새 의존성 추가는 이유와 대안을 제안하고 사용자 승인 후 ADR에 기록한다.
+- 인증(Session), 파일 저장소(로컬 파일시스템), Entity ID(BIGINT IDENTITY)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
 
 ## 6. 현재 개발 단계 — 6주차
 

@@ -1,7 +1,10 @@
 # DocFlow Specification
 
-Version: Draft v0.1
-Status: Initial Specification / Development Preparation
+Version: Draft v0.2
+Status: Development Environment Initialized
+Last Updated: 2026-10-14
+
+> v0.2 변경 요약: 6주차 초기화 결과에 맞춰 §11(확정 Stack·구조·개발 규칙·환경변수·Actuator 정책), §15(실제 명령어·검증 결과), §16(잠정 결정 3건 분리), §17(ADR-0001~0003 결정 추가)을 갱신하였다. §1~§10, §12~§14, §18은 v0.1과 동일하다.
 
 ## 1. 프로젝트 개요
 
@@ -343,23 +346,19 @@ Out of Scope
 
 ## 11. 기술 컨텍스트
 
-### 현재 예정 Stack
+### 11.1 확정 Stack
 
-#### Frontend
+6주차 프로젝트 초기화에서 다음 버전을 설치·검증하였다. 선택 이유와 검토한 대안은 [ADR-0001](./docs/adr/0001-technology-stack.md)을 따른다.
 
-- Next.js
-- React
-- TypeScript
+| 구분 | 기술 및 버전 |
+| --- | --- |
+| Frontend | Node.js 22, npm, Next.js 16.4.0 (App Router), React 19.3.0, TypeScript 5.9.3, Tailwind CSS 4.3.3, ESLint 9 (ESLint CLI), Vitest 5.0.4 |
+| Backend | Java 21, Spring Boot 4.1.1, Gradle 9.8.1 (Groovy DSL), Spring Data JPA 4.1.1, Hibernate ORM 7.4.5, Flyway 12.4.0, PostgreSQL JDBC 42.7.13 |
+| Database | PostgreSQL 16 |
+| CI | GitHub Actions |
 
-#### Backend
-
-- Java
-- Spring Boot
-- Spring Data JPA
-
-#### Database
-
-- PostgreSQL
+- Spring Boot 4.1.1은 Spring Initializr가 아니라 Maven Central 메타데이터로 4.1.x 최신 안정 버전임을 확인하였다. 클라우드 개발 환경의 네트워크 정책이 `start.spring.io`를 차단하였기 때문이다.
+- Spring Security와 인증은 아직 도입하지 않았다(§16 잠정 결정 참고).
 
 #### AI — Post-MVP
 
@@ -367,22 +366,57 @@ Out of Scope
 - FastAPI
 - LLM API
 
-정확한 Framework 및 Runtime 버전은 프로젝트 초기 설정 이후 확정하여 기록한다.
+AI Stack은 Post-MVP 예정이며 아직 설치하지 않았다.
 
-### 예상 Repository 구조
+### 11.2 Repository 구조
 
 ```text
 docflow/
-├── frontend/
-├── backend/
+├── .github/workflows/ci.yml   # Backend build/test, Frontend lint/test/build
+├── backend/                   # Spring Boot (Gradle)
+├── frontend/                  # Next.js (npm)
+├── docs/
+│   ├── architecture.md
+│   └── adr/                   # 0001-technology-stack, 0002-package-structure, 0003-development-environment
 ├── specs/
-│   ├── 01-project-create.md
+│   ├── README.md              # 작성 안내
+│   ├── 01-project-create.md   # (작성 예정)
 │   ├── ...
-│   └── 14-ai-version-summary.md
+│   └── 14-ai-version-summary.md   # (작성 예정, Post-MVP)
+├── docker-compose.yml         # 로컬 PostgreSQL 16
+├── .env.example               # 환경변수 예시 (.env는 Git 제외)
+├── CLAUDE.md
 └── spec.md
 ```
 
-### 기본 개발 규칙
+### 11.3 패키지 구조
+
+상세 결정은 [ADR-0002](./docs/adr/0002-package-structure.md)를 따른다.
+
+Backend는 Domain 중심 패키지 구조를 사용하고, 도메인 내부는 계층으로 분리한다.
+
+```text
+com.docflow
+├── global/          # 횡단 관심사 (config, error, common) — 필요해질 때 생성
+└── <domain>/        # user, project, document, review, feedback, audit — 기능 SPEC 구현 시 생성
+    ├── controller/
+    ├── service/
+    ├── repository/
+    ├── domain/
+    └── dto/
+```
+
+Frontend는 Next.js App Router와 features 중심 구조를 사용한다.
+
+```text
+frontend/src
+├── app/                  # 라우팅·레이아웃
+└── features/<feature>/   # 기능별 api.ts, types.ts, components/, 테스트
+```
+
+아직 구현하지 않은 기능의 빈 패키지·디렉터리는 생성하지 않는다.
+
+### 11.4 기본 개발 규칙
 
 - Controller는 HTTP 요청/응답을 담당한다.
 - 핵심 비즈니스 규칙은 Service에서 처리한다.
@@ -392,8 +426,32 @@ docflow/
 - 상태 전이는 Server에서 검증한다.
 - 서로 일관성을 유지해야 하는 변경은 Transaction으로 처리한다.
 - Frontend는 최소한 Loading / Empty / Error / Success 상태를 구분한다.
+- 다른 도메인의 Repository 직접 참조는 지양하되 모든 접근을 Service 경유로 강제하지는 않는다. 도메인 간 순환 의존은 만들지 않는다.
+- Database 스키마는 Flyway migration으로만 변경한다(`spring.jpa.hibernate.ddl-auto=validate`).
 
-실제 패키지 구조와 파일 경로는 프로젝트 생성 후 본 문서에 추가한다.
+### 11.5 환경변수·비밀정보 관리
+
+상세 결정은 [ADR-0003](./docs/adr/0003-development-environment.md)을 따른다.
+
+- 저장소 루트의 `.env.example`만 Git에 포함한다. 실제 값은 `.env`에 두며 `.env`는 Git에서 제외한다.
+- 비밀번호, API Key 등 비밀정보를 코드·설정 파일에 기록하지 않는다.
+
+| 변수 | 사용처 | 비고 |
+| --- | --- | --- |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT` | `docker-compose.yml` | `POSTGRES_PASSWORD`가 없으면 Compose 실행 거부 |
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Backend | `DB_PASSWORD`는 기본값 없음. 값이 없으면 기동·테스트 실패 |
+| `BACKEND_URL` | Frontend (Next.js rewrites) | 기본값 `http://localhost:8080` |
+
+- Backend는 `backend/`에서 실행하면 루트 `.env`를 읽는다. OS 환경변수가 있으면 환경변수가 우선한다.
+- GitHub Actions의 DB 비밀번호는 일회성 CI 컨테이너용 값이며 실제 비밀정보가 아니다.
+
+### 11.6 Actuator 노출 정책
+
+- HTTP로는 `health` 엔드포인트만 노출한다.
+- `show-details`와 `show-components`를 `never`로 두어 전체 상태(UP/DOWN)만 응답한다. DB 종류, 디스크 경로 등 상세 정보는 노출하지 않는다.
+- 다른 Actuator 엔드포인트와 `/actuator/health/db` 같은 구성 요소 경로는 404를 반환한다.
+- Frontend 프록시는 `/backend/health` → `/actuator/health` 한 경로만 연결한다.
+- Spring Security 도입 시 이 정책을 재검토한다.
 
 ## 12. 공통 실패 및 예외 상황
 
@@ -480,13 +538,17 @@ Acceptance Criteria가 하나라도 충족되지 않은 기능은 완료된 것�
 
 ### Backend
 
-프로젝트 생성 후 실제 명령어로 확정한다.
-
-예상:
-
 ```bash
-./gradlew test
+cd backend
+./gradlew build    # 컴파일 + 테스트
+./gradlew test     # 테스트만
 ```
+
+Backend 테스트는 실행 중인 PostgreSQL 16이 필요하다. H2 등 내장 DB는 사용하지 않는다.
+
+- 로컬: `docker compose up -d`로 PostgreSQL을 실행한 뒤 테스트한다.
+- CI: GitHub Actions의 `postgres:16` service container를 사용한다.
+- DB 접속 정보는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`로 주입한다(§11.5).
 
 각 핵심 비즈니스 기능은 최소한 다음 경우를 검증한다.
 
@@ -498,14 +560,13 @@ Acceptance Criteria가 하나라도 충족되지 않은 기능은 완료된 것�
 
 ### Frontend
 
-프로젝트 생성 후 실제 명령어로 확정한다.
-
-예상:
-
 ```bash
-npm run dev
-npm run test
-npm run lint
+cd frontend
+npm ci             # 또는 npm install
+npm run lint       # ESLint CLI
+npm run test       # vitest run
+npm run build
+npm run dev        # 개발 서버 (http://localhost:3000)
 ```
 
 주요 화면은 최소한 다음 상태를 확인한다.
@@ -517,7 +578,46 @@ npm run lint
 - Permission Error
 - Network / Server Error
 
+### CI
+
+`.github/workflows/ci.yml`이 push와 Pull Request마다 다음을 실행한다.
+
+- `backend` job: `postgres:16` service + `./gradlew build`
+- `frontend` job: Node.js 22, `npm ci` → `npm run lint` → `npm run test` → `npm run build`
+
+### 15.1 6주차 초기화 검증 결과 (2026-10-14)
+
+검증 환경을 구분하여 기록한다. 실제로 실행하지 않은 항목은 "미검증"으로 표시한다.
+
+| 항목 | 클라우드 (Claude Code) | GitHub Actions CI | 로컬 |
+| --- | --- | --- | --- |
+| Backend build/test (5건) | 통과 (PostgreSQL 16.15 직접 실행) | 통과 | 미검증 |
+| Flyway `V1__baseline` 적용 | 통과 | 통과 (테스트로 확인) | 미검증 |
+| `bootRun` 후 health UP / DB 중단 시 DOWN | 통과 | — | 미검증 |
+| Actuator 상세 정보·기타 엔드포인트 비노출 | 통과 | 통과 (테스트로 확인) | 미검증 |
+| Frontend lint / test (5건) / build | 통과 | 통과 | 미검증 |
+| 연결 확인 화면 상태 (UP / DOWN / 연결 오류) | 통과 (Playwright) | — | 미검증 |
+| `docker compose up` (PostgreSQL 16) | 실행 불가 (Docker daemon 없음) | — | 미검증 |
+| 도메인 스키마 검증 (`ddl-auto=validate`) | 해당 없음 (Entity 없음) | 해당 없음 | 해당 없음 |
+
+- 현재 Entity가 없으므로 `ddl-auto=validate`가 검증하는 도메인 스키마도 없다. 첫 Entity 추가 시점부터 의미 있는 검증이 된다.
+- 로컬 검증 결과가 확인되면 이 표를 갱신한다.
+
 ## 16. 열린 질문
+
+원칙: 결정되지 않은 항목은 구현 과정에서 임의로 가정하지 않고 SPEC을 먼저 수정한 후 구현한다.
+
+### 16.1 잠정 결정 (Proposed)
+
+다음 사항은 방향만 정했으며, 해당 기능 SPEC을 구현하기 전에 재검토하여 확정한다.
+
+| 질문 | 잠정 결정 | 확정 시점 | 근거 |
+| --- | --- | --- | --- |
+| 인증 방식은 Session/JWT 중 어떤 방식을 사용할 것인가? | Session 기반 인증. CSRF, Session Cookie, 권한 검증은 인증 SPEC에서 상세 설계한다. | 인증 SPEC 작성 시 | [ADR-0001](./docs/adr/0001-technology-stack.md) |
+| 파일 저장소는 어떤 방식으로 구성할 것인가? | MVP에서는 로컬 파일시스템. 저장소 인터페이스와 업로드 기능은 해당 SPEC에서 구현한다. | SPEC-03/04 작성 시 | [ADR-0001](./docs/adr/0001-technology-stack.md) |
+| Entity ID 전략은 무엇으로 할 것인가? | BIGINT IDENTITY | 첫 도메인 SPEC 구현 시 | [ADR-0001](./docs/adr/0001-technology-stack.md) |
+
+### 16.2 미결정
 
 다음 사항은 아직 결정되지 않았으며, 구현 전에 결정한다.
 
@@ -530,12 +630,8 @@ npm run lint
 - 승인된 Document에 새로운 Version을 추가할 수 있는가?
 - 동일 Version에 중복 Review 요청을 허용할 것인가?
 - Document 파일 형식은 어디까지 지원할 것인가?
-- 파일 저장소는 어떤 방식으로 구성할 것인가?
-- 인증 방식은 Session/JWT 중 어떤 방식을 사용할 것인가?
 - AuditLog의 기록 범위를 어디까지 설정할 것인가?
 - 삭제 기능을 MVP에 포함할 것인가?
-
-원칙: 결정되지 않은 항목은 구현 과정에서 임의로 가정하지 않고 SPEC을 먼저 수정한 후 구현한다.
 
 ## 17. 결정 기록
 
@@ -562,6 +658,30 @@ AI Version Summary는 프로젝트의 주요 확장 기능으로 유지하지만
 Feedback 상태를 OPEN → APPLIED → CONFIRMED로 정의하였다.
 
 이유: 작성자가 “수정했다”고 표시하는 행위와 Reviewer가 “실제로 반영되었다”고 확인하는 행위를 구분하기 위함이다.
+
+#### 2026-10-14 — 기술 스택 및 버전 확정
+
+Java 21 / Spring Boot 4.1.1 / Gradle(Groovy DSL), Next.js 16.4 / React 19.3 / TypeScript / Tailwind CSS, PostgreSQL 16을 사용한다. Lombok과 Spring Security는 초기 프로젝트에 포함하지 않는다. 인증(Session), 파일 저장소(로컬 파일시스템), Entity ID(BIGINT IDENTITY)는 잠정 결정으로 둔다.
+
+이유: 최신 안정 버전을 사용하되 클라우드 개발 환경에서 실제로 검증 가능한 버전을 우선하고, 필요성이 확인되지 않은 의존성은 추가하지 않기 위함이다.
+
+상세: [ADR-0001](./docs/adr/0001-technology-stack.md)
+
+#### 2026-10-14 — Domain 중심 패키지 구조
+
+Backend는 Domain 중심 패키지와 도메인 내부 계층 분리를, Frontend는 App Router와 features 중심 구조를 사용한다. 도메인 간 Repository 직접 참조는 지양하되 엄격히 강제하지 않는다.
+
+이유: 기능 SPEC 단위 개발과 AI Agent 작업 지시에서 변경 범위를 패키지 단위로 모으기 위함이다.
+
+상세: [ADR-0002](./docs/adr/0002-package-structure.md)
+
+#### 2026-10-14 — 개발 환경 및 Database 연결 구성
+
+로컬에서는 PostgreSQL만 Docker Compose로 실행하고 Backend·Frontend는 호스트에서 실행한다. 설정은 환경변수와 `.env`(Git 제외)로 주입하고, 스키마는 Flyway로 관리하며, Actuator는 health 전체 상태만 노출한다. DB 장애 시 빠르게 실패하도록 DB 연결 대기 시간을 5초로 설정하였다.
+
+이유: 클라우드·로컬·CI에서 같은 PostgreSQL 16과 같은 설정 키로 검증하고, 비밀정보와 내부 정보 노출을 막기 위함이다.
+
+상세: [ADR-0003](./docs/adr/0003-development-environment.md)
 
 ## 18. 향후 SPEC 발전 방식
 
