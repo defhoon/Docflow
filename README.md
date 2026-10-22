@@ -4,7 +4,7 @@ Document Review Workflow Management System
 
 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 시스템이다. 요구사항과 MVP 범위는 [`spec.md`](./spec.md)를 따른다.
 
-> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)를 구현 중이다([Issue #4](https://github.com/defhoon/Docflow/issues/4), [`specs/00-auth.md`](./specs/00-auth.md)). 문서·검토·피드백 등 비즈니스 기능은 아직 구현되지 않았다.
+> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)를 구현했으며 PR 검토 중이다([Issue #4](https://github.com/defhoon/Docflow/issues/4), [`specs/00-auth.md`](./specs/00-auth.md)). 문서·검토·피드백 등 비즈니스 기능은 아직 구현되지 않았다.
 
 ## 기술 스택
 

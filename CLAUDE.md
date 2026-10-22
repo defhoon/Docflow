@@ -58,7 +58,8 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 - 패키지 구조는 `spec.md` §11.3과 [`docs/adr/0002-package-structure.md`](./docs/adr/0002-package-structure.md)를 따른다.
 - 실행·검증 명령어는 `spec.md` §15와 `README.md`를 따른다.
 - 버전 변경이나 새 의존성 추가는 이유와 대안을 제안하고 사용자 승인 후 ADR에 기록한다.
-- 인증(Session), 파일 저장소(로컬 파일시스템), Entity ID(BIGINT IDENTITY)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
+- 인증(Spring Security 세션)과 Entity ID(BIGINT IDENTITY)는 SPEC-AUTH에서 확정되었다([ADR-0005](./docs/adr/0005-session-authentication.md)).
+- 파일 저장소(로컬 파일시스템)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
 
 ## 6. 현재 개발 단계 — 7주차 (SPEC-AUTH)
 
@@ -72,11 +73,9 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 
 ### 진행 단계
 
-1. Git 컨벤션 적용과 SPEC-AUTH 상세 설계 문서 작성 (현재 단계)
-2. 설계 검토·승인 후 기능 구현: Spring Security, Flyway V2 `users`, 인증 API, 개발 계정 Seeder, Frontend 로그인
-3. CI 및 Windows 로컬 검증 후 PR (`Closes #4`)
-
-구현 단계는 사용자가 별도로 승인한 뒤 시작한다.
+1. Git 컨벤션 적용과 SPEC-AUTH 상세 설계 문서 작성 (완료)
+2. 설계 검토·승인 후 기능 구현: Spring Security, Flyway V2 `users`, 인증 API, 개발 계정 Seeder, Frontend 로그인 (완료)
+3. CI 및 Windows 로컬 검증 후 PR (`Closes #4`) (현재 단계 — 사용자 검토·병합 대기)
 
 ### 이번 단계에서 구현하지 않을 것
 

@@ -365,7 +365,7 @@ Out of Scope
 | CI | GitHub Actions |
 
 - Spring Boot 4.1.1은 Spring Initializr가 아니라 Maven Central 메타데이터로 4.1.x 최신 안정 버전임을 확인하였다. 클라우드 개발 환경의 네트워크 정책이 `start.spring.io`를 차단하였기 때문이다.
-- Spring Security와 인증은 아직 도입하지 않았다. 설계는 SPEC-AUTH([`specs/00-auth.md`](./specs/00-auth.md), [ADR-0005](./docs/adr/0005-session-authentication.md))에서 확정하였다.
+- Spring Security 세션 인증을 도입하였다(SPEC-AUTH, [`specs/00-auth.md`](./specs/00-auth.md), [ADR-0005](./docs/adr/0005-session-authentication.md)). 의존성: `spring-boot-starter-security`(Spring Security 7.1.1), 테스트용 `spring-boot-starter-security-test`.
 
 #### AI — Post-MVP
 

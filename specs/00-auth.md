@@ -1,6 +1,6 @@
 # SPEC-AUTH: 세션 기반 사용자 인증
 
-- 상태: **구현 완료 — Windows 로컬 검증 대기** (2026-10-22 설계 승인·구현, §12 결정 반영, 결과는 §17)
+- 상태: **구현·검증 완료 — PR 검토 대기** (2026-10-22, CI 및 Windows 로컬 검증 완료, 결과는 §17)
 - Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
 - 브랜치: `feat/4/auth`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §11, §12, §16 / [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
@@ -534,19 +534,46 @@ frontend/src
 
 ## 17. 구현 및 검증 결과 (2026-10-22)
 
-검증 주체를 구분한다. 클라우드와 CI 결과는 Claude Code가 직접 실행했거나 CI 로그로 확인한 것이다. Windows 로컬 결과는 사용자가 실행해 보고한 것만 기록한다.
+검증 주체를 세 가지로 구분한다. 실제로 실행하지 않은 항목은 "미검증" 또는 "실행 불가"로 표시한다.
+
+- **Claude Code 클라우드**: Claude Code가 클라우드 환경에서 직접 실행한 결과. JDK 25가 없어 Backend는 실행하지 못했다.
+- **GitHub Actions CI**: Claude Code가 CI 실행 결과와 로그로 확인한 결과 (Temurin JDK 25, PostgreSQL 16 service).
+- **Windows 로컬 (사용자)**: **사용자가 Windows 11에서 직접 실행하고 보고한 결과**. Claude Code는 Windows 환경에서 실행하지 않았다. 환경: Java 25.0.5.0.2, Spring Boot 4.1.1, PostgreSQL 16(Docker Compose), Next.js 16.4.0.
+
+### 17.1 빌드·자동화 테스트
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test (JDK 25, 테스트 소스 기준 35건) | 실행 불가 (JDK 25 없음) | 통과 (run 39766901843, 커밋 `6e6f6fa`) | 미검증 |
-| Frontend lint | 통과 | 통과 | 미검증 |
-| Frontend test (Vitest 39건) | 통과 | 통과 | 미검증 |
-| Frontend build | 통과 | 통과 | 미검증 |
-| Next.js rewrite 경유 쿠키·CSRF 흐름 (AC-AUTH-22, §13.4) | 실행 불가 (JDK 25 없음) | — | 미검증 |
-| 세션 만료(30분) 수동 확인 | 실행 불가 | — | 미검증 |
+| Backend build·test (JDK 25, 테스트 소스 기준 35건) | 실행 불가 (JDK 25 없음) | 통과 (run 39766901843, 커밋 `6e6f6fa` 외 이후 커밋) | 통과 (`.\gradlew.bat clean build`) |
+| Frontend lint | 통과 | 통과 | 통과 |
+| Frontend test (Vitest 6개 파일, 39건) | 통과 | 통과 | 통과 |
+| Frontend build | 통과 | 통과 | 통과 |
 
-- CI 성공 로그는 테스트 건수를 출력하지 않는다. "35건"은 테스트 소스의 `@Test` 수이며, 이 테스트들이 포함된 `:test` 태스크가 성공했다.
-- 구현 중 발견하여 수정한 사항
-  - `LoginRequest`: 앞뒤 공백이 있는 이메일이 `@Email` 검증에서 거부되어, 검증 전에 공백을 제거하도록 수정 (§5.4와 일치)
-  - 테스트 격리: `csrf()` 테스트 지원 기능이 공유 `CsrfFilter` 저장소를 교체하는 문제를 별도 테스트 클래스로 분리해 해결 (§13.2)
+- CI 성공 로그는 Backend 테스트 건수를 출력하지 않는다. "35건"은 테스트 소스의 `@Test` 수이며, 이 테스트들을 포함한 `:test` 태스크가 성공했다.
+
+### 17.2 실행·통합 검증 (Windows 로컬, 사용자 실행·보고)
+
+| 항목 | 결과 | 관련 AC |
+| --- | --- | --- |
+| `local` 프로파일로 Spring Boot 실행 | 통과 | — |
+| Flyway V1·V2 적용 | 통과 | 11 |
+| 개발 계정(Author·Reviewer) 생성 | 통과 | 23 |
+| 서버 재시작 시 개발 계정 중복 생성 방지 | 통과 | 23 |
+| 미인증 상태에서 `/` 접근 시 `/login?next=%2F`로 이동 | 통과 | 18 |
+| Author 계정 로그인, 사용자 정보·Backend UP 표시 | 통과 | 01, 19 |
+| 새로고침 후 로그인 상태 유지 | 통과 | 22 |
+| 잘못된 비밀번호 입력 시 오류 메시지 | 통과 | 03, 16 |
+| 로그아웃 후 로그인 화면 이동, 보호 페이지 접근 차단 | 통과 | 08, 20 |
+| Reviewer 계정 로그인 | 통과 | 01, 23 |
+| 로그인 요청의 `X-XSRF-TOKEN` 헤더 | 통과 | 17, 22 |
+| `JSESSIONID`·`XSRF-TOKEN` 쿠키 속성 | 통과 | 06, 22 |
+| 세션 만료 (검증용 1분 timeout, 설정은 커밋하지 않음) | 통과 | 09 |
+
+- 클라우드에서는 위 항목을 실행하지 못했다(JDK 25·Docker 없음). CI에서는 동일 동작을 MockMvc 통합 테스트로 검증했으며(§13.2), 실제 브라우저와 Next.js rewrite를 거치는 동작은 Windows 로컬 검증으로만 확인되었다.
+- 사용자 보고에 포함되지 않은 세부 항목(예: 로그인 후 `XSRF-TOKEN` 값이 실제 브라우저에서 바뀌었는지)은 자동화 테스트(`CsrfCookieFlowIntegrationTest`)로만 검증되었다.
+
+### 17.3 구현 중 발견하여 수정한 사항
+
+- `LoginRequest`: 앞뒤 공백이 있는 이메일이 `@Email` 검증에서 거부되어, 검증 전에 공백을 제거하도록 수정 (§5.4와 일치)
+- 테스트 격리: `csrf()` 테스트 지원 기능이 공유 `CsrfFilter` 저장소를 교체하는 문제를 별도 테스트 클래스로 분리해 해결 (§13.2). 애플리케이션 동작과 보안 설정은 변경하지 않았다.
 - AC-AUTH-06은 쿠키 기반 CSRF(double-submit) 동작에 맞게 설계 단계에서 수정되었다(§6.4).
