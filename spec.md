@@ -1,10 +1,12 @@
 # DocFlow Specification
 
-Version: Draft v0.2
+Version: Draft v0.3
 Status: Development Environment Initialized
-Last Updated: 2026-10-14
+Last Updated: 2026-10-22
 
 > v0.2 변경 요약: 6주차 초기화 결과에 맞춰 §11(확정 Stack·구조·개발 규칙·환경변수·Actuator 정책), §15(실제 명령어·검증 결과), §16(잠정 결정 3건 분리), §17(ADR-0001~0003 결정 추가)을 갱신하였다. §18의 v0.1 안내 문장을 삭제하였다. §1~§10, §12~§14는 v0.1과 동일하다.
+
+> v0.3 변경 요약: Backend Java 버전을 21에서 25 LTS로 변경하였다(ADR-0004). §11.1·§11.2, §15(JDK 조건, §15.2 Java 25 검증 결과), §17을 갱신하였다. Java 21 기준 기록(§15.1, §17 2026-10-14)은 보존한다.
 
 ## 1. 프로젝트 개요
 
@@ -350,10 +352,12 @@ Out of Scope
 
 6주차 프로젝트 초기화에서 다음 버전을 설치·검증하였다. 선택 이유와 검토한 대안은 [ADR-0001](./docs/adr/0001-technology-stack.md)을 따른다.
 
+2026-10-22에 Java 버전을 21에서 25 LTS로 변경하였다([ADR-0004](./docs/adr/0004-java-25-upgrade.md)). 다른 버전은 변경하지 않았다.
+
 | 구분 | 기술 및 버전 |
 | --- | --- |
 | Frontend | Node.js 22, npm, Next.js 16.4.0 (App Router), React 19.3.0, TypeScript 5.9.3, Tailwind CSS 4.3.3, ESLint 9 (ESLint CLI), Vitest 5.0.4 |
-| Backend | Java 21, Spring Boot 4.1.1, Gradle 9.8.1 (Groovy DSL), Spring Data JPA 4.1.1, Hibernate ORM 7.4.5, Flyway 12.4.0, PostgreSQL JDBC 42.7.13 |
+| Backend | Java 25 (Gradle Toolchain), Spring Boot 4.1.1, Gradle 9.8.1 (Groovy DSL), Spring Data JPA 4.1.1, Hibernate ORM 7.4.5, Flyway 12.4.0, PostgreSQL JDBC 42.7.13 |
 | Database | PostgreSQL 16 |
 | CI | GitHub Actions |
 
@@ -377,7 +381,7 @@ docflow/
 ├── frontend/                  # Next.js (npm)
 ├── docs/
 │   ├── architecture.md
-│   └── adr/                   # 0001-technology-stack, 0002-package-structure, 0003-development-environment
+│   └── adr/                   # 0001-technology-stack ~ 0004-java-25-upgrade
 ├── specs/
 │   ├── README.md              # 작성 안내
 │   ├── 01-project-create.md   # (작성 예정)
@@ -385,6 +389,7 @@ docflow/
 │   └── 14-ai-version-summary.md   # (작성 예정, Post-MVP)
 ├── docker-compose.yml         # 로컬 PostgreSQL 16
 ├── .env.example               # 환경변수 예시 (.env는 Git 제외)
+├── .gitattributes             # Gradle Wrapper·배치 파일 줄바꿈 규칙
 ├── CLAUDE.md
 └── spec.md
 ```
@@ -544,6 +549,8 @@ cd backend
 ./gradlew test     # 테스트만
 ```
 
+Backend 빌드·테스트에는 JDK 25가 필요하다(Gradle Toolchain). Gradle이 JDK를 자동으로 다운로드하지 않으므로 직접 설치한다.
+
 Backend 테스트는 실행 중인 PostgreSQL 16이 필요하다. H2 등 내장 DB는 사용하지 않는다.
 
 - 로컬: `docker compose up -d`로 PostgreSQL을 실행한 뒤 테스트한다.
@@ -602,6 +609,34 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 
 - 현재 Entity가 없으므로 `ddl-auto=validate`가 검증하는 도메인 스키마도 없다. 첫 Entity 추가 시점부터 의미 있는 검증이 된다.
 - 로컬 검증 결과가 확인되면 이 표를 갱신한다.
+
+### 15.2 Java 25 전환 검증 결과 (2026-10-22)
+
+§15.1은 Java 21 기준 결과이며 그대로 보존한다. 아래는 Java 25 전환(ADR-0004) 이후 결과이다. 실제로 실행하지 않은 항목은 "미검증"으로 표시한다.
+
+검증 주체를 구분한다.
+
+- **클라우드**와 **GitHub Actions CI** 열: Claude Code가 직접 실행했거나 CI 로그로 확인한 결과
+- **Windows 로컬** 열: **사용자가 직접 실행하고 보고한 결과**. Claude Code는 Windows 환경에서 실행하지 않았다.
+
+| 항목 | 클라우드 (Claude Code) | GitHub Actions CI | Windows 로컬 (사용자 실행·보고) |
+| --- | --- | --- | --- |
+| JDK 25 확인 | 실행 불가 (JDK 21만 존재, JDK 25 다운로드 차단) | 통과 (Temurin 25.0.4+1) | 통과 (Oracle JDK 25.0.5.0.2, `java -version`) |
+| Gradle 9.8.1 / Launcher·Daemon JVM | — | 통과 (Gradle 9.8.1) | 통과 (`gradlew.bat --version`, Launcher·Daemon 모두 Java 25) |
+| Backend build/test (5건) on JDK 25 | 실행 불가 | 통과 (`./gradlew build`, `:test` 성공) | 통과 (`gradlew.bat clean build` BUILD SUCCESSFUL) |
+| `docker compose config --quiet` | 형식 검증만 통과 (6주차) | — | 통과 |
+| `docker compose up -d` / `ps` (PostgreSQL 16) | 실행 불가 (Docker daemon 없음) | — | 통과 (컨테이너 `healthy`) |
+| `bootRun` 후 `/actuator/health` | 실행 불가 (JDK 25 없음) | — | 통과 (`{"groups":["liveness","readiness"],"status":"UP"}`) |
+| Frontend `npm ci` / lint / test / build | 통과 (Java와 무관, Node 22) | 통과 | 통과 (Vitest 5건 통과, 프로덕션 빌드 성공) |
+| 연결 확인 화면: 정상 연결 (UP) | 실행 불가 | — | 통과 ("Backend 정상 (UP)" 표시) |
+| 연결 확인 화면: PostgreSQL 중지 → 재시작 | 실행 불가 | — | 통과 (DOWN 표시 → UP 복구) |
+| 연결 확인 화면: Backend 종료 → 재시작 | 실행 불가 | — | 통과 (연결 오류 표시 → UP 복구) |
+
+- Windows 로컬 환경(사용자 보고): Windows 11, Oracle JDK 25.0.5.0.2, Gradle 9.8.1, PostgreSQL 16(Docker Compose), Node.js 22.
+- JDK 배포판이 다르다. CI는 Eclipse Temurin, Windows 로컬은 Oracle JDK이다. 두 환경 모두 Java 25에서 Backend 빌드·테스트가 통과하였다.
+- `backend/`에서 `bootRun` 실행 시 루트 `.env` 자동 로딩은 2026-10-22 클라우드에서 **JDK 21**로 확인하였다(`DB_*` 환경변수 없이 health UP). 이 동작은 `application.yml`의 `spring.config.import` 설정에 의한 것이며 Java 버전과 무관하다. Windows 로컬 보고에는 `.env` 로딩 방식에 대한 별도 확인 내용이 없다.
+- GitHub Actions 결과: PR #3 CI run 39744463956 (2026-10-22, 커밋 `1c17257`).
+- Java 25 전환에 대해 클라우드에서 직접 실행하지 못한 Backend 항목은 CI와 사용자의 Windows 로컬 검증으로 확인되었다.
 
 ## 16. 열린 질문
 
@@ -682,6 +717,14 @@ Backend는 Domain 중심 패키지와 도메인 내부 계층 분리를, Fronten
 이유: 클라우드·로컬·CI에서 같은 PostgreSQL 16과 같은 설정 키로 검증하고, 비밀정보와 내부 정보 노출을 막기 위함이다.
 
 상세: [ADR-0003](./docs/adr/0003-development-environment.md)
+
+#### 2026-10-22 — Java 25 LTS로 업그레이드
+
+Backend의 Java 버전을 21에서 25 LTS로 변경한다. Spring Boot 4.1.1, Gradle 9.8.1, Frontend 버전은 유지한다. JDK 25는 개발자가 직접 설치하며, Gradle 자동 다운로드(foojay) 의존성은 추가하지 않는다. Windows 줄바꿈 문제 방지를 위해 `.gitattributes`를 추가한다.
+
+이유: 7주차 기능 구현 전, 비즈니스 코드가 없는 시점에 최신 LTS로 전환하여 전환 비용을 최소화하기 위함이다.
+
+상세: [ADR-0004](./docs/adr/0004-java-25-upgrade.md)
 
 ## 18. 향후 SPEC 발전 방식
 

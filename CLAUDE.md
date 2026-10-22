@@ -49,7 +49,7 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 6주차 프로젝트 초기화에서 확정·설치한 버전은 다음과 같다. 상세 버전, 선택 이유 및 대안은 `spec.md` §11과 [`docs/adr/0001-technology-stack.md`](./docs/adr/0001-technology-stack.md)를 기준으로 한다.
 
 - **Frontend:** Node.js 22, npm, Next.js 16.4 (App Router), React 19.3, TypeScript 5.9, Tailwind CSS 4, ESLint CLI, Vitest
-- **Backend:** Java 21, Spring Boot 4.1.1, Gradle 9.8 (Groovy DSL), Spring Data JPA, Flyway
+- **Backend:** Java 25 (2026-10-22 Java 21에서 변경, ADR-0004), Spring Boot 4.1.1, Gradle 9.8 (Groovy DSL), Spring Data JPA, Flyway
 - **Database:** PostgreSQL 16 (로컬은 Docker Compose)
 - **AI (Post-MVP):** Python, FastAPI, LLM API — 아직 설치하지 않음
 

@@ -13,7 +13,7 @@
 ```
 
 - **Frontend**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4
-- **Backend**: Java 21 + Spring Boot 4.1 (Spring MVC, Spring Data JPA, Flyway, Actuator)
+- **Backend**: Java 25 + Spring Boot 4.1 (Spring MVC, Spring Data JPA, Flyway, Actuator)
 - **Database**: PostgreSQL 16 (로컬은 Docker Compose)
 - 추가 인프라(Redis, Kafka, Message Queue, Microservices)와 AI 서비스(Python/FastAPI)는 **포함하지 않는다.** AI는 Post-MVP다.
 
@@ -35,7 +35,7 @@ docflow/
 │       └── features/backend-health/    # 개발용 Backend 연결 상태 화면
 ├── docs/
 │   ├── architecture.md
-│   └── adr/0001~0003
+│   └── adr/0001~0004
 ├── specs/README.md            # 기능별 상세 SPEC 작성 안내 (SPEC은 다음 주차 작성)
 ├── docker-compose.yml         # PostgreSQL 16
 ├── .env.example               # 환경변수 예시 (.env는 Git 제외)
