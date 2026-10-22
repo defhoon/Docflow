@@ -60,27 +60,30 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 - 버전 변경이나 새 의존성 추가는 이유와 대안을 제안하고 사용자 승인 후 ADR에 기록한다.
 - 인증(Session), 파일 저장소(로컬 파일시스템), Entity ID(BIGINT IDENTITY)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
 
-## 6. 현재 개발 단계 — 6주차
+## 6. 현재 개발 단계 — 7주차 (SPEC-AUTH)
 
-현재 목표는 **AI Agent 활용 개발환경 구축 및 `spec.md` 기반 프로젝트 기본 아키텍처 생성**이다.
+6주차(프로젝트 초기화, 개발환경 구축)와 Java 25 전환(ADR-0004)은 완료되었다.
 
-### 이번 단계의 작업 범위
+현재 목표는 **SPEC-AUTH: 세션 기반 사용자 인증**이다.
 
-- Frontend / Backend / Database 기본 구조 제안 및 설계 검토
-- Claude Code 웹과 GitHub 저장소를 이용한 개발 흐름 구축
-- 승인된 설계에 따른 프로젝트 초기화
-- 기본 빌드, 실행 및 PostgreSQL 연결 검증
-- README 및 아키텍처 결정 기록 작성
-- 검증 결과를 바탕으로 `spec.md` Draft v0.2 수정 사항 제안
+- Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
+- 브랜치: `feat/4/auth`
+- SPEC: [`specs/00-auth.md`](./specs/00-auth.md), 결정 기록: [ADR-0005](./docs/adr/0005-session-authentication.md)
+
+### 진행 단계
+
+1. Git 컨벤션 적용과 SPEC-AUTH 상세 설계 문서 작성 (현재 단계)
+2. 설계 검토·승인 후 기능 구현: Spring Security, Flyway V2 `users`, 인증 API, 개발 계정 Seeder, Frontend 로그인
+3. CI 및 Windows 로컬 검증 후 PR (`Closes #4`)
+
+구현 단계는 사용자가 별도로 승인한 뒤 시작한다.
 
 ### 이번 단계에서 구현하지 않을 것
 
-- 문서 등록, 검토 요청, 피드백 관리 등 전체 비즈니스 기능
-- AI Version Summary, RAG, AI Review Agent
-- 실시간 공동 편집, Office 문서 자체 편집, 자동 문서 병합
-- 근거 없이 추가하는 Redis, Kafka, Microservices 등
-
-**첫 번째 요청에서는 아키텍처 제안만 수행하고 파일을 생성하거나 수정하지 않는다.** 이후 사용자의 명시적 승인에 따라 초기 프로젝트를 생성한다.
+- 회원가입, 비밀번호 변경·재설정, 소셜 로그인, JWT, Remember-me
+- 로그인 실패 제한·계정 잠금, 전역 Role, 로그인 AuditLog
+- 프로젝트 생성(SPEC-01) 등 다른 기능 SPEC
+- AI 기능, 실시간 공동 편집, 근거 없이 추가하는 Redis, Kafka, Microservices 등
 
 ## 7. 검증 및 완료 보고 원칙
 
