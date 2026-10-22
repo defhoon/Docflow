@@ -11,14 +11,14 @@ Document Review Workflow Management System
 | 구분 | 기술 |
 | --- | --- |
 | Frontend | Next.js 16.4, React 19.3, TypeScript 5.9, Tailwind CSS 4, Vitest |
-| Backend | Java 21, Spring Boot 4.1.1, Spring Data JPA, Flyway, Gradle 9.8 (Groovy DSL) |
+| Backend | Java 25, Spring Boot 4.1.1, Spring Data JPA, Flyway, Gradle 9.8 (Groovy DSL) |
 | Database | PostgreSQL 16 |
 
 자세한 버전과 선택 이유는 [`docs/adr/0001-technology-stack.md`](./docs/adr/0001-technology-stack.md)를 참고한다.
 
 ## 사전 준비
 
-- JDK 21
+- JDK 25 — Gradle이 JDK를 자동으로 다운로드하지 않으므로 직접 설치한다 (예: Eclipse Temurin 25). Java 21에서 변경된 이유는 [ADR-0004](./docs/adr/0004-java-25-upgrade.md) 참고
 - Node.js 22, npm
 - Docker (Docker Compose v2) — 로컬 PostgreSQL 실행용
 
@@ -38,6 +38,15 @@ cp .env.example .env
 | `BACKEND_URL` | Frontend | Next.js rewrite 대상 (기본 `http://localhost:8080`) |
 
 `.env`는 Git에 포함하지 않는다.
+
+**`.env` 자동 로딩 범위**
+
+- Backend는 `backend/src/main/resources/application.yml`의 `spring.config.import: optional:file:../.env[.properties]` 설정으로 `.env`를 읽는다.
+- 경로 `../.env`는 **실행 시 작업 디렉터리 기준**이다. `backend/`에서 `./gradlew bootRun`, `./gradlew test`, `./gradlew build`를 실행하면 Gradle의 작업 디렉터리가 `backend/`이므로 루트 `.env`가 로딩된다.
+- 다른 작업 디렉터리(예: IDE 실행 설정이 저장소 루트를 가리키는 경우)에서 실행하면 `.env`를 찾지 못한다. `optional:`이므로 오류 없이 넘어가지만 `DB_PASSWORD`가 없어 DB 연결이 실패한다. 이때는 IDE의 작업 디렉터리를 `backend`로 지정하거나 환경변수를 직접 설정한다.
+- OS 환경변수가 설정되어 있으면 `.env` 값보다 우선한다.
+- `.env`는 Java properties 형식으로 해석된다. 값에 따옴표를 붙이지 말고(따옴표까지 값에 포함됨), 비밀번호에 `\` 문자를 쓰지 않는다(이스케이프 문자로 처리됨).
+- Frontend(Next.js)는 루트 `.env`를 읽지 않는다. `BACKEND_URL`을 바꿀 때만 셸 환경변수로 지정한다(기본값 `http://localhost:8080`).
 
 ### 2. PostgreSQL 실행
 
@@ -63,6 +72,61 @@ npm run dev              # http://localhost:3000
 ```
 
 브라우저에서 `http://localhost:3000`을 열면 Backend·Database 연결 상태(UP / DOWN / 연결 오류)가 표시된다.
+
+## Windows (PowerShell) 실행 절차
+
+사전 준비: JDK 25(설치 시 `JAVA_HOME` 설정), Node.js 22, Docker Desktop(WSL 2 backend), Git for Windows.
+
+```powershell
+# 0) 버전 확인
+java -version                      # openjdk version "25.0.x"
+node -v                            # v22.x
+docker version                     # Server 항목이 표시되어야 한다 (Docker Desktop 실행 중)
+
+# JAVA_HOME이 JDK 25를 가리키지 않으면 현재 세션에서만 지정한다 (경로는 실제 설치 경로로 수정)
+# $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.x-hotspot"
+# $env:Path = "$env:JAVA_HOME\bin;$env:Path"
+
+# 1) 환경변수 파일 (저장소 루트)
+Copy-Item .env.example .env
+notepad .env                       # POSTGRES_PASSWORD와 DB_PASSWORD를 같은 값으로 수정
+
+# 2) PostgreSQL
+docker compose up -d
+docker compose ps                  # STATUS: healthy
+
+# 3) Backend (backend\에서 실행해야 ..\.env가 로딩된다)
+cd backend
+.\gradlew.bat -version            # Gradle 9.8.1
+.\gradlew.bat clean build         # 컴파일 + 테스트 (PostgreSQL 실행 필요)
+.\gradlew.bat bootRun
+# 다른 PowerShell 창에서:
+curl.exe http://localhost:8080/actuator/health    # {"status":"UP",...}
+
+# 4) Frontend (새 PowerShell 창, 저장소 루트 기준)
+cd frontend
+npm ci
+npm run lint
+npm run test
+npm run build
+npm run dev                        # http://localhost:3000
+```
+
+`.env`를 쓰지 않거나 IDE 등 다른 작업 디렉터리에서 실행할 때는 PowerShell 환경변수로 지정한다. 현재 PowerShell 창에만 적용된다.
+
+```powershell
+$env:DB_URL = "jdbc:postgresql://localhost:5432/docflow"
+$env:DB_USERNAME = "docflow"
+$env:DB_PASSWORD = "<.env의 POSTGRES_PASSWORD와 같은 값>"
+cd backend
+.\gradlew.bat bootRun
+```
+
+참고:
+
+- PowerShell 5.1에서 `curl`은 `Invoke-WebRequest`의 별칭이므로 `curl.exe`를 사용한다.
+- Windows에 PostgreSQL이 이미 설치되어 5432 포트를 사용 중이면 `.env`에서 `POSTGRES_PORT=5433`, `DB_URL=jdbc:postgresql://localhost:5433/docflow`로 변경한다.
+- 저장소의 `.gitattributes`가 `backend/gradlew`는 LF, `*.bat`은 CRLF로 체크아웃되도록 고정한다.
 
 ## 테스트·검증 명령어
 
