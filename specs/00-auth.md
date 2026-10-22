@@ -1,6 +1,6 @@
 # SPEC-AUTH: 세션 기반 사용자 인증
 
-- 상태: **승인됨 — 구현 중** (2026-10-22 설계 승인, §12 결정 반영)
+- 상태: **구현 완료 — Windows 로컬 검증 대기** (2026-10-22 설계 승인·구현, §12 결정 반영, 결과는 §17)
 - Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
 - 브랜치: `feat/4/auth`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §11, §12, §16 / [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
@@ -310,9 +310,10 @@ frontend/src
 ├── lib/api-client.ts                 # same-origin fetch, CSRF 헤더, ErrorResponse 파싱
 ├── features/auth/
 │   ├── api.ts                        # fetchCsrf, login, logout, fetchCurrentUser
-│   ├── types.ts                      # AuthUser, AuthState
-│   ├── AuthProvider.tsx              # 인증 상태 (loading / authenticated / anonymous)
-│   └── components/LoginForm.tsx, LogoutButton.tsx, RequireAuth.tsx (+ *.test.tsx)
+│   ├── types.ts                      # AuthUser, AuthStatus
+│   ├── redirect.ts                   # next 파라미터 검증 (open redirect 방지)
+│   ├── AuthProvider.tsx              # 인증 상태 (loading / authenticated / anonymous / error)
+│   └── components/LoginForm.tsx, LogoutButton.tsx, RequireAuth.tsx, CurrentUserPanel.tsx (+ *.test.tsx)
 ├── app/login/page.tsx
 └── app/page.tsx                      # 로그인 후 홈: 사용자 정보, 로그아웃, BackendHealthStatus
 ```
@@ -324,8 +325,10 @@ frontend/src
 - 인증 상태는 서버 응답(`GET /api/auth/me`)으로만 판단한다. localStorage·sessionStorage에 사용자 정보나 토큰을 저장하지 않는다.
 - `RequireAuth`의 상태별 처리:
   - `loading`: 로딩 표시
-  - `anonymous`: `/login?next={현재 경로}`로 이동
+  - `anonymous`: `/login?next={현재 경로}`로 이동 (세션 만료로 판단되면 `&reason=expired` 추가)
   - `authenticated`: 화면 렌더링
+  - `error`: `/me` 확인 중 네트워크·서버 오류. 오류 문구와 "다시 시도" 버튼 표시 (자동 재시도 없음)
+- 로그인 상태에서 브라우저 창이 다시 활성화(`focus`)되면 `/me`로 세션 유효 여부를 다시 확인한다. 장시간 미사용 후 세션 만료를 감지하기 위함이다.
 - `/login`에 이미 로그인한 사용자가 접근하면 `/`로 이동한다.
 - `next` 파라미터는 `/`로 시작하고 `//`로 시작하지 않는 내부 경로만 허용한다. 그 외 값은 `/`로 대체한다(open redirect 방지).
 - 보호 API가 `401`을 반환하면 상태를 `anonymous`로 바꾸고 "세션이 만료되었습니다. 다시 로그인해 주세요." 안내와 함께 로그인 화면으로 이동한다.
@@ -466,6 +469,7 @@ frontend/src
 - 보안 설정을 끄거나 `@WithMockUser`로 우회해 기존 기대값(`404`)을 맞추지 않는다.
 - `DocflowApplicationTests`, `DatabaseConnectionTest`는 변경 없이 통과해야 한다.
 - 테스트 계정은 각 테스트가 직접 생성·정리한다. Seeder에 의존하지 않는다.
+- `spring-security-test`의 `csrf()`는 같은 테스트 컨텍스트에서 공유되는 `CsrfFilter`의 토큰 저장소를 테스트용(세션 기반) 저장소로 교체한다. 따라서 실제 `XSRF-TOKEN` 쿠키 흐름은 별도 클래스(`CsrfCookieFlowIntegrationTest`)에서 `csrf()` 없이 검증하고, 각 테스트 전에 애플리케이션의 실제 쿠키 저장소로 되돌린다. 보안 설정은 변경하지 않는다.
 
 ### 13.3 Frontend 테스트 (Vitest)
 
