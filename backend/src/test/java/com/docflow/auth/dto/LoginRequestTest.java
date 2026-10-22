@@ -13,4 +13,11 @@ class LoginRequestTest {
 		assertThat(request.toString()).doesNotContain("Secret-Password-1").contains("****");
 	}
 
+	@Test
+	void stripsSurroundingWhitespaceFromEmail() {
+		LoginRequest request = new LoginRequest("  Author@DocFlow.Local ", "pw");
+
+		assertThat(request.email()).isEqualTo("Author@DocFlow.Local");
+	}
+
 }

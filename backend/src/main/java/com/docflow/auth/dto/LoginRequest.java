@@ -13,6 +13,13 @@ public record LoginRequest(
 		@NotBlank(message = "비밀번호를 입력해 주세요.")
 		@Size(max = 128, message = "비밀번호는 128자 이하로 입력해 주세요.") String password) {
 
+	/**
+	 * 이메일 앞뒤 공백은 검증 전에 제거한다 (SPEC-AUTH §5.4). 대소문자 정규화는 인증 단계에서 수행한다.
+	 */
+	public LoginRequest {
+		email = (email != null) ? email.strip() : null;
+	}
+
 	@Override
 	public String toString() {
 		return "LoginRequest[email=" + this.email + ", password=****]";
