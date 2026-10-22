@@ -616,14 +616,15 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 
 | 항목 | 클라우드 (Claude Code) | GitHub Actions CI | Windows 로컬 |
 | --- | --- | --- | --- |
-| JDK 25 설치 확인 | 실행 불가 (JDK 21만 존재, JDK 25 다운로드 차단) | 확인 중 | 미검증 |
-| Backend build/test (5건) on JDK 25 | 실행 불가 | 확인 중 | 미검증 |
-| Frontend lint / test / build | 통과 (Java와 무관, Node 22) | 확인 중 | 미검증 |
+| JDK 25 설치 확인 | 실행 불가 (JDK 21만 존재, JDK 25 다운로드 차단) | 통과 (Temurin 25.0.4+1) | 미검증 |
+| Backend build/test (5건) on JDK 25 | 실행 불가 | 통과 (`./gradlew build`, `:test` 성공) | 미검증 |
+| Frontend lint / test / build | 통과 (Java와 무관, Node 22) | 통과 | 미검증 |
 | `docker compose up` (PostgreSQL 16) | 실행 불가 (Docker daemon 없음) | — | 미검증 |
 | `bootRun` 후 health UP | 실행 불가 (JDK 25 없음) | — | 미검증 |
 | 연결 확인 화면 (UP) | 실행 불가 | — | 미검증 |
 
 - 참고: `backend/`에서 `bootRun` 실행 시 루트 `.env`가 자동으로 로딩되는지는 2026-10-22 클라우드에서 **JDK 21**로 확인하였다(`DB_*` 환경변수 없이 health UP). 이 동작은 `application.yml`의 `spring.config.import` 설정에 의한 것이며 Java 버전과 무관하다.
+- GitHub Actions 결과: PR #3 CI run 39744463956 (2026-10-22, 커밋 `1c17257`).
 - Windows 로컬 검증 결과가 확인되면 이 표를 갱신한다.
 
 ## 16. 열린 질문
