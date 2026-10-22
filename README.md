@@ -4,7 +4,7 @@ Document Review Workflow Management System
 
 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 시스템이다. 요구사항과 MVP 범위는 [`spec.md`](./spec.md)를 따른다.
 
-> **현재 단계 (6주차):** 프로젝트 초기화와 개발 환경 구성만 완료되었다. 비즈니스 기능(문서·검토·피드백 등)과 인증은 아직 구현되지 않았다.
+> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)를 구현 중이다([Issue #4](https://github.com/defhoon/Docflow/issues/4), [`specs/00-auth.md`](./specs/00-auth.md)). 문서·검토·피드백 등 비즈니스 기능은 아직 구현되지 않았다.
 
 ## 기술 스택
 
@@ -36,6 +36,8 @@ cp .env.example .env
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT` | docker-compose | PostgreSQL 컨테이너 설정 |
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Backend | JDBC 연결 정보 (`DB_PASSWORD`는 필수, 기본값 없음) |
 | `BACKEND_URL` | Frontend | Next.js rewrite 대상 (기본 `http://localhost:8080`) |
+| `DEV_SEED_PASSWORD` | Backend (`local` 프로파일) | 개발 계정 공통 비밀번호. 비어 있으면 계정을 만들지 않음 |
+| `SESSION_COOKIE_SECURE` | Backend | 세션·CSRF 쿠키 `Secure` 속성 (로컬 `false`, 운영 `true`) |
 
 `.env`는 Git에 포함하지 않는다.
 
@@ -59,9 +61,18 @@ docker compose ps        # STATUS가 healthy인지 확인
 
 ```bash
 cd backend
-./gradlew bootRun        # 루트 .env를 자동으로 읽는다
+./gradlew bootRun --args='--spring.profiles.active=local'   # 루트 .env를 자동으로 읽는다
 curl http://localhost:8080/actuator/health   # {"status":"UP", ...}
 ```
+
+`local` 프로파일로 실행하면 `.env`의 `DEV_SEED_PASSWORD`로 개발 계정을 만든다(이미 있으면 건너뛰고, 기존 비밀번호는 바꾸지 않는다). 프로파일 없이 실행해도 서버는 동작하지만 계정이 생성되지 않는다.
+
+| 개발 계정 | 표시 이름 | 비밀번호 |
+| --- | --- | --- |
+| `author@docflow.local` | Author | `.env`의 `DEV_SEED_PASSWORD` |
+| `reviewer@docflow.local` | Reviewer | `.env`의 `DEV_SEED_PASSWORD` |
+
+Author/Reviewer 구분은 테스트 시나리오용이며 권한 차이는 없다(전역 Role 없음).
 
 ### 4. Frontend 실행
 
@@ -71,7 +82,9 @@ npm install
 npm run dev              # http://localhost:3000
 ```
 
-브라우저에서 `http://localhost:3000`을 열면 Backend·Database 연결 상태(UP / DOWN / 연결 오류)가 표시된다.
+브라우저에서 `http://localhost:3000`을 열면 로그인 화면(`/login`)으로 이동한다. 개발 계정으로 로그인하면 `/`에 사용자 정보, 로그아웃 버튼, Backend·Database 연결 상태(UP / DOWN / 연결 오류)가 표시된다.
+
+브라우저는 `localhost:3000`만 호출한다. `/api/*` 요청은 Next.js rewrite로 Backend에 전달되므로 세션 쿠키(`JSESSIONID`)와 CSRF 쿠키(`XSRF-TOKEN`)는 `localhost:3000`에 저장된다.
 
 ## Windows (PowerShell) 실행 절차
 
@@ -89,7 +102,7 @@ docker version                     # Server 항목이 표시되어야 한다 (Do
 
 # 1) 환경변수 파일 (저장소 루트)
 Copy-Item .env.example .env
-notepad .env                       # POSTGRES_PASSWORD와 DB_PASSWORD를 같은 값으로 수정
+notepad .env                       # POSTGRES_PASSWORD와 DB_PASSWORD를 같은 값으로, DEV_SEED_PASSWORD에 개발 계정 비밀번호 입력
 
 # 2) PostgreSQL
 docker compose up -d
@@ -99,7 +112,8 @@ docker compose ps                  # STATUS: healthy
 cd backend
 .\gradlew.bat -version            # Gradle 9.8.1
 .\gradlew.bat clean build         # 컴파일 + 테스트 (PostgreSQL 실행 필요)
-.\gradlew.bat bootRun
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"   # 개발 계정 생성(local 프로파일)
+# 대안: $env:SPRING_PROFILES_ACTIVE = "local"; .\gradlew.bat bootRun
 # 다른 PowerShell 창에서:
 curl.exe http://localhost:8080/actuator/health    # {"status":"UP",...}
 
