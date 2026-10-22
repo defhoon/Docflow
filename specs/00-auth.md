@@ -1,6 +1,6 @@
 # SPEC-AUTH: 세션 기반 사용자 인증
 
-- 상태: **Draft — 검토 대기** (구현은 이 문서 승인 후 별도 승인으로 시작)
+- 상태: **승인됨 — 구현 중** (2026-10-22 설계 승인, §12 결정 반영)
 - Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
 - 브랜치: `feat/4/auth`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §11, §12, §16 / [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
@@ -74,6 +74,9 @@
 | 로그인 후 화면 | `/`에 사용자 정보, 로그아웃, Backend 연결 상태 표시 |
 | 로그인 실패 제한 | MVP 제외 |
 | 인증 AuditLog | SPEC-13에서 검토 |
+| 미인증 로그아웃 | 세션이 없어도 `204`. CSRF 검증은 유지. 세션이 있으면 무효화 (§12 Q1) |
+| 개발 계정 | `author@docflow.local`, `reviewer@docflow.local`. 비밀번호는 `DEV_SEED_PASSWORD`로 주입 (§12 Q2) |
+| `local` 프로파일 활성화 | 기본: `.\gradlew.bat bootRun --args="--spring.profiles.active=local"`, 대안: `SPRING_PROFILES_ACTIVE` 환경변수 (§12 Q3) |
 
 ## 4. 정상 흐름
 
@@ -145,7 +148,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `GET /api/auth/csrf` | 불필요 | 불필요 | — | `204`, `XSRF-TOKEN` 쿠키 발급·갱신 | — |
 | `POST /api/auth/login` | 불필요 | **필요** | `LoginRequest` | `200 AuthUserResponse`, 새 세션 쿠키 | `400 VALIDATION_FAILED`, `401 AUTH_INVALID_CREDENTIALS`, `403 CSRF_INVALID` |
-| `POST /api/auth/logout` | §12 Q1 | **필요** | — | `204`, 세션·CSRF 쿠키 삭제 | `403 CSRF_INVALID` |
+| `POST /api/auth/logout` | 불필요 (세션이 있으면 무효화) | **필요** | — | `204`, 세션·CSRF 쿠키 삭제. 세션이 없어도 `204` | `403 CSRF_INVALID` |
 | `GET /api/auth/me` | 필요 | 불필요 | — | `200 AuthUserResponse` | `401 AUTH_REQUIRED` |
 
 ### 5.3 요청·응답 본문
@@ -172,6 +175,7 @@ AuthUserResponse (record)
   - 존재하지 않는 이메일에 대해서도 `DaoAuthenticationProvider`의 타이밍 공격 완화 동작(더미 해시 비교)을 유지한다.
 - **로그인 중 재로그인:** 다른 계정으로 다시 로그인하면 세션 ID가 바뀌고 새 사용자로 교체된다.
 - **`/me` 최신성:** DB에서 사용자를 다시 조회한다. 사용자가 없거나 `enabled=false`이면 `401 AUTH_REQUIRED`로 응답하고 세션을 무효화한다.
+- **MVP 한계 — 다른 보호 API의 비활성 계정 재검증 없음:** `/me` 이외의 보호 API는 세션의 인증 정보만 확인하고, 요청마다 DB에서 계정 활성 여부를 다시 확인하지 않는다. 로그인 중 비활성화된 계정은 `/me`를 호출하거나 세션이 만료될 때까지 다른 보호 API를 호출할 수 있다(§16 R6).
 - **`GET /api/auth/csrf`:** 요청에서 `CsrfToken`을 실제로 읽어 지연 로딩된 토큰을 쿠키로 기록하게 한다. 응답 본문은 없다.
 
 ## 6. 보안 정책
@@ -180,6 +184,7 @@ AuthUserResponse (record)
 
 | 항목 | 설정 |
 | --- | --- |
+| 기준 버전 | Spring Boot 4.1.1이 관리하는 **Spring Security 7.1.1**의 실제 API (예: `DaoAuthenticationProvider(UserDetailsService)` 생성자, `csrf.spa()`) |
 | 인증 방식 | 커스텀 JSON 로그인 Controller + `AuthenticationManager` |
 | 비활성화 | `formLogin`, `httpBasic`, 기본 로그인 페이지, Spring 기본 생성 사용자 |
 | 비밀번호 해시 | `PasswordEncoderFactories.createDelegatingPasswordEncoder()` (기본 bcrypt, `{bcrypt}` 접두어) |
@@ -196,7 +201,7 @@ AuthUserResponse (record)
 | `GET /actuator/health`, `GET /actuator/health/**` | `permitAll` |
 | `GET /api/auth/csrf` | `permitAll` |
 | `POST /api/auth/login` | `permitAll` (CSRF 검증은 적용) |
-| `POST /api/auth/logout` | §12 Q1 결정에 따름 |
+| `POST /api/auth/logout` | `permitAll` (CSRF 검증은 적용. Logout 필터가 인가 전에 처리) |
 | `/api/**` | `authenticated` |
 | 그 외 모든 경로 (`/actuator/**` 나머지 포함) | `denyAll` |
 
@@ -228,7 +233,8 @@ Spring Security 7의 `http.csrf(csrf -> csrf.spa())`를 사용한다. Spring Boo
 | 토큰 해석 | 헤더로 보낸 값은 쿠키 원본 값 그대로 비교(`SpaCsrfTokenRequestHandler`) |
 | 검증 대상 | `GET`, `HEAD`, `TRACE`, `OPTIONS`를 제외한 모든 요청. **login, logout 포함** |
 | 토큰 발급 | 토큰은 지연 로딩되므로, 쿠키는 토큰을 실제로 읽는 요청에서만 기록됨 → `GET /api/auth/csrf`가 발급을 담당 |
-| 로그인 후 | `CsrfAuthenticationStrategy`가 기존 토큰을 삭제(쿠키 Max-Age=0) → Frontend가 `GET /api/auth/csrf` 재호출 |
+| 로그인 후 | `CsrfAuthenticationStrategy`가 기존 토큰을 삭제(쿠키 Max-Age=0) → Frontend가 `GET /api/auth/csrf` 재호출해 새 토큰을 받음 |
+| 토큰 검증 방식 | 쿠키 저장소는 서버에 토큰을 보관하지 않고 "쿠키 값 = 헤더 값"을 비교(double-submit)한다. 따라서 "토큰 교체"는 브라우저의 기존 쿠키를 삭제하고 새 값을 발급하는 것을 의미하며, 서버가 이전 값을 별도로 블랙리스트 처리하지는 않는다 |
 | 로그아웃 후 | `CsrfLogoutHandler`가 토큰 삭제 → Frontend가 `GET /api/auth/csrf` 재호출 |
 | CSRF 쿠키 속성 | `Path=/`, `SameSite=Lax`, `Secure`는 세션 쿠키와 같은 설정을 따름 |
 | CORS | 설정하지 않음 (Next.js rewrite로 동일 출처) |
@@ -282,8 +288,18 @@ CREATE UNIQUE INDEX uk_users_email ON users (lower(email));
 - 비밀번호는 환경변수 `DEV_SEED_PASSWORD`에서만 읽는다. `.env.example`에는 키 이름과 안내만 두고 값은 비워 둔다.
 - `DEV_SEED_PASSWORD`가 비어 있으면 계정을 만들지 않고 경고 로그만 남긴다. 애플리케이션 기동은 계속한다.
 - 이미 같은 이메일의 계정이 있으면 건너뛴다. 기존 계정의 비밀번호는 바꾸지 않는다.
-- 생성할 계정 목록(이메일, 표시 이름)과 개수는 §12 Q2에서 확정한다.
-- `local` 프로파일 활성화 방법(예: `--spring.profiles.active=local`, `SPRING_PROFILES_ACTIVE`)은 구현 시 Windows에서 동작을 확인한 뒤 README에 기록한다.
+- 생성 계정 (§12 Q2):
+
+  | 이메일 | 표시 이름 |
+  | --- | --- |
+  | `author@docflow.local` | Author |
+  | `reviewer@docflow.local` | Reviewer |
+
+  두 계정의 구분은 테스트 시나리오용이며 전역 Role이 아니다. 권한 차이는 없다.
+- 비밀번호와 비밀번호 해시는 로그에 출력하지 않는다. 로그에는 생성·건너뜀 여부와 이메일만 남긴다.
+- `local` 프로파일 활성화 (§12 Q3):
+  - 기본: `.\gradlew.bat bootRun --args="--spring.profiles.active=local"` (macOS/Linux: `./gradlew bootRun --args='--spring.profiles.active=local'`)
+  - 대안: PowerShell `$env:SPRING_PROFILES_ACTIVE = "local"` 후 `.\gradlew.bat bootRun`
 
 ## 9. Frontend
 
@@ -328,11 +344,15 @@ frontend/src
 
 ### 9.4 CSRF 오류 복구와 재시도 제한
 
-- `api-client`가 `403`이면서 `code=CSRF_INVALID`인 응답을 받은 경우의 처리:
+- 자동 재시도는 **서버가 `403`과 `code=CSRF_INVALID`로 명확히 거부한 요청에만** 적용한다.
   1. `GET /api/auth/csrf`로 토큰을 갱신한다.
-  2. 원래 요청을 **딱 1회** 재시도한다.
+  2. 원래 요청을 **최대 1회** 재시도한다.
 - 재시도해도 `CSRF_INVALID`이면 더 이상 재시도하지 않고 오류를 표시한다.
-- `403 ACCESS_DENIED`(권한 오류)는 재시도하지 않는다.
+- 다음은 **자동 재시도하지 않는다.**
+  - `CSRF_INVALID`가 아닌 `403` (`ACCESS_DENIED` 등)
+  - 네트워크 오류 (요청이 서버에 도달했는지 알 수 없어 중복 실행 위험이 있음)
+  - `5xx` 응답
+  - 그 밖의 모든 `4xx`
 - 재시도가 안전한 이유: CSRF 검증은 Controller 실행 전 필터에서 거부되므로, 거부된 요청은 서버 상태를 바꾸지 않는다.
 - 동시에 여러 요청이 CSRF 오류를 받으면 토큰 갱신 요청은 하나만 보내고 결과를 공유한다.
 
@@ -350,6 +370,8 @@ frontend/src
 | 세션 없이 `/api/auth/me` 또는 보호 API | `401 AUTH_REQUIRED` (리다이렉트 아님) | `/login?next=...` |
 | 30분 미사용 후 요청 | `401 AUTH_REQUIRED` | 세션 만료 안내 후 로그인 화면 |
 | 로그아웃 후 이전 세션 쿠키로 요청 | `401 AUTH_REQUIRED` | 로그인 화면 |
+| 세션 없이 로그아웃 (CSRF 정상) | `204` | 로그인 화면 |
+| 세션 없이 로그아웃 (CSRF 없음) | `403 CSRF_INVALID` | 토큰 갱신 후 1회 재시도 |
 | 로그인 중 계정 비활성화 | 보호 API는 세션 만료까지 허용, `/me`는 `401` (§5.4) | 로그인 화면 |
 | 서버 재시작 | 메모리 세션 소멸 → `401` | 로그인 화면 |
 | 익명 사용자가 `/actuator/env` | `401` (SecurityFilterChain) | — |
@@ -366,9 +388,9 @@ frontend/src
 - **AC-AUTH-03** 존재하지 않는 이메일, 잘못된 비밀번호, 비활성 계정의 로그인은 모두 같은 `401` 응답 본문을 반환하고 세션에 인증 정보가 저장되지 않는다.
 - **AC-AUTH-04** 이메일 형식 오류, 빈 비밀번호, 길이 초과는 `400 VALIDATION_FAILED`를 반환하며, 응답에 입력한 비밀번호가 포함되지 않는다.
 - **AC-AUTH-05** CSRF 토큰 없이 또는 잘못된 토큰으로 `POST /api/auth/login`, `POST /api/auth/logout`을 호출하면 `403 CSRF_INVALID`를 반환한다.
-- **AC-AUTH-06** `GET /api/auth/csrf`는 인증 없이 `XSRF-TOKEN` 쿠키를 발급한다. 로그인 후 이전 CSRF 토큰으로 보낸 변경 요청은 거부된다.
+- **AC-AUTH-06** `GET /api/auth/csrf`는 인증 없이 `XSRF-TOKEN` 쿠키를 발급한다. 로그인·로그아웃 응답은 `XSRF-TOKEN` 쿠키를 삭제(`Max-Age=0`)하며, 이후 `GET /api/auth/csrf`가 이전과 다른 새 토큰을 발급한다.
 - **AC-AUTH-07** 세션 없이 `GET /api/auth/me` 또는 인증이 필요한 `/api/**`를 호출하면 리다이렉트가 아닌 `401 AUTH_REQUIRED` JSON을 반환한다.
-- **AC-AUTH-08** 로그아웃 후 같은 세션 쿠키로 `GET /api/auth/me`를 호출하면 `401`을 반환한다.
+- **AC-AUTH-08** 로그아웃 후 같은 세션 쿠키로 `GET /api/auth/me`를 호출하면 `401`을 반환한다. 세션 없이 유효한 CSRF 토큰으로 로그아웃하면 `204`를 반환한다.
 - **AC-AUTH-09** 무효화되었거나 만료된 세션으로 요청하면 `401`을 반환한다.
 - **AC-AUTH-10** 어떤 응답에도 `passwordHash` 또는 비밀번호 원문이 포함되지 않는다.
 - **AC-AUTH-11** `users` 테이블이 Flyway V2로 생성되고, `ddl-auto=validate` 상태에서 애플리케이션이 기동한다. 대소문자만 다른 이메일은 DB에서 중복 저장이 거부된다.
@@ -377,10 +399,13 @@ frontend/src
 - **AC-AUTH-14** `DevUserSeeder`는 `local` 프로파일에서만 등록되며, 테스트(기본 프로파일)에서는 Bean이 존재하지 않는다.
 - **AC-AUTH-15** 로그인 요청 처리 중 비밀번호 원문이 애플리케이션 로그에 출력되지 않는다.
 
+- **AC-AUTH-23** `local` 프로파일에서 `DEV_SEED_PASSWORD`가 설정되면 Seeder가 `author@docflow.local`, `reviewer@docflow.local`을 생성한다. 다시 실행해도 중복 생성하지 않고 기존 비밀번호를 바꾸지 않으며, 비밀번호와 해시를 로그에 출력하지 않는다.
+- **AC-AUTH-24** `/me` 호출 시 계정이 비활성화되어 있으면 `401`을 반환하고 세션을 무효화한다.
+
 ### Frontend
 
 - **AC-AUTH-16** 로그인 화면은 제출 중, 입력 오류, 인증 실패, 네트워크·서버 오류, 성공 상태를 구분해 표시한다.
-- **AC-AUTH-17** 변경 요청(`POST` 등)에는 `X-XSRF-TOKEN` 헤더가 포함되고, `CSRF_INVALID` 응답 시 토큰 갱신 후 1회만 재시도한다.
+- **AC-AUTH-17** 변경 요청(`POST` 등)에는 `X-XSRF-TOKEN` 헤더가 포함되고, `403 CSRF_INVALID` 응답 시에만 토큰 갱신 후 최대 1회 재시도한다. 그 밖의 `403`, 네트워크 오류, `5xx`는 자동 재시도하지 않는다.
 - **AC-AUTH-18** 미인증 사용자가 `/`에 접근하면 `/login?next=/`로 이동하고, 로그인 후 원래 경로로 돌아간다. 외부 URL `next`는 무시된다.
 - **AC-AUTH-19** 로그인 후 `/`에 사용자 표시 이름·이메일, 로그아웃 버튼, Backend 연결 상태가 표시된다.
 - **AC-AUTH-20** 로그아웃하면 `/login`으로 이동하고, 이후 `/` 접근 시 다시 로그인 화면으로 이동한다.
@@ -390,14 +415,15 @@ frontend/src
 
 - **AC-AUTH-22** 브라우저가 `http://localhost:3000`만 사용하는 상태에서 `JSESSIONID`와 `XSRF-TOKEN` 쿠키가 `localhost:3000`에 저장되고, 로그인 → 새로고침 → `/me` 유지 → 로그아웃이 동작한다.
 
-## 12. 결정이 필요한 사항 (미결정)
+## 12. 결정 사항 (2026-10-22 확정)
 
-| ID | 질문 | 선택지 | 권장 |
-| --- | --- | --- | --- |
-| Q1 | 세션 없이 `POST /api/auth/logout`을 호출하면? | (a) `204` 응답 (멱등) / (b) `401 AUTH_REQUIRED` | (a). Spring Security Logout 필터의 기본 동작과 같고, 세션이 이미 만료된 사용자의 로그아웃 버튼도 오류 없이 처리됨. CSRF 검증은 두 경우 모두 적용 |
-| Q2 | 개발 Seeder 계정 구성 | 계정 수, 이메일, 표시 이름 | 2개: `author@docflow.local`(Author), `reviewer@docflow.local`(Reviewer). 이메일·이름은 코드에, 공통 비밀번호는 `DEV_SEED_PASSWORD`. 이름은 표시용일 뿐 Role이 아님 |
+| ID | 질문 | 결정 |
+| --- | --- | --- |
+| Q1 | 세션 없이 `POST /api/auth/logout`을 호출하면? | `204`. 미인증 사용자도 접근 가능(`permitAll`), CSRF 검증 유지, 세션이 있으면 무효화 |
+| Q2 | 개발 Seeder 계정 구성 | `author@docflow.local`, `reviewer@docflow.local`. 비밀번호는 `DEV_SEED_PASSWORD`. 전역 Role 없음 |
+| Q3 | `local` 프로파일 활성화 | 기본 `--args="--spring.profiles.active=local"`, 대안 `SPRING_PROFILES_ACTIVE` |
 
-위 두 항목은 결정 전까지 구현하지 않는다. 그 외 정책은 §3에서 확정되었다.
+현재 미결정 사항은 없다. 구현 중 범위 변경이나 중요한 설계 문제가 생기면 사용자에게 보고한 뒤 이 문서를 먼저 갱신한다.
 
 ## 13. 테스트 계획
 
@@ -419,14 +445,18 @@ frontend/src
 | 없는 이메일·비밀번호 불일치·비활성 계정 → 같은 401 본문, 세션 인증 정보 없음 | 03 |
 | 입력 검증 400, 응답에 비밀번호 미포함 | 04, 10 |
 | CSRF 없음·불일치 → 403 `CSRF_INVALID` (login, logout) | 05 |
-| `/csrf` 쿠키 발급, 로그인 후 이전 토큰 거부 | 06 |
+| `/csrf` 쿠키 발급, 로그인·로그아웃 응답의 `XSRF-TOKEN` 삭제(`Max-Age=0`), 재발급 토큰이 이전과 다름 | 06 |
+| 쿠키 → `X-XSRF-TOKEN` 헤더 흐름으로 실제 로그인 (테스트 지원 기능 `csrf()` 없이) | 05, 06 |
 | 세션 없이 `/me`·보호 API → 401 JSON, 302 아님 | 07 |
-| 로그아웃 후 `/me` 401 | 08 |
+| 로그아웃 후 `/me` 401, 세션 없이 로그아웃 204, CSRF 없는 로그아웃 403 | 08, 05 |
+| 로그인 후 세션에 `SPRING_SECURITY_CONTEXT`가 저장됨 (SecurityContext 명시적 저장) | 01 |
+| `/me` 비활성 계정 → 401, 세션 무효화 | 24 |
 | 무효화된 세션 → 401 | 09 |
 | Flyway V2 적용, 이메일 대소문자 중복 거부 | 11 |
 | `/actuator/health` 익명 200 | 12 |
 | Actuator 노출 구성 = `health`만 (노출 여부), `/actuator/env` 익명 401·인증 403 (Security 처리) | 13 |
 | 기본 프로파일에 `DevUserSeeder` Bean 없음 | 14 |
+| `local` 프로파일 Seeder: 2개 계정 생성, 재실행 시 중복·비밀번호 변경 없음, 로그에 비밀번호 없음 | 23 |
 | 로그인 시 로그 출력에 비밀번호 원문 없음 (`OutputCaptureExtension`) | 15 |
 
 **기존 테스트 조정 원칙**
@@ -440,7 +470,7 @@ frontend/src
 ### 13.3 Frontend 테스트 (Vitest)
 
 - `LoginForm`: 제출 중, 400, 401, 네트워크 오류, 성공 이동
-- `api-client`: CSRF 헤더 부착, `ErrorResponse` 파싱, `CSRF_INVALID` 1회 재시도·두 번째 실패 시 중단, `ACCESS_DENIED` 재시도 안 함
+- `api-client`: CSRF 헤더 부착, `ErrorResponse` 파싱, `CSRF_INVALID` 1회 재시도·두 번째 실패 시 중단, `ACCESS_DENIED`·네트워크 오류·`5xx` 재시도 안 함
 - `RequireAuth`: loading / anonymous 이동 / authenticated
 - `next` 파라미터 검증 (내부 경로만 허용)
 - 기존 `BackendHealthStatus` 테스트 5건 유지
@@ -470,7 +500,7 @@ frontend/src
 
 ## 14. 완료 기준
 
-- AC-AUTH-01 ~ 22 충족
+- AC-AUTH-01 ~ 24 충족
 - 기존·신규 테스트가 보안 설정을 끄지 않은 상태에서 통과 (CI Backend·Frontend job success)
 - Windows 로컬 수동 검증(§13.4) 통과 — 사용자 보고
 - 문서 갱신: README(계정 준비, local 프로파일 실행 방법), `.env.example`(`DEV_SEED_PASSWORD`, `SESSION_COOKIE_SECURE` 키)
@@ -494,6 +524,6 @@ frontend/src
 | R3 | 로컬 http에서 `Secure` 쿠키 미저장 | `SESSION_COOKIE_SECURE` 환경변수로 분리, 운영 `true` |
 | R4 | 메모리 세션: 재시작 시 전원 로그아웃 | MVP 수용, 문서 명시 |
 | R5 | 무차별 로그인 시도 제한 없음 | MVP 제외, 후속 과제 |
-| R6 | 비활성화된 계정의 기존 세션이 보호 API에서 만료 전까지 유효 | `/me`에서 재확인(§5.4). 보호 API 전체 재확인은 범위 밖 |
+| R6 | 비활성화된 계정의 기존 세션이 `/me` 이외의 보호 API에서 만료 전까지 유효 (**MVP 한계**) | `/me`에서 재확인하고 세션 무효화(§5.4). 보호 API 전체 재확인은 후속 과제 |
 | R7 | 클라우드에 JDK 25가 없어 Backend 테스트를 직접 실행할 수 없음 | CI와 Windows 로컬로 검증하고 검증 주체를 구분해 보고 |
 | R8 | Security 도입으로 기존 테스트 기대값이 바뀜 | §13.2 원칙대로 조정. 보안 설정을 끄지 않음 |
