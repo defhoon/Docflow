@@ -614,18 +614,29 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 
 §15.1은 Java 21 기준 결과이며 그대로 보존한다. 아래는 Java 25 전환(ADR-0004) 이후 결과이다. 실제로 실행하지 않은 항목은 "미검증"으로 표시한다.
 
-| 항목 | 클라우드 (Claude Code) | GitHub Actions CI | Windows 로컬 |
-| --- | --- | --- | --- |
-| JDK 25 설치 확인 | 실행 불가 (JDK 21만 존재, JDK 25 다운로드 차단) | 통과 (Temurin 25.0.4+1) | 미검증 |
-| Backend build/test (5건) on JDK 25 | 실행 불가 | 통과 (`./gradlew build`, `:test` 성공) | 미검증 |
-| Frontend lint / test / build | 통과 (Java와 무관, Node 22) | 통과 | 미검증 |
-| `docker compose up` (PostgreSQL 16) | 실행 불가 (Docker daemon 없음) | — | 미검증 |
-| `bootRun` 후 health UP | 실행 불가 (JDK 25 없음) | — | 미검증 |
-| 연결 확인 화면 (UP) | 실행 불가 | — | 미검증 |
+검증 주체를 구분한다.
 
-- 참고: `backend/`에서 `bootRun` 실행 시 루트 `.env`가 자동으로 로딩되는지는 2026-10-22 클라우드에서 **JDK 21**로 확인하였다(`DB_*` 환경변수 없이 health UP). 이 동작은 `application.yml`의 `spring.config.import` 설정에 의한 것이며 Java 버전과 무관하다.
+- **클라우드**와 **GitHub Actions CI** 열: Claude Code가 직접 실행했거나 CI 로그로 확인한 결과
+- **Windows 로컬** 열: **사용자가 직접 실행하고 보고한 결과**. Claude Code는 Windows 환경에서 실행하지 않았다.
+
+| 항목 | 클라우드 (Claude Code) | GitHub Actions CI | Windows 로컬 (사용자 실행·보고) |
+| --- | --- | --- | --- |
+| JDK 25 확인 | 실행 불가 (JDK 21만 존재, JDK 25 다운로드 차단) | 통과 (Temurin 25.0.4+1) | 통과 (Oracle JDK 25.0.5.0.2, `java -version`) |
+| Gradle 9.8.1 / Launcher·Daemon JVM | — | 통과 (Gradle 9.8.1) | 통과 (`gradlew.bat --version`, Launcher·Daemon 모두 Java 25) |
+| Backend build/test (5건) on JDK 25 | 실행 불가 | 통과 (`./gradlew build`, `:test` 성공) | 통과 (`gradlew.bat clean build` BUILD SUCCESSFUL) |
+| `docker compose config --quiet` | 형식 검증만 통과 (6주차) | — | 통과 |
+| `docker compose up -d` / `ps` (PostgreSQL 16) | 실행 불가 (Docker daemon 없음) | — | 통과 (컨테이너 `healthy`) |
+| `bootRun` 후 `/actuator/health` | 실행 불가 (JDK 25 없음) | — | 통과 (`{"groups":["liveness","readiness"],"status":"UP"}`) |
+| Frontend `npm ci` / lint / test / build | 통과 (Java와 무관, Node 22) | 통과 | 통과 (Vitest 5건 통과, 프로덕션 빌드 성공) |
+| 연결 확인 화면: 정상 연결 (UP) | 실행 불가 | — | 통과 ("Backend 정상 (UP)" 표시) |
+| 연결 확인 화면: PostgreSQL 중지 → 재시작 | 실행 불가 | — | 통과 (DOWN 표시 → UP 복구) |
+| 연결 확인 화면: Backend 종료 → 재시작 | 실행 불가 | — | 통과 (연결 오류 표시 → UP 복구) |
+
+- Windows 로컬 환경(사용자 보고): Windows 11, Oracle JDK 25.0.5.0.2, Gradle 9.8.1, PostgreSQL 16(Docker Compose), Node.js 22.
+- JDK 배포판이 다르다. CI는 Eclipse Temurin, Windows 로컬은 Oracle JDK이다. 두 환경 모두 Java 25에서 Backend 빌드·테스트가 통과하였다.
+- `backend/`에서 `bootRun` 실행 시 루트 `.env` 자동 로딩은 2026-10-22 클라우드에서 **JDK 21**로 확인하였다(`DB_*` 환경변수 없이 health UP). 이 동작은 `application.yml`의 `spring.config.import` 설정에 의한 것이며 Java 버전과 무관하다. Windows 로컬 보고에는 `.env` 로딩 방식에 대한 별도 확인 내용이 없다.
 - GitHub Actions 결과: PR #3 CI run 39744463956 (2026-10-22, 커밋 `1c17257`).
-- Windows 로컬 검증 결과가 확인되면 이 표를 갱신한다.
+- Java 25 전환에 대해 클라우드에서 직접 실행하지 못한 Backend 항목은 CI와 사용자의 Windows 로컬 검증으로 확인되었다.
 
 ## 16. 열린 질문
 

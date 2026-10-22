@@ -63,3 +63,8 @@ JDK를 준비하는 방식도 함께 검토하였다.
 | Claude Code 클라우드 | JDK 25가 없어 Backend 실행 불가. diff 범위 검토와 Frontend 검증만 수행 |
 
 결과는 `spec.md` §15.2에 기록한다.
+
+**결과 요약 (2026-10-22):**
+
+- GitHub Actions: Temurin 25.0.4+1에서 Backend·Frontend job 통과 (Claude Code가 CI 로그로 확인)
+- Windows 11 로컬: Oracle JDK 25.0.5.0.2에서 build/test, `bootRun`, Docker Compose, 화면 상태 전환까지 모두 통과 (**사용자가 직접 실행·보고**)
