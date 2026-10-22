@@ -30,3 +30,15 @@ management:
       # 전체 상태(UP/DOWN)만 응답하고 구성 요소·DB 정보 등 상세 내용은 숨긴다.
       show-components: never
       show-details: never
+
+server:
+  servlet:
+    session:
+      # 서버 메모리 세션, 마지막 요청 후 30분 미사용 시 만료 (SPEC-AUTH §6.3)
+      timeout: 30m
+      tracking-modes: cookie
+      cookie:
+        http-only: true
+        same-site: lax
+        # 로컬(http://localhost)은 false, 운영(HTTPS)은 true로 설정한다.
+        secure: ${SESSION_COOKIE_SECURE:false}
