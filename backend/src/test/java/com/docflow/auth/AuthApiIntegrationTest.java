@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +26,6 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.docflow.auth.security.AuthenticatedUser;
@@ -37,6 +35,7 @@ import com.docflow.user.service.UserAccountService;
 
 /**
  * SPEC-AUTH Backend Acceptance Criteria 통합 테스트 (실제 PostgreSQL, 보안 설정 활성 상태).
+ * 실제 XSRF-TOKEN 쿠키 흐름은 {@link CsrfCookieFlowIntegrationTest}에서 검증한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -187,45 +186,6 @@ class AuthApiIntegrationTest {
 			.andExpect(jsonPath("$.code").value("CSRF_INVALID"));
 	}
 
-	// AC-AUTH-05, 06: 실제 SPA 흐름(XSRF-TOKEN 쿠키 → X-XSRF-TOKEN 헤더)과 토큰 교체
-	@Test
-	void spaCsrfFlowWithCookieAndHeader() throws Exception {
-		Cookie initialToken = fetchCsrfCookie(null);
-
-		MvcResult loginResult = this.mockMvc
-			.perform(post("/api/auth/login").cookie(initialToken)
-				.header("X-XSRF-TOKEN", initialToken.getValue())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(json(EMAIL, PASSWORD)))
-			.andExpect(status().isOk())
-			.andExpect(cookie().maxAge("XSRF-TOKEN", 0))
-			.andReturn();
-		MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
-		assertThat(session).isNotNull();
-
-		Cookie rotatedToken = fetchCsrfCookie(session);
-		assertThat(rotatedToken.getValue()).isNotEqualTo(initialToken.getValue());
-
-		this.mockMvc.perform(get("/api/auth/me").session(session)).andExpect(status().isOk());
-
-		this.mockMvc
-			.perform(post("/api/auth/logout").session(session)
-				.cookie(rotatedToken)
-				.header("X-XSRF-TOKEN", rotatedToken.getValue()))
-			.andExpect(status().isNoContent())
-			.andExpect(cookie().maxAge("XSRF-TOKEN", 0));
-	}
-
-	// AC-AUTH-06: CSRF 토큰 발급은 인증 없이 가능
-	@Test
-	void csrfEndpointIssuesTokenCookieWithoutAuthentication() throws Exception {
-		this.mockMvc.perform(get("/api/auth/csrf"))
-			.andExpect(status().isNoContent())
-			.andExpect(cookie().exists("XSRF-TOKEN"))
-			.andExpect(cookie().httpOnly("XSRF-TOKEN", false))
-			.andExpect(cookie().path("XSRF-TOKEN", "/"));
-	}
-
 	// AC-AUTH-07: 미인증 요청은 리다이렉트가 아닌 401 JSON
 	@Test
 	void unauthenticatedRequestsReceiveUnauthorizedJson() throws Exception {
@@ -307,20 +267,6 @@ class AuthApiIntegrationTest {
 			.with(csrf())
 			.contentType(MediaType.APPLICATION_JSON)
 			.content(json(email, password)));
-	}
-
-	private Cookie fetchCsrfCookie(MockHttpSession session) throws Exception {
-		var request = get("/api/auth/csrf");
-		if (session != null) {
-			request.session(session);
-		}
-		Cookie token = this.mockMvc.perform(request)
-			.andExpect(status().isNoContent())
-			.andReturn()
-			.getResponse()
-			.getCookie("XSRF-TOKEN");
-		assertThat(token).isNotNull();
-		return token;
 	}
 
 	private static String json(String email, String password) {
