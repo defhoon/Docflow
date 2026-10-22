@@ -1,0 +1,76 @@
+package com.docflow.global.error;
+
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+/**
+ * Controller 처리 중 발생한 예외를 {@link ErrorResponse}로 변환한다.
+ * 응답과 로그에 요청 본문이나 입력값을 포함하지 않는다.
+ */
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+	@ExceptionHandler(BusinessException.class)
+	ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex) {
+		return toResponse(ex.errorCode());
+	}
+
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+		List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult()
+			.getFieldErrors()
+			.stream()
+			.map((error) -> new ErrorResponse.FieldError(error.getField(), error.getDefaultMessage()))
+			.toList();
+		return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
+			.body(ErrorResponse.of(ErrorCode.VALIDATION_FAILED, fieldErrors));
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException ex) {
+		return toResponse(ErrorCode.VALIDATION_FAILED);
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException ex) {
+		return toResponse(ErrorCode.NOT_FOUND);
+	}
+
+	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+	ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+		return toResponse(ErrorCode.METHOD_NOT_ALLOWED);
+	}
+
+	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+	ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+		return toResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+	}
+
+	@ExceptionHandler(Exception.class)
+	ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
+		// Spring MVC가 4xx로 분류한 기타 요청 오류는 서버 오류로 기록하지 않는다.
+		if (ex instanceof org.springframework.web.ErrorResponse errorResponse
+				&& errorResponse.getStatusCode().is4xxClientError()) {
+			return ResponseEntity.status(errorResponse.getStatusCode()).body(ErrorResponse.of(ErrorCode.BAD_REQUEST));
+		}
+		log.error("Unhandled exception: {}", ex.getClass().getName(), ex);
+		return toResponse(ErrorCode.INTERNAL_ERROR);
+	}
+
+	private static ResponseEntity<ErrorResponse> toResponse(ErrorCode errorCode) {
+		return ResponseEntity.status(errorCode.status()).body(ErrorResponse.of(errorCode));
+	}
+
+}
