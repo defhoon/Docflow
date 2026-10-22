@@ -34,15 +34,17 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 
 ## 4. 개발 작업 절차
 
-1. **명세 확인:** `spec.md` 및 관련 `specs/*.md` 읽기
-2. **현황 파악:** 관련 코드, 의존성, 설정, 테스트 확인
-3. **질문 정리:** Open Questions와 모호한 정책 식별
-4. **계획 제안:** 구현 범위, 접근 방식, 대안, 변경 예정 파일, 검증 방법 제시
-5. **승인 대기:** 사용자가 승인하기 전에는 파일을 변경하지 않음
-6. **구현:** 승인된 범위만 작업
-7. **검증:** 관련 빌드·테스트·수동 확인 수행
-8. **결과 보고:** 변경 파일, 실행 명령어, 실제 결과, 실패·미해결 사항 정리
-9. **문서 갱신 제안:** 실제 구현과 SPEC 사이의 차이 또는 새로 결정된 사항을 보고
+1. **Issue 확인:** 작업에 해당하는 GitHub Issue를 확인하거나, 사용자 승인 후 생성한다.
+2. **브랜치 생성:** 최신 `origin/main`에서 §9 규칙에 따라 브랜치를 생성한다.
+3. **명세 확인:** `spec.md` 및 관련 `specs/*.md` 읽기
+4. **현황 파악:** 관련 코드, 의존성, 설정, 테스트 확인
+5. **질문 정리:** Open Questions와 모호한 정책 식별
+6. **계획 제안:** 구현 범위, 접근 방식, 대안, 변경 예정 파일, 검증 방법 제시
+7. **승인 대기:** 사용자가 승인하기 전에는 파일을 변경하지 않음
+8. **구현:** 승인된 범위만 작업하고 §9 규칙에 따라 커밋
+9. **검증:** 관련 빌드·테스트·수동 확인 수행
+10. **결과 보고:** 변경 파일, 실행 명령어, 실제 결과, 실패·미해결 사항 정리
+11. **문서 갱신 제안:** 실제 구현과 SPEC 사이의 차이 또는 새로 결정된 사항을 보고
 
 ## 5. 기술 스택
 
@@ -56,29 +58,31 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 - 패키지 구조는 `spec.md` §11.3과 [`docs/adr/0002-package-structure.md`](./docs/adr/0002-package-structure.md)를 따른다.
 - 실행·검증 명령어는 `spec.md` §15와 `README.md`를 따른다.
 - 버전 변경이나 새 의존성 추가는 이유와 대안을 제안하고 사용자 승인 후 ADR에 기록한다.
-- 인증(Session), 파일 저장소(로컬 파일시스템), Entity ID(BIGINT IDENTITY)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
+- 인증(Spring Security 세션)과 Entity ID(BIGINT IDENTITY)는 SPEC-AUTH에서 확정되었다([ADR-0005](./docs/adr/0005-session-authentication.md)).
+- 파일 저장소(로컬 파일시스템)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
 
-## 6. 현재 개발 단계 — 6주차
+## 6. 현재 개발 단계 — 7주차 (SPEC-AUTH)
 
-현재 목표는 **AI Agent 활용 개발환경 구축 및 `spec.md` 기반 프로젝트 기본 아키텍처 생성**이다.
+6주차(프로젝트 초기화, 개발환경 구축)와 Java 25 전환(ADR-0004)은 완료되었다.
 
-### 이번 단계의 작업 범위
+현재 목표는 **SPEC-AUTH: 세션 기반 사용자 인증**이다.
 
-- Frontend / Backend / Database 기본 구조 제안 및 설계 검토
-- Claude Code 웹과 GitHub 저장소를 이용한 개발 흐름 구축
-- 승인된 설계에 따른 프로젝트 초기화
-- 기본 빌드, 실행 및 PostgreSQL 연결 검증
-- README 및 아키텍처 결정 기록 작성
-- 검증 결과를 바탕으로 `spec.md` Draft v0.2 수정 사항 제안
+- Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
+- 브랜치: `feat/4/auth`
+- SPEC: [`specs/00-auth.md`](./specs/00-auth.md), 결정 기록: [ADR-0005](./docs/adr/0005-session-authentication.md)
+
+### 진행 단계
+
+1. Git 컨벤션 적용과 SPEC-AUTH 상세 설계 문서 작성 (완료)
+2. 설계 검토·승인 후 기능 구현: Spring Security, Flyway V2 `users`, 인증 API, 개발 계정 Seeder, Frontend 로그인 (완료)
+3. CI 및 Windows 로컬 검증 후 PR (`Closes #4`) (현재 단계 — 사용자 검토·병합 대기)
 
 ### 이번 단계에서 구현하지 않을 것
 
-- 문서 등록, 검토 요청, 피드백 관리 등 전체 비즈니스 기능
-- AI Version Summary, RAG, AI Review Agent
-- 실시간 공동 편집, Office 문서 자체 편집, 자동 문서 병합
-- 근거 없이 추가하는 Redis, Kafka, Microservices 등
-
-**첫 번째 요청에서는 아키텍처 제안만 수행하고 파일을 생성하거나 수정하지 않는다.** 이후 사용자의 명시적 승인에 따라 초기 프로젝트를 생성한다.
+- 회원가입, 비밀번호 변경·재설정, 소셜 로그인, JWT, Remember-me
+- 로그인 실패 제한·계정 잠금, 전역 Role, 로그인 AuditLog
+- 프로젝트 생성(SPEC-01) 등 다른 기능 SPEC
+- AI 기능, 실시간 공동 편집, 근거 없이 추가하는 Redis, Kafka, Microservices 등
 
 ## 7. 검증 및 완료 보고 원칙
 
@@ -95,3 +99,49 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 - 중요한 기술적 결정에는 **선택 이유와 고려한 대안**을 함께 설명한다.
 - 프로젝트에 존재하지 않는 파일, 명령어, 테스트 결과를 존재하는 것처럼 설명하지 않는다.
 - 불확실한 내용은 추측으로 확정하지 않고 **미결정 사항**으로 표시한다.
+
+## 9. Git 컨벤션
+
+SPEC-AUTH(Issue #4)부터 적용한다. 그 이전 브랜치·커밋 기록은 변경하지 않는다.
+
+모든 작업은 실제 GitHub Issue 번호를 기준으로 한다. Issue 없이 브랜치나 커밋을 만들지 않는다.
+
+### 9.1 브랜치
+
+형식: `type/issueNumber/kebab-case-description`
+
+- `type`: `feat`(기능), `fix`(버그 수정), `hotfix`(main 긴급 수정)
+- `issueNumber`: 실제 GitHub Issue 번호 (숫자만, `#` 금지)
+- `description`: 소문자 kebab-case
+- 예: `feat/4/auth`, `fix/12/login-error-message`
+- 최신 `origin/main`에서 생성하고, PR로 `main`에 병합한다.
+- 하나의 기능 SPEC은 하나의 Issue와 하나의 브랜치에서 설계·구현·테스트한다.
+
+### 9.2 커밋 메시지
+
+형식: `type/#issueNumber: subject`
+
+| type | 용도 |
+| --- | --- |
+| `feat` | 기능 추가 |
+| `fix` | 버그 수정 |
+| `docs` | 문서 (`spec.md`, `specs/`, `docs/`, `README.md`, `CLAUDE.md`) |
+| `style` | 동작 변경 없는 코드 포맷 |
+| `refactor` | 동작 변경 없는 구조 개선 |
+| `test` | 테스트 추가·수정 |
+| `chore` | 빌드·의존성·설정·CI |
+| `design` | UI 디자인·스타일 변경 |
+| `hotfix` | main 긴급 수정 |
+
+- `type`은 영어 소문자, `#issueNumber`는 실제 Issue 번호
+- 제목(`subject`) 끝에 마침표를 쓰지 않으며 50자 이내를 권장
+- 본문이 필요하면 제목 다음에 한 줄을 비우고 작성
+- Claude Code가 작성하는 커밋은 본문 끝에 `Co-Authored-By`, `Claude-Session` trailer를 둘 수 있다. 제목은 반드시 위 형식을 따른다.
+- 예: `docs/#4: add SPEC-AUTH detailed spec`, `feat/#4: add session login API`
+
+### 9.3 Pull Request
+
+- 제목은 커밋 메시지와 같은 형식(`type/#issueNumber: subject`)을 사용한다.
+- 본문은 `.github/pull_request_template.md`를 따르며 `Closes #issueNumber`를 포함한다.
+- 병합 방식은 Merge commit을 사용한다.
+- `main` 병합은 사용자가 직접 수행한다. Claude Code는 사용자의 명시적 요청 없이 `main`에 병합하지 않는다.

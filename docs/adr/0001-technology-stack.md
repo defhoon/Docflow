@@ -2,6 +2,7 @@
 
 - 상태: **Accepted** (단, 아래 "잠정 결정" 항목은 **Proposed**)
 - 후속 변경: Java 버전 결정(Java 21)은 [ADR-0004](./0004-java-25-upgrade.md)(2026-10-22, Java 25)로 대체되었다. 아래 본문은 6주차 당시 결정 기록으로 보존한다.
+- 후속 변경: 잠정 결정 Q1(Session 인증), Q9(Entity ID BIGINT IDENTITY)는 [ADR-0005](./0005-session-authentication.md)(2026-10-22)에서 확정되었다.
 - 날짜: 2026-10-14
 - 관련 문서: [`spec.md`](../../spec.md) §11 기술 컨텍스트, [`CLAUDE.md`](../../CLAUDE.md) §5
 

@@ -1,7 +1,7 @@
 # specs/ — 기능별 상세 SPEC
 
-이 디렉터리에는 [`spec.md`](../spec.md) §9의 기능 SPEC(SPEC-01 ~ SPEC-14)을 기능별 파일로 작성한다.
-**실제 기능별 상세 SPEC은 다음 주차(7주차)부터 작성한다.** 현재는 안내 문서만 있다.
+이 디렉터리에는 [`spec.md`](../spec.md) §9의 기능 SPEC(SPEC-AUTH, SPEC-01 ~ SPEC-14)을 기능별 파일로 작성한다.
+7주차부터 기능별 상세 SPEC을 작성한다.
 
 ## 파일 명명 규칙
 
@@ -9,11 +9,27 @@
 
 ```text
 specs/
+├── 00-auth.md                 # SPEC-AUTH (기능 SPEC보다 먼저 진행)
 ├── 01-project-create.md
 ├── 02-project-member.md
 ├── ...
 └── 14-ai-version-summary.md   # Post-MVP
 ```
+
+## SPEC과 Issue·브랜치·PR
+
+하나의 기능 SPEC은 하나의 GitHub Issue, 하나의 브랜치, 하나의 PR로 진행한다(`CLAUDE.md` §9).
+
+```text
+GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작성·승인  →  구현·테스트  →  PR (Closes #N)
+```
+
+- SPEC 문서 상단에 관련 Issue 번호를 기록한다.
+- SPEC 문서 작성과 기능 구현은 같은 브랜치에서 진행하되, 구현은 SPEC 승인 이후 시작한다.
+
+| SPEC | 파일 | Issue |
+| --- | --- | --- |
+| SPEC-AUTH 사용자 인증 | `00-auth.md` | #4 |
 
 ## 작성 원칙
 

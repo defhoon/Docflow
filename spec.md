@@ -1,12 +1,14 @@
 # DocFlow Specification
 
-Version: Draft v0.3
+Version: Draft v0.4
 Status: Development Environment Initialized
 Last Updated: 2026-10-22
 
 > v0.2 변경 요약: 6주차 초기화 결과에 맞춰 §11(확정 Stack·구조·개발 규칙·환경변수·Actuator 정책), §15(실제 명령어·검증 결과), §16(잠정 결정 3건 분리), §17(ADR-0001~0003 결정 추가)을 갱신하였다. §18의 v0.1 안내 문장을 삭제하였다. §1~§10, §12~§14는 v0.1과 동일하다.
 
 > v0.3 변경 요약: Backend Java 버전을 21에서 25 LTS로 변경하였다(ADR-0004). §11.1·§11.2, §15(JDK 조건, §15.2 Java 25 검증 결과), §17을 갱신하였다. Java 21 기준 기록(§15.1, §17 2026-10-14)은 보존한다.
+
+> v0.4 변경 요약: SPEC-AUTH(사용자 인증) 상세 SPEC([`specs/00-auth.md`](./specs/00-auth.md))을 추가하고 §9 SPEC 표에 등록하였다. §16.1에서 Session 인증과 Entity ID(BIGINT IDENTITY)를 확정하였다(ADR-0005). §11.1·§11.2·§11.6, §17을 갱신하였다. 인증 기능은 아직 구현되지 않았다.
 
 ## 1. 프로젝트 개요
 
@@ -247,6 +249,7 @@ Author로서 수정된 문서를 새로운 버전으로 등록하면서 이전 �
 
 | SPEC | 기능 | MVP |
 | --- | --- | --- |
+| SPEC-AUTH | 사용자 인증 (로그인·로그아웃·현재 사용자 조회) | O |
 | SPEC-01 | Project 생성 | O |
 | SPEC-02 | Project Member 관리 | O |
 | SPEC-03 | Document 등록 | O |
@@ -362,7 +365,7 @@ Out of Scope
 | CI | GitHub Actions |
 
 - Spring Boot 4.1.1은 Spring Initializr가 아니라 Maven Central 메타데이터로 4.1.x 최신 안정 버전임을 확인하였다. 클라우드 개발 환경의 네트워크 정책이 `start.spring.io`를 차단하였기 때문이다.
-- Spring Security와 인증은 아직 도입하지 않았다(§16 잠정 결정 참고).
+- Spring Security 세션 인증을 도입하였다(SPEC-AUTH, [`specs/00-auth.md`](./specs/00-auth.md), [ADR-0005](./docs/adr/0005-session-authentication.md)). 의존성: `spring-boot-starter-security`(Spring Security 7.1.1), 테스트용 `spring-boot-starter-security-test`.
 
 #### AI — Post-MVP
 
@@ -381,9 +384,10 @@ docflow/
 ├── frontend/                  # Next.js (npm)
 ├── docs/
 │   ├── architecture.md
-│   └── adr/                   # 0001-technology-stack ~ 0004-java-25-upgrade
+│   └── adr/                   # 0001-technology-stack ~ 0005-session-authentication
 ├── specs/
 │   ├── README.md              # 작성 안내
+│   ├── 00-auth.md             # SPEC-AUTH (Issue #4)
 │   ├── 01-project-create.md   # (작성 예정)
 │   ├── ...
 │   └── 14-ai-version-summary.md   # (작성 예정, Post-MVP)
@@ -456,7 +460,7 @@ frontend/src
 - `show-details`와 `show-components`를 `never`로 두어 전체 상태(UP/DOWN)만 응답한다. DB 종류, 디스크 경로 등 상세 정보는 노출하지 않는다.
 - 다른 Actuator 엔드포인트와 `/actuator/health/db` 같은 구성 요소 경로는 404를 반환한다.
 - Frontend 프록시는 `/backend/health` → `/actuator/health` 한 경로만 연결한다.
-- Spring Security 도입 시 이 정책을 재검토한다.
+- Spring Security 도입 시 이 정책을 재검토한다. SPEC-AUTH 설계에서는 `/actuator/health`만 `permitAll`로 두고, 나머지 Actuator 경로는 `denyAll`(익명 `401`, 인증 사용자 `403`)로 처리한다. 노출 설정(`exposure.include=health`)은 변경하지 않는다(`specs/00-auth.md` §6.2).
 
 ## 12. 공통 실패 및 예외 상황
 
@@ -642,15 +646,15 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 
 원칙: 결정되지 않은 항목은 구현 과정에서 임의로 가정하지 않고 SPEC을 먼저 수정한 후 구현한다.
 
-### 16.1 잠정 결정 (Proposed)
+### 16.1 사전 결정 사항
 
-다음 사항은 방향만 정했으며, 해당 기능 SPEC을 구현하기 전에 재검토하여 확정한다.
+다음 사항은 6주차에 잠정 결정(Proposed)한 뒤, 해당 기능 SPEC에서 재검토하여 확정한다.
 
-| 질문 | 잠정 결정 | 확정 시점 | 근거 |
+| 질문 | 결정 | 상태 | 근거 |
 | --- | --- | --- | --- |
-| 인증 방식은 Session/JWT 중 어떤 방식을 사용할 것인가? | Session 기반 인증. CSRF, Session Cookie, 권한 검증은 인증 SPEC에서 상세 설계한다. | 인증 SPEC 작성 시 | [ADR-0001](./docs/adr/0001-technology-stack.md) |
-| 파일 저장소는 어떤 방식으로 구성할 것인가? | MVP에서는 로컬 파일시스템. 저장소 인터페이스와 업로드 기능은 해당 SPEC에서 구현한다. | SPEC-03/04 작성 시 | [ADR-0001](./docs/adr/0001-technology-stack.md) |
-| Entity ID 전략은 무엇으로 할 것인가? | BIGINT IDENTITY | 첫 도메인 SPEC 구현 시 | [ADR-0001](./docs/adr/0001-technology-stack.md) |
+| 인증 방식은 Session/JWT 중 어떤 방식을 사용할 것인가? | Spring Security 서버 세션 인증. JWT와 혼용하지 않는다. CSRF, Session Cookie, 인가 규칙은 SPEC-AUTH에서 정의한다. | **확정** (2026-10-22, SPEC-AUTH) | [ADR-0005](./docs/adr/0005-session-authentication.md), [`specs/00-auth.md`](./specs/00-auth.md) |
+| 파일 저장소는 어떤 방식으로 구성할 것인가? | MVP에서는 로컬 파일시스템. 저장소 인터페이스와 업로드 기능은 해당 SPEC에서 구현한다. | 잠정 (SPEC-03/04 작성 시 확정) | [ADR-0001](./docs/adr/0001-technology-stack.md) |
+| Entity ID 전략은 무엇으로 할 것인가? | `BIGINT GENERATED ALWAYS AS IDENTITY` | **확정** (2026-10-22, SPEC-AUTH) | [ADR-0005](./docs/adr/0005-session-authentication.md) |
 
 ### 16.2 미결정
 
@@ -725,6 +729,14 @@ Backend의 Java 버전을 21에서 25 LTS로 변경한다. Spring Boot 4.1.1, Gr
 이유: 7주차 기능 구현 전, 비즈니스 코드가 없는 시점에 최신 LTS로 전환하여 전환 비용을 최소화하기 위함이다.
 
 상세: [ADR-0004](./docs/adr/0004-java-25-upgrade.md)
+
+#### 2026-10-22 — Spring Security 세션 기반 인증 (SPEC-AUTH)
+
+인증은 Spring Security 서버 세션(메모리 저장, 미사용 30분 만료)으로 하고 JWT와 혼용하지 않는다. 이메일·비밀번호 로그인, CSRF(`csrf.spa()`), 세션 고정 방어, 401/403 JSON 응답을 적용한다. 회원가입과 전역 Role은 두지 않고, 개발 계정은 `local` 프로파일 전용 Seeder로 준비한다. Entity ID는 BIGINT IDENTITY로 확정한다.
+
+이유: 동일 출처 웹 앱 하나에서는 서버 세션이 가장 단순하고, 로그아웃·계정 비활성화를 서버에서 즉시 반영할 수 있기 때문이다.
+
+상세: [ADR-0005](./docs/adr/0005-session-authentication.md), [`specs/00-auth.md`](./specs/00-auth.md)
 
 ## 18. 향후 SPEC 발전 방식
 

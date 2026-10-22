@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
         source: "/backend/health",
         destination: `${backendUrl}/actuator/health`,
       },
+      {
+        // Backend API. 브라우저는 동일 출처(Next.js)만 호출하므로 세션·CSRF 쿠키가 이 출처에 저장된다.
+        source: "/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
+      },
     ];
   },
 };
