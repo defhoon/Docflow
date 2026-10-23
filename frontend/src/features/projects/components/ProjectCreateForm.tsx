@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/AuthProvider";
 import { ApiError } from "@/lib/api-client";
@@ -20,14 +20,31 @@ export function ProjectCreateForm() {
   const [submitting, setSubmitting] = useState(false);
   // 상태 반영 전 연속 제출도 막는다.
   const submittingRef = useRef(false);
-  const mountedRef = useRef(true);
+  // cacheComponents 사용 시 Next.js는 다른 경로로 이동해도 이 화면을 언마운트하지 않고 <Activity>로 숨긴다.
+  // 다시 진입하면 같은 인스턴스의 상태가 그대로 보이므로, 생성에 성공한 폼은 숨겨질 때 초기화한다.
+  const visibleRef = useRef(false);
+  const resetOnHideRef = useRef(false);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+  const resetForm = useCallback(() => {
+    submittingRef.current = false;
+    setSubmitting(false);
+    setName("");
+    setDescription("");
+    setFieldErrors({});
+    setFormError(null);
   }, []);
+
+  // 화면이 숨겨지기 전에 동기적으로 초기화하여 다시 진입할 때 이전 상태가 잠깐 보이지 않게 한다.
+  useLayoutEffect(() => {
+    visibleRef.current = true;
+    return () => {
+      visibleRef.current = false;
+      if (resetOnHideRef.current) {
+        resetOnHideRef.current = false;
+        resetForm();
+      }
+    };
+  }, [resetForm]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,13 +62,18 @@ export function ProjectCreateForm() {
     setSubmitting(true);
     try {
       const created = await createProject(value);
-      // 이동하는 동안 다시 제출되지 않도록 제출 상태를 유지한다.
+      if (visibleRef.current) {
+        // 이동하는 동안 다시 제출되지 않도록 제출 상태를 유지하고, 화면이 숨겨질 때 초기화한다.
+        resetOnHideRef.current = true;
+      } else {
+        // 요청 중에 이미 다른 화면으로 이동했으면 바로 초기화한다.
+        resetForm();
+      }
       router.push(`/projects/${created.id}`);
       return;
     } catch (error) {
-      if (!mountedRef.current) {
-        return;
-      }
+      // 숨겨진 상태(Activity)에서도 실패 결과를 반영해야 다시 진입했을 때 제출할 수 있다.
+      // 언마운트된 뒤의 상태 갱신은 React가 무시한다.
       if (isUnauthenticated(error)) {
         void refresh();
       }
