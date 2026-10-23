@@ -27,21 +27,23 @@ docflow/
 │       ├── java/com/docflow/
 │       │   ├── global/        # config(Security, JPA Auditing), error(공통 오류 응답), security(401/403 JSON), common(BaseTimeEntity)
 │       │   ├── user/          # domain(User), repository, service(UserAccountService)
-│       │   └── auth/          # controller, service, security(AuthenticatedUser, UserDetailsService), dto, dev(local Seeder)
+│       │   ├── auth/          # controller, service, security(AuthenticatedUser, UserDetailsService), dto, dev(local Seeder)
+│       │   └── project/       # controller, service(ProjectService), domain(Project, ProjectText), repository, dto
 │       └── resources/
 │           ├── application.yml
-│           └── db/migration/  # V1__baseline, V2__create_users
+│           └── db/migration/  # V1__baseline, V2__create_users, V3__create_projects
 ├── frontend/                  # Next.js (npm)
 │   └── src/
-│       ├── app/               # /, /login, layout(AuthProvider)
+│       ├── app/               # /, /login, /projects, /projects/new, /projects/[projectId], layout(AuthProvider)
 │       ├── lib/api-client.ts  # 동일 출처 fetch, CSRF 헤더·재시도, 오류 파싱
 │       └── features/
 │           ├── auth/          # AuthProvider, api, LoginForm, RequireAuth, LogoutButton
+│           ├── projects/      # api, types, validation(§5.5 입력 규칙), ProjectList, ProjectCreateForm, ProjectDetail
 │           └── backend-health/
 ├── docs/
 │   ├── architecture.md
 │   └── adr/0001~0005
-├── specs/                     # README.md, 00-auth.md (SPEC-AUTH)
+├── specs/                     # README.md, 00-auth.md (SPEC-AUTH), 01-project-create.md (SPEC-01)
 ├── docker-compose.yml         # PostgreSQL 16
 ├── .env.example               # 환경변수 예시 (.env는 Git 제외)
 ├── spec.md
@@ -70,11 +72,15 @@ docflow/
 - Backend 호출은 Next.js rewrites를 통해 동일 출처로 한다. 등록된 경로는 `/api/:path*`(API)와 `/backend/health`(개발용 연결 확인)다.
 - API 호출은 `lib/api-client.ts`를 사용한다. 변경 요청에 CSRF 헤더를 붙이고, `403 CSRF_INVALID`일 때만 토큰 갱신 후 1회 재시도한다.
 - 인증 상태는 `AuthProvider`가 `GET /api/auth/me` 응답으로만 판단하며, 브라우저 저장소에 사용자 정보나 토큰을 저장하지 않는다.
+- 기능 API가 `401`을 반환하면 해당 화면이 `useAuth().refresh()`를 호출하고, `RequireAuth`가 `/login?next=...&reason=expired`로 이동시킨다(SPEC-01 §8.4).
+- `cacheComponents: true`에서 동적 세그먼트(`/projects/[projectId]`)는 `useParams`뿐 아니라 `RequireAuth`의 `usePathname`도 suspend되므로, `RequireAuth`를 포함한 하위 트리 전체를 `Suspense`로 감싼다. `ProjectDetail`만 감싸면 `npm run build`가 실패함을 확인했다.
+- 클라이언트 입력 검증(`features/projects/validation.ts`)은 Backend `ProjectText`와 같은 문자 범주를 명시적으로 사용한다. JavaScript `trim()`·`\s`는 Java와 기준이 달라 사용하지 않으며, 서버 검증이 최종 기준이다.
 
 ## 5. 데이터와 스키마
 
 - 스키마는 Flyway migration으로만 변경한다(`ddl-auto=validate`).
-- `V1__baseline.sql`(기준점), `V2__create_users.sql`(SPEC-AUTH `users`)이 있다. `User` Entity가 추가되어 `ddl-auto=validate`가 실제 스키마를 검증한다.
+- `V1__baseline.sql`(기준점), `V2__create_users.sql`(SPEC-AUTH `users`), `V3__create_projects.sql`(SPEC-01 `projects`)이 있다. `ddl-auto=validate`가 `User`·`Project` Entity와 실제 스키마를 검증한다.
+- `projects.owner_id`는 `users.id` FK(`ON DELETE RESTRICT`)이며, 목록 조회용 인덱스 `(owner_id, created_at DESC, id DESC)`와 공백 이름 방지 `CHECK`가 있다.
 - Entity ID는 `BIGINT GENERATED ALWAYS AS IDENTITY`로 확정했다(ADR-0005).
 
 ## 6. 보안 관련 현재 상태
@@ -85,12 +91,12 @@ docflow/
 - 세션: 서버 메모리, 미사용 30분 만료, 쿠키 `HttpOnly`·`SameSite=Lax`, `Secure`는 `SESSION_COOKIE_SECURE`로 제어.
 - Actuator는 `health` 전체 상태만 노출하고 상세 정보는 숨긴다(ADR-0003 §4).
 - 비밀정보는 `.env`(Git 제외)로만 주입한다. 개발 계정 비밀번호(`DEV_SEED_PASSWORD`)도 같다.
+- 프로젝트 접근: 현재는 Owner만 접근할 수 있으며, `ProjectService.getAccessibleProject()`가 단일 진입점이다. 다른 사용자의 프로젝트와 없는 프로젝트는 같은 `404 PROJECT_NOT_FOUND`로 응답한다(SPEC-01 §7.4, §7.8).
 - MVP 한계: `/me` 이외의 보호 API는 요청마다 계정 활성 여부를 다시 확인하지 않는다. 로그인 실패 횟수 제한이 없다.
 
 ## 7. 다음 단계에서 추가될 요소 (미생성)
 
 | 시점 | 추가 요소 |
 | --- | --- |
-| SPEC-01 Project 생성 | `project/` 패키지, `V3` 이후 migration, 생성자 FK(`users.id`) |
 | SPEC-02 Project Member | 프로젝트 단위 권한 검증 |
 | SPEC-03/04 Document·Version | 파일 저장소 인터페이스(로컬 파일시스템) |
