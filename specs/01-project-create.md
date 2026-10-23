@@ -1,6 +1,6 @@
 # SPEC-01: 프로젝트 생성·조회 및 소유권
 
-- 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — Backend 구현 완료(CI 통과), Frontend 구현 승인 대기**
+- 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — Backend·Frontend 구현 완료(CI 통과), Windows 로컬 검증·PR 승인 대기**
 - Issue: [#6](https://github.com/defhoon/Docflow/issues/6)
 - 브랜치: `feat/6/project-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §9, §10, §12, §13, §15, §16 / [`specs/00-auth.md`](./00-auth.md) / [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0003](../docs/adr/0003-development-environment.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
@@ -704,29 +704,34 @@ frontend/src
 
 0. [x] 이 SPEC 설계 확정 (Q1~Q15, 2026-10-23)
 1. [x] GitHub Issue #6 생성, `feat/6/project-create` 브랜치 생성
-2. [ ] 문서: 이 SPEC 확정 커밋(완료, `ecf865a`), `specs/README.md` SPEC 표에 행 추가, `CLAUDE.md` §6 현재 단계 갱신, `specs/00-auth.md` 상태 줄(병합 완료) 갱신 여부 확인
+2. [x] 문서: 이 SPEC 확정 커밋(`ecf865a`), `specs/README.md` SPEC 표에 행 추가, `CLAUDE.md` §6 현재 단계 갱신, `specs/00-auth.md` 상태 줄(병합 완료) 갱신 여부 확인
 3. [x] `GlobalExceptionHandler`에 `MethodArgumentTypeMismatchException` → `400 BAD_REQUEST` 처리 + 테스트, SPEC-AUTH 회귀 확인 ([결정 Q14])
 4. [x] Backend 도메인: `V3__create_projects.sql`, `Project`, `ProjectRepository`, `ProjectText`, `CreateProjectRequest` 정규화·검증(§5.5) + 단위 테스트
 5. [x] Backend API: `ProjectService`(`create`, `findMine`, `getAccessibleProject`), `ProjectController`, 응답 DTO, `ErrorCode.PROJECT_NOT_FOUND` + 통합 테스트(FK 위반 기반 저장 실패 테스트 포함)
 6. [x] CI 확인 (Backend) — `20853cf`, GitHub Actions run 39883535943 성공
-7. [ ] Frontend: `features/projects`, `/projects`, `/projects/new`, `/projects/[projectId]`(`Suspense`), `/` 링크 + Vitest
-8. [ ] Frontend lint·test·build (클라우드) → CI 확인
-9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
+7. [x] Frontend: `features/projects`, `/projects`, `/projects/new`, `/projects/[projectId]`(`Suspense`), `/` 링크 + Vitest
+8. [x] Frontend lint·test·build (클라우드) → CI 확인 — `dc6e8f5`, GitHub Actions run 39886025416 성공
+9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
 10. [ ] Windows 로컬 수동 검증 (사용자, §10.4)
 11. [ ] PR (`Closes #6`), 병합은 사용자
 
 ## 16. 검증 결과
 
-**Backend: GitHub Actions CI 통과 (2026-10-23).** Frontend와 Windows 로컬 검증은 미실행이다.
+**Backend·Frontend: GitHub Actions CI 통과, Frontend는 클라우드에서도 직접 실행 (2026-10-23).** Windows 로컬 검증(§10.4)은 미실행이다.
 
 - 커밋 `20853cf`, GitHub Actions run `39883535943`: Backend(build & test, PostgreSQL 16 서비스)와 Frontend(lint·test·build) Job 모두 성공. SPEC-AUTH 기존 테스트 포함 전체 Backend 테스트가 함께 실행되었다.
 - CI의 PostgreSQL 로그에서 의도한 DB 오류가 실제로 발생했음을 확인했다: `projects_owner_id_fkey` 위반(AC-PROJECT-15 저장 실패, AC-PROJECT-17 미존재 Owner), `ck_projects_name_not_blank` 위반(AC-PROJECT-17).
 - 클라우드 환경에는 JDK 25가 없어 Backend를 컴파일·실행하지 못했다. Backend 검증은 CI 결과만을 근거로 한다.
 - Backend 테스트: `ProjectTextTest`, `CreateProjectRequestValidationTest`(§5.5.5 #1~#17), `ProjectTest`, `ProjectApiIntegrationTest`(AC-PROJECT-01~14, 오류 계약 §6.5), `ProjectPersistenceFailureIntegrationTest`(AC-PROJECT-15), `ProjectConcurrencyIntegrationTest`(AC-PROJECT-16), `ProjectSchemaIntegrationTest`(AC-PROJECT-17).
-- AC-PROJECT-18 이후의 Frontend 항목은 아직 구현하지 않았다.
+- Frontend (커밋 `dc6e8f5`, GitHub Actions run `39886025416` 성공):
+  - Claude Code 클라우드(Node.js 22.22.0)에서 직접 실행: `npm run lint` 오류·경고 0건, `npm run test` 12개 파일 90건 통과(기존 39건 + 신규 51건), `npm run build` 성공. CI에서도 같은 결과(90건 통과, build 성공).
+  - 신규 테스트: `validation.test.ts`(§5.5.5 #1~#17, Java 문자 기준 일치), `api.test.ts`(경로·메서드·본문·CSRF 헤더), `ProjectList`·`ProjectCreateForm`·`ProjectDetail` 컴포넌트 테스트(AC-PROJECT-18~22, 언마운트 후 응답 무시, 이전 요청 응답 무시), `routes.test.tsx`(실제 `AuthProvider`·`RequireAuth`·`api-client`로 AC-PROJECT-22·23).
+  - `/projects/[projectId]`에서 `Suspense`를 `ProjectDetail`만 감싸도록 바꾸면 `usePathname()`(RequireAuth) 때문에 `npm run build`가 실패함을 실험으로 확인했다(§8.2, R2). 현재 구조(`Suspense` → `RequireAuth` → `ProjectDetail`)는 빌드에 성공한다.
+  - 클라우드 `npm run build`에서 Next.js가 AI 에이전트 환경을 감지해 "알려진 보안 취약점이 있는 버전" 업그레이드 안내로 첫 실행을 중단했다. 재실행 시 경고만 출력하고 성공했으며 CI에서는 나타나지 않았다. 버전 변경은 이 SPEC 범위 밖이므로 하지 않았다.
+- AC 상태: AC-PROJECT-01~23, 25는 자동 테스트·CI로 확인. **AC-PROJECT-24(실제 브라우저에서 Reviewer 접근 차단)와 §10.4 수동 E2E는 Windows 로컬에서 미실행.**
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
 | Backend build·test | 실행 불가 (JDK 25 없음) | 성공 (`20853cf`) | 미실행 |
-| Frontend lint·test·build | 미실행 | 미실행 | 미실행 |
+| Frontend lint·test·build | 성공 (lint 0건, 90 tests, build) | 성공 (`dc6e8f5`) | 미실행 |
 | 수동 E2E (§10.4) | — | — | 미실행 |

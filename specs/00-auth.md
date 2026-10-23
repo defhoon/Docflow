@@ -1,6 +1,6 @@
 # SPEC-AUTH: 세션 기반 사용자 인증
 
-- 상태: **구현·검증 완료 — PR 검토 대기** (2026-10-22, CI 및 Windows 로컬 검증 완료, 결과는 §17)
+- 상태: **구현·검증 완료 — main 병합 완료 (PR #5)** (2026-10-22, CI 및 Windows 로컬 검증 완료, 결과는 §17)
 - Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
 - 브랜치: `feat/4/auth`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §11, §12, §16 / [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
