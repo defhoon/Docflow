@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { CurrentUserPanel } from "@/features/auth/components/CurrentUserPanel";
 import { RequireAuth } from "@/features/auth/components/RequireAuth";
 import { BackendHealthStatus } from "@/features/backend-health/components/BackendHealthStatus";
@@ -14,6 +16,12 @@ export default function Home() {
           <h2 className="mb-2 text-sm font-semibold text-zinc-500">로그인 사용자</h2>
           <CurrentUserPanel />
         </section>
+        <Link
+          href="/projects"
+          className="mt-6 block rounded-lg border border-zinc-200 p-4 font-medium hover:bg-zinc-50"
+        >
+          내 프로젝트 →
+        </Link>
         <section className="mt-6 rounded-lg border border-zinc-200 p-4">
           <h2 className="mb-2 text-sm font-semibold text-zinc-500">Backend 연결 상태</h2>
           <BackendHealthStatus />
