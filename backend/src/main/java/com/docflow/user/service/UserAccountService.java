@@ -34,6 +34,14 @@ public class UserAccountService {
 		return this.userRepository.findById(id).filter(User::isEnabled);
 	}
 
+	/**
+	 * 추가 조회 없이 사용자 참조(프록시)를 반환한다. 호출한 트랜잭션 안에서 사용하며, 존재 여부는 이를 참조하는
+	 * FK 제약이 보장한다.
+	 */
+	public User getReference(Long id) {
+		return this.userRepository.getReferenceById(id);
+	}
+
 	@Transactional(readOnly = true)
 	public boolean existsByEmail(String email) {
 		return this.userRepository.existsByEmail(User.normalizeEmail(email));

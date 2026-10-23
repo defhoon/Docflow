@@ -27,9 +27,10 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 - SPEC 문서 상단에 관련 Issue 번호를 기록한다.
 - SPEC 문서 작성과 기능 구현은 같은 브랜치에서 진행하되, 구현은 SPEC 승인 이후 시작한다.
 
-| SPEC | 파일 | Issue |
-| --- | --- | --- |
-| SPEC-AUTH 사용자 인증 | `00-auth.md` | #4 |
+| SPEC | 파일 | Issue | 상태 |
+| --- | --- | --- | --- |
+| SPEC-AUTH 사용자 인증 | `00-auth.md` | #4 | 구현·병합 완료 |
+| SPEC-01 프로젝트 생성·조회 및 소유권 | `01-project-create.md` | #6 | 구현·검증 완료 (CI, Windows 수동 E2E), PR 검토 대기 |
 
 ## 작성 원칙
 

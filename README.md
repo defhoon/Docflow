@@ -4,7 +4,7 @@ Document Review Workflow Management System
 
 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 시스템이다. 요구사항과 MVP 범위는 [`spec.md`](./spec.md)를 따른다.
 
-> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)를 구현했으며 PR 검토 중이다([Issue #4](https://github.com/defhoon/Docflow/issues/4), [`specs/00-auth.md`](./specs/00-auth.md)). 문서·검토·피드백 등 비즈니스 기능은 아직 구현되지 않았다.
+> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현과 검증(자동 테스트·CI, Windows 수동 E2E)을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10) 검토 중이며 아직 `main`에 병합되지 않았다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). 프로젝트 멤버, 문서·검토·피드백 기능은 아직 구현되지 않았다.
 
 ## 기술 스택
 
@@ -83,6 +83,18 @@ npm run dev              # http://localhost:3000
 ```
 
 브라우저에서 `http://localhost:3000`을 열면 로그인 화면(`/login`)으로 이동한다. 개발 계정으로 로그인하면 `/`에 사용자 정보, 로그아웃 버튼, Backend·Database 연결 상태(UP / DOWN / 연결 오류)가 표시된다.
+
+#### 프로젝트 화면 (SPEC-01)
+
+로그인이 필요하며, 로그인하지 않았으면 로그인 화면으로 이동한다.
+
+| 경로 | 화면 |
+| --- | --- |
+| `/projects` | 내가 만든 프로젝트 목록 (최신순). `/`의 "내 프로젝트" 링크로 이동 |
+| `/projects/new` | 프로젝트 생성 (이름 필수 1~100자, 설명 선택 0~1000자). 성공하면 상세 화면으로 이동 |
+| `/projects/{projectId}` | 프로젝트 상세 (이름, 설명, Owner, 생성일). 다른 사용자의 프로젝트와 없는 프로젝트는 모두 "프로젝트를 찾을 수 없습니다." |
+
+프로젝트 Owner는 로그인한 사용자로 자동 지정된다. 수동 확인 절차는 [`specs/01-project-create.md`](./specs/01-project-create.md) §10.4를 참고한다(예: `author@docflow.local`로 만든 프로젝트를 `reviewer@docflow.local`이 볼 수 없는지 확인).
 
 브라우저는 `localhost:3000`만 호출한다. `/api/*` 요청은 Next.js rewrite로 Backend에 전달되므로 세션 쿠키(`JSESSIONID`)와 CSRF 쿠키(`XSRF-TOKEN`)는 `localhost:3000`에 저장된다.
 

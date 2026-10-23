@@ -61,27 +61,29 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 - 인증(Spring Security 세션)과 Entity ID(BIGINT IDENTITY)는 SPEC-AUTH에서 확정되었다([ADR-0005](./docs/adr/0005-session-authentication.md)).
 - 파일 저장소(로컬 파일시스템)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
 
-## 6. 현재 개발 단계 — 7주차 (SPEC-AUTH)
+## 6. 현재 개발 단계 — 7주차 (SPEC-01)
 
-6주차(프로젝트 초기화, 개발환경 구축)와 Java 25 전환(ADR-0004)은 완료되었다.
+6주차(프로젝트 초기화, 개발환경 구축), Java 25 전환(ADR-0004), SPEC-AUTH(Issue #4, 세션 기반 사용자 인증)는 완료되었다.
 
-현재 목표는 **SPEC-AUTH: 세션 기반 사용자 인증**이다.
+현재 목표는 **SPEC-01: 프로젝트 생성·조회 및 소유권**이다.
 
-- Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
-- 브랜치: `feat/4/auth`
-- SPEC: [`specs/00-auth.md`](./specs/00-auth.md), 결정 기록: [ADR-0005](./docs/adr/0005-session-authentication.md)
+- Issue: [#6](https://github.com/defhoon/Docflow/issues/6)
+- 브랜치: `feat/6/project-create`
+- SPEC: [`specs/01-project-create.md`](./specs/01-project-create.md)
 
 ### 진행 단계
 
-1. Git 컨벤션 적용과 SPEC-AUTH 상세 설계 문서 작성 (완료)
-2. 설계 검토·승인 후 기능 구현: Spring Security, Flyway V2 `users`, 인증 API, 개발 계정 Seeder, Frontend 로그인 (완료)
-3. CI 및 Windows 로컬 검증 후 PR (`Closes #4`) (현재 단계 — 사용자 검토·병합 대기)
+1. SPEC-01 상세 설계 문서 작성·확정 (완료)
+2. Backend 구현: Flyway V3 `projects`, `Project`, 입력 정규화·검증, 프로젝트 API, 타입 불일치 400 처리 (완료, CI 통과)
+3. Frontend 구현: `/projects`, `/projects/new`, `/projects/[projectId]` (완료, CI 확인)
+4. Windows 로컬 수동 E2E 검증 (완료)
+5. PR [#10](https://github.com/defhoon/Docflow/pull/10) (`Closes #6`) (현재 단계 — 사용자 검토·병합 대기)
 
 ### 이번 단계에서 구현하지 않을 것
 
-- 회원가입, 비밀번호 변경·재설정, 소셜 로그인, JWT, Remember-me
-- 로그인 실패 제한·계정 잠금, 전역 Role, 로그인 AuditLog
-- 프로젝트 생성(SPEC-01) 등 다른 기능 SPEC
+- 프로젝트 수정·삭제, 프로젝트 멤버 관리(SPEC-02)
+- 문서·버전·검토 등 다른 기능 SPEC
+- 목록 페이징·검색·정렬 옵션
 - AI 기능, 실시간 공동 편집, 근거 없이 추가하는 Redis, Kafka, Microservices 등
 
 ## 7. 검증 및 완료 보고 원칙

@@ -11,6 +11,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -41,6 +42,15 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException ex) {
 		return toResponse(ErrorCode.VALIDATION_FAILED);
+	}
+
+	/**
+	 * 경로 변수·요청 파라미터 형식 오류 (예: 숫자가 아닌 {@code projectId}). 클라이언트 입력 오류이므로 ERROR 로그를
+	 * 남기지 않는다.
+	 */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		return toResponse(ErrorCode.BAD_REQUEST);
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)
