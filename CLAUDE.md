@@ -76,7 +76,8 @@ DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. �
 1. SPEC-01 상세 설계 문서 작성·확정 (완료)
 2. Backend 구현: Flyway V3 `projects`, `Project`, 입력 정규화·검증, 프로젝트 API, 타입 불일치 400 처리 (완료, CI 통과)
 3. Frontend 구현: `/projects`, `/projects/new`, `/projects/[projectId]` (완료, CI 확인)
-4. Windows 로컬 검증 후 PR (`Closes #6`) (현재 단계 — 사용자 검증·PR 승인 대기)
+4. Windows 로컬 수동 E2E 검증 (완료)
+5. PR [#10](https://github.com/defhoon/Docflow/pull/10) (`Closes #6`) (현재 단계 — 사용자 검토·병합 대기)
 
 ### 이번 단계에서 구현하지 않을 것
 
