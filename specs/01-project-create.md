@@ -728,6 +728,11 @@ frontend/src
   - 신규 테스트: `validation.test.ts`(§5.5.5 #1~#17, Java 문자 기준 일치), `api.test.ts`(경로·메서드·본문·CSRF 헤더), `ProjectList`·`ProjectCreateForm`·`ProjectDetail` 컴포넌트 테스트(AC-PROJECT-18~22, 언마운트 후 응답 무시, 이전 요청 응답 무시), `routes.test.tsx`(실제 `AuthProvider`·`RequireAuth`·`api-client`로 AC-PROJECT-22·23).
   - `/projects/[projectId]`에서 `Suspense`를 `ProjectDetail`만 감싸도록 바꾸면 `usePathname()`(RequireAuth) 때문에 `npm run build`가 실패함을 실험으로 확인했다(§8.2, R2). 현재 구조(`Suspense` → `RequireAuth` → `ProjectDetail`)는 빌드에 성공한다.
   - 클라우드 `npm run build`에서 Next.js가 AI 에이전트 환경을 감지해 "알려진 보안 취약점이 있는 버전" 업그레이드 안내로 첫 실행을 중단했다. 재실행 시 경고만 출력하고 성공했으며 CI에서는 나타나지 않았다. 버전 변경은 이 SPEC 범위 밖이므로 하지 않았다.
+- Windows 로컬 수동 E2E 중 발견한 버그와 수정 (2026-10-23):
+  - 증상: 프로젝트 생성 → 상세 이동 → 다시 `/projects/new`로 진입하면 버튼이 "생성 중..."으로 비활성화되어 있었다. 새로고침하면 복구되었다.
+  - 원인: `cacheComponents: true`에서 Next.js 16은 이전 경로를 언마운트하지 않고 React `<Activity mode="hidden">`으로 숨겨 상태를 보존한다(최대 3개 경로). `ProjectCreateForm`은 성공 후 이동하는 동안의 중복 제출을 막으려고 제출 상태를 일부러 유지했고, 언마운트되면 사라질 것으로 가정했다. 그런데 같은 인스턴스가 재사용되어 제출 상태와 입력값이 남았다. API 요청은 이미 끝난 상태였다.
+  - 수정: 생성에 성공한 폼은 화면이 숨겨질 때(`useLayoutEffect` cleanup) 초기화한다. 요청 중 화면을 떠난 경우의 성공·실패도 제출 상태를 복구한다. 제출하지 않은 작성 중 입력은 Next.js 기본 동작대로 유지한다.
+  - 회귀 테스트: `ProjectCreateForm.activity.test.tsx` (React `<Activity>`로 경로 숨김·재표시 재현, 5건)
 - AC 상태: AC-PROJECT-01~23, 25는 자동 테스트·CI로 확인. **AC-PROJECT-24(실제 브라우저에서 Reviewer 접근 차단)와 §10.4 수동 E2E는 Windows 로컬에서 미실행.**
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
