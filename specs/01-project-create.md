@@ -1,6 +1,6 @@
 # SPEC-01: 프로젝트 생성·조회 및 소유권
 
-- 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — 구현 미시작, 구현 승인 대기**
+- 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — Backend 구현 완료(CI 통과), Frontend 구현 승인 대기**
 - Issue: [#6](https://github.com/defhoon/Docflow/issues/6)
 - 브랜치: `feat/6/project-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §9, §10, §12, §13, §15, §16 / [`specs/00-auth.md`](./00-auth.md) / [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0003](../docs/adr/0003-development-environment.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
@@ -704,11 +704,11 @@ frontend/src
 
 0. [x] 이 SPEC 설계 확정 (Q1~Q15, 2026-10-23)
 1. [x] GitHub Issue #6 생성, `feat/6/project-create` 브랜치 생성
-2. [ ] 문서: 이 SPEC 확정 커밋, `specs/README.md` SPEC 표에 행 추가, `CLAUDE.md` §6 현재 단계 갱신, `specs/00-auth.md` 상태 줄(병합 완료) 갱신 여부 확인
-3. [ ] `GlobalExceptionHandler`에 `MethodArgumentTypeMismatchException` → `400 BAD_REQUEST` 처리 + 테스트, SPEC-AUTH 회귀 확인 ([결정 Q14])
-4. [ ] Backend 도메인: `V3__create_projects.sql`, `Project`, `ProjectRepository`, `ProjectText`, `CreateProjectRequest` 정규화·검증(§5.5) + 단위 테스트
-5. [ ] Backend API: `ProjectService`(`create`, `findMine`, `getAccessibleProject`), `ProjectController`, 응답 DTO, `ErrorCode.PROJECT_NOT_FOUND` + 통합 테스트(FK 위반 기반 저장 실패 테스트 포함)
-6. [ ] CI 확인 (Backend)
+2. [ ] 문서: 이 SPEC 확정 커밋(완료, `ecf865a`), `specs/README.md` SPEC 표에 행 추가, `CLAUDE.md` §6 현재 단계 갱신, `specs/00-auth.md` 상태 줄(병합 완료) 갱신 여부 확인
+3. [x] `GlobalExceptionHandler`에 `MethodArgumentTypeMismatchException` → `400 BAD_REQUEST` 처리 + 테스트, SPEC-AUTH 회귀 확인 ([결정 Q14])
+4. [x] Backend 도메인: `V3__create_projects.sql`, `Project`, `ProjectRepository`, `ProjectText`, `CreateProjectRequest` 정규화·검증(§5.5) + 단위 테스트
+5. [x] Backend API: `ProjectService`(`create`, `findMine`, `getAccessibleProject`), `ProjectController`, 응답 DTO, `ErrorCode.PROJECT_NOT_FOUND` + 통합 테스트(FK 위반 기반 저장 실패 테스트 포함)
+6. [x] CI 확인 (Backend) — `20853cf`, GitHub Actions run 39883535943 성공
 7. [ ] Frontend: `features/projects`, `/projects`, `/projects/new`, `/projects/[projectId]`(`Suspense`), `/` 링크 + Vitest
 8. [ ] Frontend lint·test·build (클라우드) → CI 확인
 9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
@@ -717,10 +717,16 @@ frontend/src
 
 ## 16. 검증 결과
 
-**미실행.** 설계는 확정되었으나 구현과 테스트는 시작하지 않았다. §6.5의 오류 응답 표는 소스 코드 분석에 따른 예상 동작이며 실행 결과가 아니다.
+**Backend: GitHub Actions CI 통과 (2026-10-23).** Frontend와 Windows 로컬 검증은 미실행이다.
+
+- 커밋 `20853cf`, GitHub Actions run `39883535943`: Backend(build & test, PostgreSQL 16 서비스)와 Frontend(lint·test·build) Job 모두 성공. SPEC-AUTH 기존 테스트 포함 전체 Backend 테스트가 함께 실행되었다.
+- CI의 PostgreSQL 로그에서 의도한 DB 오류가 실제로 발생했음을 확인했다: `projects_owner_id_fkey` 위반(AC-PROJECT-15 저장 실패, AC-PROJECT-17 미존재 Owner), `ck_projects_name_not_blank` 위반(AC-PROJECT-17).
+- 클라우드 환경에는 JDK 25가 없어 Backend를 컴파일·실행하지 못했다. Backend 검증은 CI 결과만을 근거로 한다.
+- Backend 테스트: `ProjectTextTest`, `CreateProjectRequestValidationTest`(§5.5.5 #1~#17), `ProjectTest`, `ProjectApiIntegrationTest`(AC-PROJECT-01~14, 오류 계약 §6.5), `ProjectPersistenceFailureIntegrationTest`(AC-PROJECT-15), `ProjectConcurrencyIntegrationTest`(AC-PROJECT-16), `ProjectSchemaIntegrationTest`(AC-PROJECT-17).
+- AC-PROJECT-18 이후의 Frontend 항목은 아직 구현하지 않았다.
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 미실행 | 미실행 | 미실행 |
+| Backend build·test | 실행 불가 (JDK 25 없음) | 성공 (`20853cf`) | 미실행 |
 | Frontend lint·test·build | 미실행 | 미실행 | 미실행 |
 | 수동 E2E (§10.4) | — | — | 미실행 |
