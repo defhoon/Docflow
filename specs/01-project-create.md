@@ -1,6 +1,6 @@
 # SPEC-01: 프로젝트 생성·조회 및 소유권
 
-- 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — Backend·Frontend 구현 완료(CI 통과), Windows 로컬 검증·PR 승인 대기**
+- 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — Backend·Frontend 구현 완료(CI 통과), Windows 수동 E2E 통과, PR 검토 대기**
 - Issue: [#6](https://github.com/defhoon/Docflow/issues/6)
 - 브랜치: `feat/6/project-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §9, §10, §12, §13, §15, §16 / [`specs/00-auth.md`](./00-auth.md) / [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0003](../docs/adr/0003-development-environment.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
@@ -712,12 +712,12 @@ frontend/src
 7. [x] Frontend: `features/projects`, `/projects`, `/projects/new`, `/projects/[projectId]`(`Suspense`), `/` 링크 + Vitest
 8. [x] Frontend lint·test·build (클라우드) → CI 확인 — `dc6e8f5`, GitHub Actions run 39886025416 성공
 9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
-10. [ ] Windows 로컬 수동 검증 (사용자, §10.4)
+10. [x] Windows 로컬 수동 검증 (사용자, §10.4) — 2026-10-23 통과
 11. [ ] PR (`Closes #6`), 병합은 사용자
 
 ## 16. 검증 결과
 
-**Backend·Frontend: GitHub Actions CI 통과, Frontend는 클라우드에서도 직접 실행 (2026-10-23).** Windows 로컬 검증(§10.4)은 미실행이다.
+**Backend·Frontend: GitHub Actions CI 통과, Frontend는 클라우드에서도 직접 실행, Windows 수동 E2E(§10.4) 통과 (2026-10-23).**
 
 - 커밋 `20853cf`, GitHub Actions run `39883535943`: Backend(build & test, PostgreSQL 16 서비스)와 Frontend(lint·test·build) Job 모두 성공. SPEC-AUTH 기존 테스트 포함 전체 Backend 테스트가 함께 실행되었다.
 - CI의 PostgreSQL 로그에서 의도한 DB 오류가 실제로 발생했음을 확인했다: `projects_owner_id_fkey` 위반(AC-PROJECT-15 저장 실패, AC-PROJECT-17 미존재 Owner), `ck_projects_name_not_blank` 위반(AC-PROJECT-17).
@@ -733,10 +733,22 @@ frontend/src
   - 원인: `cacheComponents: true`에서 Next.js 16은 이전 경로를 언마운트하지 않고 React `<Activity mode="hidden">`으로 숨겨 상태를 보존한다(최대 3개 경로). `ProjectCreateForm`은 성공 후 이동하는 동안의 중복 제출을 막으려고 제출 상태를 일부러 유지했고, 언마운트되면 사라질 것으로 가정했다. 그런데 같은 인스턴스가 재사용되어 제출 상태와 입력값이 남았다. API 요청은 이미 끝난 상태였다.
   - 수정: 생성에 성공한 폼은 화면이 숨겨질 때(`useLayoutEffect` cleanup) 초기화한다. 요청 중 화면을 떠난 경우의 성공·실패도 제출 상태를 복구한다. 제출하지 않은 작성 중 입력은 Next.js 기본 동작대로 유지한다.
   - 회귀 테스트: `ProjectCreateForm.activity.test.tsx` (React `<Activity>`로 경로 숨김·재표시 재현, 5건)
-- AC 상태: AC-PROJECT-01~23, 25는 자동 테스트·CI로 확인. **AC-PROJECT-24(실제 브라우저에서 Reviewer 접근 차단)와 §10.4 수동 E2E는 Windows 로컬에서 미실행.**
+- Next.js 16.4.1 보안 업데이트(#7, PR #8)를 `main`에서 병합 반영했다(`9a00f2e`). 반영 후 클라우드에서 `npm ci`·lint·test·build 성공, `npm audit --omit=dev` 0건, 빌드 시 Next.js 보안 경고 없음. 개발 의존성 경고(`braces`, #9)는 별도 Issue로 관리한다.
+- 최종 확인 (커밋 `21b5d5c` 기준, Claude Code 클라우드에서 직접 실행): `npm ci` 성공, `npm run lint` 0건, `npm run test` 13개 파일 95건 통과, `npm run build` 성공(보안 경고 없음), `npm audit --omit=dev` 0건. 같은 커밋의 GitHub Actions run `39891712591`에서 Backend·Frontend 모두 성공.
+- Windows 로컬 수동 E2E (사용자 직접 수행, 2026-10-23) — 사용자가 확인했다고 보고한 항목:
+  - 프로젝트 생성 및 상세 화면 이동 정상
+  - 프로젝트 목록 조회 및 최신순 정렬 정상
+  - Reviewer의 다른 사용자 프로젝트 접근 차단 정상(404)
+  - 존재하지 않는 프로젝트 조회 처리 정상
+  - 프로젝트 생성 요청 `201` 및 CSRF 헤더(`X-XSRF-TOKEN`) 확인
+  - 세션 만료 시 로그인 페이지 이동 정상
+  - 연속 프로젝트 생성 버그 수정 후 재검증 성공, 생성 화면 재진입 시 버튼·입력값 초기화 정상
+  - 제출하지 않은 작성 중 입력값 보존 정상
+  - 결과: **Windows 수동 E2E 통과**
+- AC 상태: AC-PROJECT-01~23, 25는 자동 테스트·CI로 확인. **AC-PROJECT-24는 Windows 수동 E2E(Reviewer 목록 미표시·URL 직접 접근 시 404)로 확인.** AC-PROJECT-01~25 전체 충족.
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 실행 불가 (JDK 25 없음) | 성공 (`20853cf`) | 미실행 |
-| Frontend lint·test·build | 성공 (lint 0건, 90 tests, build) | 성공 (`dc6e8f5`) | 미실행 |
-| 수동 E2E (§10.4) | — | — | 미실행 |
+| Backend build·test | 실행 불가 (JDK 25 없음) | 성공 (최종 `21b5d5c`) | 보고 없음 (Backend는 E2E용으로 실행) |
+| Frontend lint·test·build | 성공 (lint 0건, 95 tests, build) | 성공 (최종 `21b5d5c`) | 보고 없음 |
+| 수동 E2E (§10.4) | — | — | **통과** (2026-10-23, 연속 생성 버그 수정 후 재검증 포함) |
