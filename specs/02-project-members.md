@@ -1,6 +1,6 @@
 # SPEC-02: 프로젝트 구성원 관리
 
-- 상태: **v1.1 설계 확정 (2026-10-27 사용자 승인) — Backend·Frontend 구현 완료(CI 통과), Windows 수동 E2E 대기**
+- 상태: **v1.1 설계 확정 (2026-10-27 사용자 승인) — 구현·검증 완료 (AC-MEMBER-01~23 충족, Windows 수동 E2E 통과), PR 검토 대기**
 - Issue: [#13](https://github.com/defhoon/Docflow/issues/13)
 - 브랜치: `feat/13/project-members`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §9, §12, §16.2 / [`specs/01-project-create.md`](./01-project-create.md) §7.4, §7.7, §7.8, §13 / [`specs/00-auth.md`](./00-auth.md) / [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -519,13 +519,13 @@ CSRF → 인증 → 경로 변수 타입(400) → 본문 검증(400) → 프로�
 6. [x] CI 확인 (Backend) — `5f42dcc`, GitHub Actions run 40484265942 성공
 7. [x] Frontend: `features/projects` 구성원 API·타입·검증, 구성원 섹션, 목록 `myRole` 표시 + Vitest
 8. [x] Frontend lint·test·build (클라우드) → CI 확인 — `3a53b72`, GitHub Actions run 40486544844 성공
-9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
-10. [ ] Windows 로컬 수동 검증 (사용자, §10.4)
-11. [ ] PR (`Closes #13`), 병합은 사용자
+9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
+10. [x] Windows 로컬 수동 검증 (사용자, §10.4) — 2026-10-27 전 항목 통과
+11. [x] PR (`Closes #13`) 생성, 병합은 사용자
 
 ## 16. 검증 결과
 
-**Backend: 클라우드(JDK 21 + 로컬 PostgreSQL 16.15)와 GitHub Actions CI(JDK 25 + PostgreSQL 16)에서 통과. Frontend: 클라우드 직접 실행과 CI 통과 (2026-10-27).** Windows 로컬 검증은 미실행이다.
+**구현·검증 완료 (2026-10-27): AC-MEMBER-01~23 전체 충족.** Backend는 클라우드(JDK 21 + 로컬 PostgreSQL 16.15)와 GitHub Actions CI(JDK 25 + PostgreSQL 16), Frontend는 클라우드 직접 실행과 CI에서 통과했고, Windows 수동 E2E(§10.4)는 사용자가 직접 수행해 전 항목 통과했다.
 
 - GitHub Actions run `40484265942` (커밋 `5f42dcc`): Backend(build & test), Frontend(lint·test·build) 성공. SPEC-AUTH·SPEC-01 기존 테스트 포함.
 - Claude Code 클라우드: JDK 25가 없어 Gradle init 스크립트(저장소 밖)로 toolchain만 21로 바꿔 실행했다. 임시 PostgreSQL 16.15에서 Backend 전체 127건 통과(실패 0). 프로젝트 저장소의 빌드 설정은 변경하지 않았다.
@@ -553,11 +553,11 @@ CSRF → 인증 → 경로 변수 타입(400) → 본문 검증(400) → 프로�
 | AC-MEMBER-19 | `ProjectMembers.test.tsx`(OWNER/MEMBER UI 분기, Owner 행 제거 버튼 없음, 확인 대화상자·취소, 동명이인 중 선택한 행의 `userId`로 제거), `ProjectDetail.test.tsx`(`myRole` 분기) | 통과 |
 | AC-MEMBER-20 | `AddMemberForm.test.tsx`(클라이언트 검증, 중복 제출 방지, 404·409·400·403·5xx 표시, 성공 후 초기화, `<Activity>` 재진입 3건) | 통과 |
 | AC-MEMBER-21 | `ProjectMembers.test.tsx`·`AddMemberForm.test.tsx`(401 → `refresh()`), `routes.test.tsx`(구성원 목록 401 → `/login?next=%2Fprojects%2F7&reason=expired`) | 통과 |
-| AC-MEMBER-22 | Windows 수동 E2E | 미실행 |
+| AC-MEMBER-22 | Windows 수동 E2E §10.4 1~5 (사용자 수행, 2026-10-27) | 통과 |
 | AC-MEMBER-23 | CI run 40486544844 (`3a53b72`) | 통과 |
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 통과 (JDK 21 + PostgreSQL 16.15, 127건) | 성공 (`5f42dcc`) | 미실행 |
-| Frontend lint·test·build | 통과 (lint 0건, 15개 파일 123건, build) | 성공 (`3a53b72`) | 미실행 |
-| 수동 E2E (§10.4) | — | — | 미실행 |
+| Backend build·test | 통과 (JDK 21 + PostgreSQL 16.15, 127건) | 성공 (`5f42dcc`) | 보고 없음 (E2E용으로 실행) |
+| Frontend lint·test·build | 통과 (lint 0건, 15개 파일 123건, build) | 성공 (`3a53b72`) | 보고 없음 |
+| 수동 E2E (§10.4) | — | — | **통과** (2026-10-27, 사용자) |

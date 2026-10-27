@@ -28,22 +28,22 @@ docflow/
 │       │   ├── global/        # config(Security, JPA Auditing), error(공통 오류 응답), security(401/403 JSON), common(BaseTimeEntity)
 │       │   ├── user/          # domain(User), repository, service(UserAccountService)
 │       │   ├── auth/          # controller, service, security(AuthenticatedUser, UserDetailsService), dto, dev(local Seeder)
-│       │   └── project/       # controller, service(ProjectService), domain(Project, ProjectText), repository, dto
+│       │   └── project/       # controller(Project, ProjectMember), service(ProjectService, ProjectPermissionService, ProjectMemberService), domain(Project, ProjectMember, ProjectRole, ProjectText), repository, dto
 │       └── resources/
 │           ├── application.yml
-│           └── db/migration/  # V1__baseline, V2__create_users, V3__create_projects
+│           └── db/migration/  # V1__baseline, V2__create_users, V3__create_projects, V4__create_project_members
 ├── frontend/                  # Next.js (npm)
 │   └── src/
 │       ├── app/               # /, /login, /projects, /projects/new, /projects/[projectId], layout(AuthProvider)
 │       ├── lib/api-client.ts  # 동일 출처 fetch, CSRF 헤더·재시도, 오류 파싱
 │       └── features/
 │           ├── auth/          # AuthProvider, api, LoginForm, RequireAuth, LogoutButton
-│           ├── projects/      # api, types, validation(§5.5 입력 규칙), ProjectList, ProjectCreateForm, ProjectDetail
+│           ├── projects/      # api, types, validation(§5.5 입력 규칙), ProjectList, ProjectCreateForm, ProjectDetail, ProjectMembers, AddMemberForm
 │           └── backend-health/
 ├── docs/
 │   ├── architecture.md
 │   └── adr/0001~0005
-├── specs/                     # README.md, 00-auth.md (SPEC-AUTH), 01-project-create.md (SPEC-01)
+├── specs/                     # README.md, 00-auth.md (SPEC-AUTH), 01-project-create.md (SPEC-01), 02-project-members.md (SPEC-02)
 ├── docker-compose.yml         # PostgreSQL 16
 ├── .env.example               # 환경변수 예시 (.env는 Git 제외)
 ├── spec.md
@@ -79,8 +79,9 @@ docflow/
 ## 5. 데이터와 스키마
 
 - 스키마는 Flyway migration으로만 변경한다(`ddl-auto=validate`).
-- `V1__baseline.sql`(기준점), `V2__create_users.sql`(SPEC-AUTH `users`), `V3__create_projects.sql`(SPEC-01 `projects`)이 있다. `ddl-auto=validate`가 `User`·`Project` Entity와 실제 스키마를 검증한다.
+- `V1__baseline.sql`(기준점), `V2__create_users.sql`(SPEC-AUTH `users`), `V3__create_projects.sql`(SPEC-01 `projects`), `V4__create_project_members.sql`(SPEC-02 `project_members`)이 있다. `ddl-auto=validate`가 `User`·`Project`·`ProjectMember` Entity와 실제 스키마를 검증한다.
 - `projects.owner_id`는 `users.id` FK(`ON DELETE RESTRICT`)이며, 목록 조회용 인덱스 `(owner_id, created_at DESC, id DESC)`와 공백 이름 방지 `CHECK`가 있다.
+- `project_members`(SPEC-02)는 MEMBER만 저장한다(Owner는 `projects.owner_id`). `project_id` FK(`ON DELETE CASCADE`), `user_id` FK(`ON DELETE RESTRICT`), `UNIQUE (project_id, user_id)`(`uk_project_members_project_user`), `user_id` 인덱스가 있다. 구성원 제거는 행을 물리 삭제한다.
 - Entity ID는 `BIGINT GENERATED ALWAYS AS IDENTITY`로 확정했다(ADR-0005).
 
 ## 6. 보안 관련 현재 상태
@@ -91,12 +92,17 @@ docflow/
 - 세션: 서버 메모리, 미사용 30분 만료, 쿠키 `HttpOnly`·`SameSite=Lax`, `Secure`는 `SESSION_COOKIE_SECURE`로 제어.
 - Actuator는 `health` 전체 상태만 노출하고 상세 정보는 숨긴다(ADR-0003 §4).
 - 비밀정보는 `.env`(Git 제외)로만 주입한다. 개발 계정 비밀번호(`DEV_SEED_PASSWORD`)도 같다.
-- 프로젝트 접근: 현재는 Owner만 접근할 수 있으며, `ProjectService.getAccessibleProject()`가 단일 진입점이다. 다른 사용자의 프로젝트와 없는 프로젝트는 같은 `404 PROJECT_NOT_FOUND`로 응답한다(SPEC-01 §7.4, §7.8).
+- 프로젝트 접근(SPEC-01 §7.8, SPEC-02 §7):
+  - 구성원(OWNER 또는 MEMBER)만 접근할 수 있다. `ProjectService.getAccessibleProject()`가 단일 진입점이며, 구성원이 아닌 사용자와 없는 프로젝트는 같은 `404 PROJECT_NOT_FOUND`로 응답한다. 목록 조회도 같은 조건을 쓴다.
+  - 작업별 권한은 `ProjectPermissionService`에서만 판단한다. 구성원 추가·제거는 OWNER 전용이며 MEMBER는 `403 ACCESS_DENIED`를 받는다.
+  - 프로젝트 목록·상세 응답의 `myRole`(`OWNER`/`MEMBER`)로 Frontend가 Owner 전용 UI를 표시하며, 최종 판단은 Backend가 한다.
+- 구성원 API(SPEC-02 §6): `GET /api/projects/{projectId}/members`(구성원), `POST /api/projects/{projectId}/members` `{ email }`(OWNER, `201`), `DELETE /api/projects/{projectId}/members/{userId}`(OWNER, `204`).
+  - 응답에는 이메일을 포함하지 않으며(`userId`, `displayName`, `role`, `addedAt`), 입력 이메일은 오류 응답과 애플리케이션 로그에 남기지 않는다.
+  - 동시 추가로 인한 `uk_project_members_project_user` 위반은 트랜잭션 롤백 후 `409 PROJECT_MEMBER_ALREADY_EXISTS`로 변환하고, 그 밖의 DB 오류는 `500`으로 처리한다(`ProjectMemberService`, `TransactionTemplate`).
 - MVP 한계: `/me` 이외의 보호 API는 요청마다 계정 활성 여부를 다시 확인하지 않는다. 로그인 실패 횟수 제한이 없다.
 
 ## 7. 다음 단계에서 추가될 요소 (미생성)
 
 | 시점 | 추가 요소 |
 | --- | --- |
-| SPEC-02 Project Member | 프로젝트 단위 권한 검증 |
 | SPEC-03/04 Document·Version | 파일 저장소 인터페이스(로컬 파일시스템) |
