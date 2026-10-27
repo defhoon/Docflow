@@ -653,7 +653,7 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 | 질문 | 결정 | 상태 | 근거 |
 | --- | --- | --- | --- |
 | 인증 방식은 Session/JWT 중 어떤 방식을 사용할 것인가? | Spring Security 서버 세션 인증. JWT와 혼용하지 않는다. CSRF, Session Cookie, 인가 규칙은 SPEC-AUTH에서 정의한다. | **확정** (2026-10-22, SPEC-AUTH) | [ADR-0005](./docs/adr/0005-session-authentication.md), [`specs/00-auth.md`](./specs/00-auth.md) |
-| 파일 저장소는 어떤 방식으로 구성할 것인가? | MVP에서는 로컬 파일시스템. 저장소 인터페이스와 업로드 기능은 해당 SPEC에서 구현한다. | 잠정 (SPEC-03/04 작성 시 확정) | [ADR-0001](./docs/adr/0001-technology-stack.md) |
+| 파일 저장소는 어떤 방식으로 구성할 것인가? | MVP에서는 로컬 파일시스템. 저장소 인터페이스(`FileStorage`)와 업로드 기능은 SPEC-03에서 구현한다. | **확정** (2026-10-27, SPEC-03) | [ADR-0001](./docs/adr/0001-technology-stack.md) Q2, [`specs/03-document-create.md`](./specs/03-document-create.md) §5.4 |
 | Entity ID 전략은 무엇으로 할 것인가? | `BIGINT GENERATED ALWAYS AS IDENTITY` | **확정** (2026-10-22, SPEC-AUTH) | [ADR-0005](./docs/adr/0005-session-authentication.md) |
 
 ### 16.2 미결정

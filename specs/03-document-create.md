@@ -1,12 +1,18 @@
 # SPEC-03: 문서 등록
 
-- 상태: **Draft v0.1 (2026-10-27) — 설계 확정, 구현 미승인**
+- 상태: **Draft v0.2 (2026-10-27) — 설계 보완 완료, 구현 미승인**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
 - 작성일: 2026-10-27
 - 변경 이력:
   - v0.1 (2026-10-27): 설계 분석(대화)에서 확정한 Q1~Q14, 추가 결정 D1~D8 반영. 문서 작성
+  - v0.2 (2026-10-27): 최종 설계 리뷰 반영.
+    - (B1) PDF 검증 기준과 AC 불일치 해소: 헤더 + 최소 구조(`%%EOF`, `startxref`, 교차 참조 위치) 검증으로 구체화하고 보장하지 않는 범위 명시 (D9)
+    - (B2) OOXML Content Type 문자열 검색 제거: JDK 기본 XML 파서(DTD·외부 엔티티·외부 리소스 차단)로 `[Content_Types].xml`의 PartName–ContentType 대응 검증, 주 문서 파트를 끝까지 읽어 크기·CRC 확인 (D8 수정, D10)
+    - (R1) ZIP 검사 자원 상한을 업로드 크기와 구분하고, 상한 초과를 검증 실패로 명시, 수치를 잠정값과 근거·검증 방법으로 정리 (D11)
+    - (R2) DB 실패 통합 테스트를 세션 사용자 삭제 방식에서 저장 키 UNIQUE 위반(두 번째 INSERT 실패) 방식으로 변경
+    - (R3) `spec.md` §16.1 파일 저장소 상태를 ADR-0001·이 SPEC과 일치하도록 "확정"으로 갱신
 
 표기: **[기존]** 이미 구현·확정된 내용, **[결정 Qn·Dn]** 사용자가 확정한 결정, **[제안]** 이 SPEC의 설계안, **[검증 필요]** 구현 단계에서 실제 실행으로 확인할 사항.
 
@@ -167,40 +173,102 @@ public interface FileStorage {
   - 로컬 개발 기본값을 제공한다(예: `backend/`에서 실행 시 `./storage`, 구현 단계에서 확정). 기본 저장 경로는 Git 추적 대상에서 제외한다(`.gitignore`, 구현 단계).
   - `.env.example`에 변수를 추가한다(구현 단계).
   - 테스트는 테스트별 독립 임시 디렉터리를 주입한다. CI도 같은 방식이다.
-- **저장 키:** 서버가 만든 UUID 기반 문자열(예: `documents/3f2a…`, 확장자 없음). 원본 파일명은 저장 경로에 쓰지 않는다.
+- **저장 키:** 서버가 만든 UUID 기반 문자열(예: `documents/3f2a…`, 확장자 없음). 원본 파일명은 저장 경로에 쓰지 않는다. 저장 키 생성은 교체 가능한 작은 구성 요소(예: `StorageKeyGenerator`, 기본 구현은 UUID)로 두어 통합 테스트에서 결정적인 키를 쓸 수 있게 한다(§10.2) [제안].
+- **덮어쓰기 금지:** 최종 위치에 같은 이름의 파일이 이미 있으면 이동하지 않고 저장 실패(`500`)로 처리한다(`REPLACE_EXISTING` 미사용). 저장 키 충돌이 다른 문서의 파일을 덮거나 보상 삭제로 지우는 일을 막기 위함이다.
 - **경로 이탈 방지:** 저장 키 → 경로 변환 후 `normalize()`한 경로가 저장 루트 아래인지 확인한다. 저장 키는 서버만 만들지만 방어적으로 확인한다.
 - **임시 파일:** 저장 루트 아래 `tmp/`에 만든다. 최종 위치로의 이동이 같은 볼륨 안의 원자적 이동(`ATOMIC_MOVE`)이 되도록 하기 위함이다.
 - **노출 금지** [결정]: 서버 저장 경로와 `storage_key`는 API 응답·오류 메시지에 넣지 않는다.
 - 저장소 확정은 ADR-0001 Q2의 상태를 "확정"으로 바꾸어 기록한다(새 ADR을 만들지 않는다).
 
-### 5.5 허용 형식과 검증 [결정 Q4, D6, D8]
+### 5.5 허용 형식과 검증 [결정 Q4, D6, D8, D9~D11]
 
-| 확장자 | 저장 `content_type` | 시그니처·구조 | 필수 엔트리 (OOXML) |
+| 확장자 | 저장 `content_type` | 검증 방식 | OOXML 주 문서 파트와 필수 Content Type |
 | --- | --- | --- | --- |
-| `.pdf` | `application/pdf` | 앞 1024바이트 안에 `%PDF-` | — |
-| `.docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | ZIP | `[Content_Types].xml`, `word/document.xml` |
-| `.xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | ZIP | `[Content_Types].xml`, `xl/workbook.xml` |
-| `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | ZIP | `[Content_Types].xml`, `ppt/presentation.xml` |
+| `.pdf` | `application/pdf` | PDF 최소 구조 검증 (§5.5.2) | — |
+| `.docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | OOXML 검증 (§5.5.3) | `/word/document.xml` = `application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml` |
+| `.xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | OOXML 검증 (§5.5.3) | `/xl/workbook.xml` = `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml` |
+| `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | OOXML 검증 (§5.5.3) | `/ppt/presentation.xml` = `application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml` |
 
-**검증 순서**
+#### 5.5.1 공통 순서
 
-1. 확장자: 정규화된 원본 파일명의 마지막 확장자(소문자, `Locale.ROOT`)가 허용 목록에 있어야 한다. `report.pdf.exe`는 `exe`로 거부된다.
-2. 실제 크기: 업로드 스트림을 임시 파일로 복사하며 읽은 바이트 수를 센다. 0바이트는 거부, 20,971,520바이트 초과는 `413`(§5.6).
-3. 형식: 확장자에 맞는 시그니처·구조를 확인한다. 클라이언트 `Content-Type`은 사용하지 않는다.
-4. **OOXML** [결정 D8]: JDK `java.util.zip.ZipFile`로 검사한다.
-   - ZIP 중앙 디렉터리를 열 수 없거나 손상되었으면 거부한다.
-   - 엔트리 수 상한(예: 10,000개)을 넘으면 거부한다.
-   - 형식별 필수 엔트리가 모두 있어야 한다.
-   - **필수 엔트리를 제한된 크기 안에서 실제로 읽는다.** 엔트리당 최대 압축 해제량(예: 1MiB)과 검사 전체 해제량 상한(예: 4MiB)을 두고, 그 안에서 압축 해제가 오류 없이 되는지 확인한다. 상한에 도달하면 더 읽지 않는다(ZIP bomb 방어).
-   - `[Content_Types].xml`에서 형식별 주 문서 Content Type 문자열(예: `wordprocessingml.document.main+xml`)이 있는지 **문자열로** 확인한다. 다른 OOXML 형식을 확장자만 바꾼 파일을 거부하기 위함이다.
-   - XML 파서를 쓰지 않는다(외부 엔티티 처리 위험 회피). 전체 Office 문서 파싱도 하지 않는다. 다른 엔트리는 압축을 풀지 않는다.
-5. **JDK 기본 기능으로 충분하다.** `ZipFile`, `InputStream`의 제한 읽기, `MessageDigest`(SHA-256)로 구현한다. Apache Tika·POI 등 새 의존성은 필요 없다. 구현 중 JDK만으로 위 요구를 충족할 수 없으면 의존성을 추가하지 않고 보고한다.
-6. 오류 응답: 형식 불일치·손상·빈 파일·파일명 오류는 `400 VALIDATION_FAILED`, `fieldErrors[].field = "file"` [결정 D6].
+1. **확장자:** 정규화된 원본 파일명(§5.7)의 마지막 확장자(소문자, `Locale.ROOT`)가 허용 목록에 있어야 한다. `report.pdf.exe`는 `exe`로 거부된다.
+2. **실제 크기:** 업로드 스트림을 임시 파일로 복사하며 읽은 바이트 수를 센다. 0바이트는 `400`, 20,971,520바이트 초과는 `413`(§5.6).
+3. **형식:** 확장자에 맞는 검증(§5.5.2 또는 §5.5.3)을 임시 파일에 대해 수행한다. 클라이언트가 보낸 `Content-Type`은 사용하지 않는다.
+4. **오류:** 형식·구조 검증 실패, 검사 자원 상한 초과는 모두 `400 VALIDATION_FAILED`, `fieldErrors[].field = "file"` [결정 D6]. 업로드 크기 제한(`413`)과 검사 자원 상한(`400`)은 서로 다른 제한이다.
+5. **새 의존성 없음:** JDK 기본 기능(`RandomAccessFile`/`SeekableByteChannel`, `java.util.zip.ZipFile`, `java.util.zip.CRC32`, JDK 기본 StAX 파서, `MessageDigest`)으로 구현한다. Apache Tika·POI·PDFBox 등은 도입하지 않는다. 구현 중 JDK만으로 아래 요구를 충족할 수 없으면 의존성을 추가하지 않고 보고한다.
 
-**검증의 한계 (잔여 위험)**
+#### 5.5.2 PDF 최소 구조 검증 [결정 D9]
 
-- 이 검증은 "선언한 형식의 구조를 갖춘 파일"인지 확인할 뿐 안전성을 보증하지 않는다.
-- 폴리글랏 파일(예: PDF이면서 ZIP), 매크로나 악성 콘텐츠를 포함한 파일, ZIP 로컬 헤더와 중앙 디렉터리 불일치를 이용한 파일은 통과할 수 있다.
+SPEC-03은 PDF의 **헤더와 최소 구조**만 검증한다. 파일의 앞부분 최대 1,024바이트, 뒷부분 최대 1,024바이트, `startxref`가 가리키는 위치의 최대 64바이트만 읽는다(파일 크기와 무관하게 읽는 양이 일정하다).
+
+**확인하는 것 (모두 만족해야 통과)**
+
+| # | 조건 | 의미 |
+| --- | --- | --- |
+| P1 | 앞 1,024바이트 안에 `%PDF-` 다음에 버전 `1.0`~`1.7` 또는 `2.0`(정규식 `%PDF-(1\.[0-7]|2\.0)`)이 있다. 헤더 시작 위치를 기준 오프셋으로 기록한다 | 헤더 |
+| P2 | 뒤 1,024바이트 안에 `%%EOF`가 있다 | 파일 끝 표시 |
+| P3 | 뒤 1,024바이트 안에서 마지막 `%%EOF`보다 앞에 `startxref` 키워드와 그 뒤의 10진수 오프셋이 있다 | 교차 참조 위치 |
+| P4 | 오프셋 + 기준 오프셋이 파일 크기보다 작다 | 범위 |
+| P5 | 그 위치(공백 문자 건너뜀)가 `xref`(교차 참조 표) 또는 `<정수> <정수> obj`(교차 참조 스트림, PDF 1.5+)로 시작한다 | 교차 참조 구조가 실제로 있음 |
+
+- 따라서 `%PDF-` 문자열만 포함한 임의의 텍스트 파일, `%%EOF`나 `startxref`가 없는 파일, `startxref`가 범위를 벗어나거나 교차 참조가 아닌 곳을 가리키는 파일은 거부된다.
+
+**보장하지 않는 것**
+
+- 교차 참조 표·스트림의 각 항목, 객체·스트림의 유효성, 압축 데이터 무결성, 암호화 여부, 렌더링 가능 여부는 검사하지 않는다.
+- 따라서 **최소 구조를 갖추고 내부가 일부 손상된 PDF, 구조가 복잡한 PDF(증분 업데이트, 선형화 등)는 손상 여부와 관계없이 통과할 수 있다.** PDF 전체 무결성은 SPEC-03에서 보장하지 않는다.
+- 반대로 `startxref` 오프셋이 틀렸지만 PDF 뷰어가 자동 복구해 열 수 있는 PDF는 거부될 수 있다(과잉 거부 가능성). 구현 시 일반 도구(MS Office·LibreOffice·브라우저 인쇄·macOS 미리보기 등)로 만든 정상 PDF 표본으로 확인한다(§12.1).
+- 전체 PDF 파싱 라이브러리는 도입하지 않는다.
+
+#### 5.5.3 OOXML 검증 (DOCX·XLSX·PPTX) [결정 D8, D10]
+
+임시 파일을 JDK `java.util.zip.ZipFile`로 연다. 파일 전체를 압축 해제하거나 모든 엔트리를 메모리에 올리지 않는다. 아래 두 엔트리만 읽는다.
+
+1. **ZIP 구조:** 중앙 디렉터리를 열 수 없거나 손상되었으면 거부한다. 암호화된 엔트리가 있으면 거부한다.
+2. **엔트리 수:** 상한(§5.5.4) 초과 시 거부한다.
+3. **필수 엔트리 존재:** `[Content_Types].xml`과 형식별 주 문서 파트 엔트리(`word/document.xml`, `xl/workbook.xml`, `ppt/presentation.xml`)가 있어야 한다.
+4. **`[Content_Types].xml` 파싱 (JDK 기본 XML 파서):**
+   - 크기 상한(§5.5.4) 안에서 끝까지 읽어 파싱한다. 상한을 넘으면 거부한다.
+   - XML이 형식에 맞지 않거나(well-formed 아님) 루트가 OPC Content Types(`Types`)가 아니면 거부한다.
+   - `Default`(`Extension` → `ContentType`)와 `Override`(`PartName` → `ContentType`) 항목을 모은다. PartName과 확장자 비교는 OPC 규칙대로 ASCII 대소문자를 구분하지 않는다.
+   - **주 문서 파트의 실효 Content Type**을 구한다: 해당 PartName의 `Override`가 있으면 그 값, 없으면 그 파트 확장자의 `Default` 값.
+   - 실효 Content Type이 위 표의 형식별 주 문서 Content Type과 **정확히 일치**해야 한다. 같은 PartName의 `Override`가 둘 이상이면 거부한다.
+   - 이로써 다음을 거부한다: 문자열만 포함하고 파트와 연결되지 않은 경우, 주 문서 파트가 다른 형식으로 선언된 경우(예: `.xlsx`인데 Word 주 문서), 매크로 포함 형식(`…document.macroEnabled.main+xml` 등)·서식 파일 형식(`…template.main+xml`)으로 선언된 경우, 주 문서 파트가 일반 `application/xml`로만 선언된 경우.
+5. **주 문서 파트 엔트리 읽기:** ZIP 엔트리 이름(앞의 `/` 제외)이 PartName과 일치하는 엔트리를 크기 상한(§5.5.4) 안에서 **끝까지** 압축 해제하며 읽고(내용은 파싱·보관하지 않음), 읽은 바이트 수가 중앙 디렉터리의 선언 크기와 같은지, 직접 계산한 CRC-32가 선언 값과 같은지 확인한다. 상한을 넘거나, 선언 크기보다 많이/적게 나오거나, CRC가 다르거나, 압축 해제 오류가 나면 거부한다.
+6. **XML 파서 보안 설정** (JDK 기본 StAX 구현, `XMLInputFactory.newDefaultFactory()`로 생성해 클래스패스의 다른 구현을 쓰지 않는다):
+   - `XMLInputFactory.SUPPORT_DTD = false` (DTD 비활성화)
+   - `XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES = false` (외부 엔티티 비활성화)
+   - `XMLConstants.ACCESS_EXTERNAL_DTD = ""`, `XMLConstants.ACCESS_EXTERNAL_SCHEMA = ""` (외부 리소스 접근 금지)
+   - `XMLResolver`는 항상 예외를 던지도록 설정한다(외부 리소스 조회 시 실패).
+   - 문서에 `DOCTYPE`(DTD 이벤트)이 나타나면 즉시 거부한다.
+   - 파서 입력은 크기 상한을 강제하는 스트림으로 감싼다. JDK XML 처리 한계(`jdk.xml.*` 기본값)도 유지한다.
+7. 주 문서 파트 내용, 관계(`_rels/.rels`, `*.rels`), 다른 파트는 파싱·검증하지 않는다.
+
+**보장하지 않는 것**
+
+- `[Content_Types].xml`과 주 문서 파트 하나만으로 **OOXML 패키지 전체의 유효성을 보장하지 않는다.** 관계 파일의 대상, 다른 파트의 존재·내용, 주 문서 XML의 스키마 유효성은 검사하지 않는다. Office가 열지 못하는 파일이 통과할 수 있다.
+- 주 문서 파트가 표준 위치(`word/document.xml` 등)가 아닌 비표준 패키지는 거부될 수 있다(과잉 거부 가능성).
+- 매크로 바이너리(`vbaProject.bin`)가 포함되어 있어도 주 문서 Content Type이 일반 형식이면 통과한다. 파일을 서버에서 실행·렌더링하지 않는다.
+
+#### 5.5.4 OOXML 검사 자원 상한 [결정 D11 — 잠정값]
+
+| 항목 | 잠정값 | 근거 | 초과 시 |
+| --- | --- | --- | --- |
+| ZIP 엔트리 수 | 10,000개 | 일반 DOCX·XLSX·PPTX는 파트가 수십~수천 개다(슬라이드·이미지·시트가 많아도 각 파트가 엔트리 하나). 20MiB 안에 정상 문서가 1만 개를 넘는 경우는 드물다고 판단한다 | `400` |
+| `[Content_Types].xml` 압축 해제 크기 | 1MiB | 파트 확장자 `Default`와 파트별 `Override` 목록만 담는다. 파트 1만 개에 `Override` 1개당 약 150바이트를 가정해도 약 1.5MB 미만이며, 일반 문서는 수 KB~수십 KB다 | `400` |
+| 주 문서 파트 압축 해제 크기 | 128MiB | `word/document.xml`은 본문 전체를 담아 텍스트가 많은 문서에서 커질 수 있다. 20MiB 업로드 상한과 XML의 일반적인 deflate 압축률(대략 5~10배)을 고려해 정상 문서가 거부되지 않을 여유를 둔다. `xl/workbook.xml`, `ppt/presentation.xml`은 시트·슬라이드 목록만 담아 보통 작다 | `400` |
+| 검사 전체 압축 해제량 | 위 두 엔트리 합계 (최대 129MiB) | 위 두 엔트리 외에는 압축을 풀지 않는다 | `400` |
+
+- **업로드 파일 크기 제한(20MiB, `413`)과 검사 자원 상한(`400`)은 별개다.** 검사 상한은 작은 ZIP이 크게 풀리는 압축 폭탄을 막기 위한 것이다.
+- **상한 초과는 항상 검증 실패다.** 상한까지만 읽고 성공으로 처리하지 않는다. 중앙 디렉터리의 선언 크기가 상한을 넘으면 읽기 전에 거부하고, 선언 크기는 위조될 수 있으므로 실제로 읽은 바이트 수로도 상한을 다시 강제한다.
+- **메모리:** `[Content_Types].xml`은 1MiB 이하로 파싱하고, 주 문서 파트는 고정 크기 버퍼로 읽으며 CRC만 계산한다(내용 미보관). 요청당 추가 메모리는 수 MiB 이하다.
+- **CPU:** 압축 해제량이 최대 129MiB로 제한되어 검사 시간이 상한을 가진다(구현 시 측정).
+- **잠정값인 이유:** 정상 Office 파일 표본으로 분포를 측정하지 않았다. 위 근거는 추정이며 확정 사실이 아니다. 구현 시 표본(MS Office·LibreOffice·Google Docs 내보내기로 만든 DOCX·XLSX·PPTX, 20MiB에 가까운 파일 포함)의 엔트리 수, `[Content_Types].xml` 크기, 주 문서 파트 크기, 검사 시간을 측정해 기록하고, 정상 표본이 거부되면 원인과 조정안을 보고해 승인 후 값을 바꾼다(§12.1).
+
+#### 5.5.5 검증의 한계 (잔여 위험)
+
+- 위 검증은 "선언한 형식의 최소 구조를 갖춘 파일"인지 확인할 뿐 **안전성이나 완전한 유효성을 보증하지 않는다** (§5.5.2, §5.5.3의 "보장하지 않는 것").
+- 폴리글랏 파일(예: PDF이면서 ZIP), 악성 콘텐츠·매크로를 포함한 파일, ZIP 로컬 헤더와 중앙 디렉터리 불일치를 이용한 파일은 통과할 수 있다.
 - 암호가 설정된 Office 문서(OLE 컨테이너)는 ZIP이 아니므로 거부된다(기능 제약).
 - 악성코드 검사는 범위 밖이다. 파일을 서버에서 실행하거나 렌더링하지 않는다.
 
@@ -432,7 +500,15 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 
 ### 10.1 Backend 단위 테스트
 
-- 형식 판별: 정상 PDF·DOCX·XLSX·PPTX(테스트 코드에서 최소 구조 생성), 확장자 위장(PDF를 `.docx`로, DOCX를 `.xlsx`로), 빈 파일, 손상된 ZIP, 필수 엔트리 누락, `[Content_Types].xml` 주 문서 타입 불일치, 엔트리 수 초과, 압축 해제 상한 초과(높은 압축률 엔트리)
+- **PDF 최소 구조 (§5.5.2):**
+  - 통과: 테스트 코드에서 만든 최소 PDF(교차 참조 표), 교차 참조 스트림 PDF, 헤더 앞에 1,024바이트 이내 접두 바이트가 있는 PDF, 증분 업데이트(`%%EOF` 2개) PDF
+  - 거부: `%PDF-`만 포함한 텍스트, 헤더 버전 형식 오류(`%PDF-9.9`), `%%EOF` 없음, `startxref` 없음, `startxref` 오프셋이 파일 크기 이상, 오프셋 위치가 `xref`·`obj`가 아님, 헤더가 1,024바이트 뒤에 있음, DOCX를 `.pdf`로 바꾼 파일
+  - 보장 범위 확인: 최소 구조는 맞고 내부 객체가 손상된 PDF가 **통과함**을 테스트로 명시한다(보장하지 않는 범위의 회귀 방지)
+- **OOXML (§5.5.3):**
+  - 통과: 테스트 코드에서 만든 최소 DOCX·XLSX·PPTX(`Override`로 주 문서 선언), 주 문서 PartName 대소문자가 다른 선언
+  - 거부: 손상된 ZIP, 암호화 엔트리, 필수 엔트리(`[Content_Types].xml`·주 문서 파트) 누락, 형식에 맞지 않는 XML, 루트가 `Types`가 아님, 주 문서 `Override` 없음(`Default`만으로 `application/xml`), 주 문서 Content Type이 다른 형식(XLSX를 `.docx`로)·매크로 형식·서식 파일 형식, Content Type 문자열이 다른 PartName이나 주석에만 있음, 같은 PartName `Override` 중복
+  - XML 보안: `DOCTYPE` 포함 → 거부, 외부 엔티티(`file:`·`http:` 참조) 포함 → 거부되고 외부 접근이 일어나지 않음(로컬 테스트 서버·파일 접근 없음 확인), 엔티티 확장 공격 → 거부
+  - 자원 상한: 엔트리 수 10,001개, `[Content_Types].xml` 1MiB 초과, 주 문서 파트 선언 크기가 상한 초과, 선언 크기와 실제 압축 해제 크기 불일치, CRC 불일치, 높은 압축률 주 문서 파트(상한 초과) → 모두 `400`이며 상한 이상 압축 해제하지 않음
 - 파일명 정규화: `../a.pdf`, `C:\x\a.pdf`, 제어·양방향·폭 없는 문자, 255/256자, `report.pdf.exe`, 확장자 없음
 - 저장소: 저장 키 → 경로 변환의 루트 이탈 차단, 임시 파일 위치
 - 제목·설명 검증(SPEC-01 §5.5.5 케이스 재사용, 길이 200)
@@ -452,13 +528,31 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | 제거된 구성원 | 문서 유지·작성자 이름 표시, 제거된 사용자는 `404` |
 | **크기 경계** | 실제 HTTP(`webEnvironment = RANDOM_PORT`)로 1MiB, 19MiB, 20,971,520바이트(`201`), 20,971,521바이트·21MiB(`413 FILE_TOO_LARGE`) — MockMvc는 Tomcat multipart 상한을 거치지 않으므로 사용하지 않는다 |
 | **파일 저장 실패** | `DOCFLOW_STORAGE_DIR`를 일반 파일로 지정해 실제 I/O 오류 → `500`, DB 행 없음, 응답에 경로 없음 |
-| **DB 실패 보상** | [기존] SPEC-01 방식(세션 사용자 행 삭제로 FK 위반) → `500`, Document·Version 모두 없음, 최종 파일 삭제됨 |
+| **DB 실패 보상** | §10.2.1 — 저장 키 UNIQUE 위반으로 두 번째 INSERT(`document_versions`) 실패 → `500 INTERNAL_ERROR`, 원인이 `uk_document_versions_storage_key` 위반임을 확인, `documents`·`document_versions` 행 수 불변, 최종 파일 보상 삭제됨, 기존 파일 보존 |
 | 공통 | 미인증 `401`, CSRF 없음 `403`(DB·저장소 변화 없음), JSON 요청 `415`, 숫자가 아닌 경로 변수 `400`, `file` 누락 `400 VALIDATION_FAILED` |
 | 동시성 | 같은 요청 2회 → 문서 2개. (선택) [기존] SPEC-02 DB 잠금 대기 기법으로 "접근 확인 후 구성원 제거 커밋 → 등록 성공"(D5) 재현 |
 | 스키마 | V5 FK·UNIQUE·CHECK 직접 INSERT 검증, `ddl-auto=validate` |
 | **회귀** | SPEC-AUTH·SPEC-01·SPEC-02 기존 테스트 전체 |
 
 - 보상 삭제 실패와 커밋 결과 불명확은 실제 장애로 결정적으로 재현하기 어렵다. 이 두 경우만 `FileStorage` 테스트 대역과 콜백 단위 테스트로 검증한다(mock 사용 예외).
+- **테스트 데이터 정리 순서:** 새 FK가 모두 `RESTRICT`이므로 문서 테스트는 `document_versions` → `documents` → (기존) `projects` → `users` 순으로 정리하고, 테스트별 임시 저장 디렉터리를 사용한다. 문서 행이 남으면 [기존] 다른 테스트의 `DELETE FROM projects`·`users` 정리가 실패하므로, 문서를 만드는 모든 테스트 클래스는 자체 정리를 보장한다.
+
+#### 10.2.1 DB 실패 보상 테스트 설계 (AC-DOC-12)
+
+- **목표:** 인증 사용자 상태를 건드리지 않고, 실제 PostgreSQL 제약 위반으로 **두 번째 INSERT**를 실패시켜 Document와 Version이 함께 롤백되고 최종 파일이 보상 삭제되는지 확인한다.
+- **역할 분리:** 요청자(세션 사용자)는 정상 구성원이며 데이터를 바꾸지 않는다. 실패는 별도로 준비한 "충돌 행"이 일으킨다.
+- **방법 (권장):**
+  1. 테스트 설정에서 `StorageKeyGenerator`(§5.4)를 고정 키 `K`를 반환하는 구현으로 교체한다(키 생성만 대체하며 저장·DB·트랜잭션은 실제 구현).
+  2. 테스트 준비 단계에서 별도 프로젝트·문서에 `storage_key = K`인 `document_versions` 행을 JDBC로 미리 넣는다. 이 행에 해당하는 파일은 테스트 저장 디렉터리에 만들지 않는다(덮어쓰기 금지 규칙에 걸리지 않도록).
+  3. 정상 구성원이 업로드한다 → 파일이 `K` 위치에 배치됨 → `documents` INSERT 성공 → `document_versions` INSERT가 `uk_document_versions_storage_key` 위반으로 실패 → 트랜잭션 롤백.
+- **검증:**
+  - 응답 `500 INTERNAL_ERROR`, 본문에 경로·저장 키·제약 이름 없음
+  - 원인이 DB 제약 위반임: 테스트 로그(PostgreSQL 오류)에 `uk_document_versions_storage_key`가 나타나고, 예외가 저장소 오류가 아님 (SPEC-02 동시성 테스트와 같은 방식)
+  - `documents`·`document_versions` 행 수가 요청 전과 같음 (먼저 INSERT된 Document도 롤백)
+  - `K` 위치의 파일이 삭제됨, 미리 넣은 행은 그대로임
+- **독립성:** 테스트 클래스별 사용자·프로젝트·임시 저장 디렉터리를 만들고 정리한다. 실행 순서나 다른 테스트 데이터에 의존하지 않는다. 고정 키 구현은 이 테스트 클래스에만 적용한다.
+- **한계:** 저장 키 생성기를 교체하는 테스트 전용 구성이 필요하다(실패 자체는 실제 DB 제약이 일으킨다). 대안으로 SPEC-02의 DB 잠금 대기 기법(별도 커넥션이 프로젝트 행 삭제를 미커밋 상태로 잡고 있다가 커밋)으로 `documents.project_id` FK 위반을 일으킬 수 있으나, 이 경우 첫 번째 INSERT가 실패해 "Document·Version 동시 롤백"을 직접 보여 주지 못하므로 보조 테스트로만 고려한다.
+
 
 ### 10.3 Frontend 테스트 (Vitest)
 
@@ -509,15 +603,15 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | **AC-DOC-01** | OWNER와 MEMBER는 문서를 등록할 수 있다 | `201`, `Location`, `DocumentResponse`, `status=DRAFT`, `latestVersion.versionNumber=1`, `createdBy`=세션 사용자 | 통합 |
 | **AC-DOC-02** | 등록 시 Document와 Version v1이 함께 저장된다 | `documents` 1행 + `document_versions` 1행(`version_number=1`, `uploaded_by`=작성자), 파일 크기·SHA-256 일치 | 통합 |
 | **AC-DOC-03** | PDF·DOCX·XLSX·PPTX를 허용하고 서버가 판별한 형식을 저장한다 | 4종 `201`, `content_type`이 §5.5 값 | 통합 |
-| **AC-DOC-04** | 허용되지 않는 형식과 형식 위장 파일을 거부한다 | 다른 확장자, 확장자와 실제 형식 불일치, 다른 OOXML 형식 위장 → `400 VALIDATION_FAILED`, `fieldErrors[file]`, DB 행·저장 파일 없음 | 단위 + 통합 |
-| **AC-DOC-05** | 손상되었거나 자원 상한을 넘는 파일을 거부한다 | 손상 ZIP·PDF, 필수 엔트리 누락·읽기 실패, 엔트리 수·압축 해제량 상한 초과 → `400`, 상한 이상 압축 해제하지 않음 | 단위 |
+| **AC-DOC-04** | 허용되지 않는 형식과 형식 위장 파일을 거부한다 | 허용 외 확장자, `%PDF-` 문자열만 포함한 텍스트, 다른 형식을 `.pdf`로 바꾼 파일, 주 문서 Content Type이 다른 OOXML 형식·매크로·서식 형식으로 선언된 파일, Content Type 문자열이 주 문서 파트와 연결되지 않은 파일 → `400 VALIDATION_FAILED`, `fieldErrors[file]`, DB 행·저장 파일 없음 (§5.5.2, §5.5.3) | 단위 + 통합 |
+| **AC-DOC-05** | 최소 구조 검증을 통과하지 못하거나 검사 자원 상한을 넘는 파일을 거부한다 | PDF: §5.5.2 P1~P5 중 하나라도 불충족. OOXML: 손상 ZIP, 필수 엔트리 누락, `[Content_Types].xml` 형식 오류·`DOCTYPE`·외부 엔티티, 주 문서 파트 크기·CRC 불일치, 엔트리 수·압축 해제량 상한 초과 → `400`, 상한 이상 압축 해제하지 않음, 외부 리소스 접근 없음. **최소 구조를 갖춘 PDF의 내부 손상은 이 기준의 거부 대상이 아님**(§5.5.2) | 단위 |
 | **AC-DOC-06** | 빈 파일과 파일 누락을 거부한다 | `400 VALIDATION_FAILED`, `fieldErrors[file]` | 통합 |
 | **AC-DOC-07** | 20MiB 경계가 정확하다 | 실제 HTTP: 1MiB·19MiB·20,971,520바이트 `201`, 20,971,521바이트·21MiB `413 FILE_TOO_LARGE`(공통 형식, 내부 정보 없음) | 통합 (RANDOM_PORT) |
 | **AC-DOC-08** | 실제 Next.js rewrite 경로로 19MiB·20MiB 업로드가 잘림 없이 성공한다 | 저장 파일 크기·SHA-256이 원본과 일치 | 수동 (클라우드·Windows) |
 | **AC-DOC-09** | 실제 요청 경로에서 크기 초과 시 응답이 전달된다 | 21MiB 업로드에 `413`이 클라이언트에 도달. 연결 종료로 끝나면 원인·대안 보고 후 추가 승인 [결정 D4] | 수동 (클라우드·Windows) |
 | **AC-DOC-10** | 제목·설명·파일명 규칙을 적용한다 | 정규화, 금지 문자, 제목 200·설명 1000·파일명 255(초과 시 거부, 자르지 않음), 경로 구분자 제거, 이중 확장자 거부 | 단위 + 통합 |
 | **AC-DOC-11** | 파일 저장 실패 시 DB 행이 생성되지 않는다 | 저장소 I/O 오류 → `500 INTERNAL_ERROR`, 행 0, 응답에 경로·저장 키 없음 | 통합 |
-| **AC-DOC-12** | DB 저장 실패 시 Document·Version이 함께 롤백되고 파일이 보상 삭제된다 | FK 위반 → `500`, 두 테이블 모두 행 없음, 최종 파일 없음 | 통합 |
+| **AC-DOC-12** | DB 저장 실패 시 Document·Version이 함께 롤백되고 파일이 보상 삭제된다 | §10.2.1: 저장 키 UNIQUE 위반으로 Version INSERT 실패 → `500`, 원인 제약 확인, 두 테이블 행 수 불변(먼저 INSERT된 Document 포함), 최종 파일 삭제, 기존 행 보존. 세션 사용자 데이터는 변경하지 않음 | 통합 |
 | **AC-DOC-13** | 커밋 결과가 불명확하면 파일을 삭제하지 않는다 | 트랜잭션 완료 결과 불명확 → 파일 보존, `storage_key` 로그 | 단위 (콜백) |
 | **AC-DOC-14** | 보상 실패가 원래 오류를 덮지 않는다 | 보상 삭제 실패 시에도 원래 오류 응답, 삭제 실패는 로그 | 단위 (테스트 대역) |
 | **AC-DOC-15** | 구성원이 아닌 사용자는 프로젝트·문서 존재를 알 수 없다 (유효한 요청 기준) | 등록·목록·상세 `404 PROJECT_NOT_FOUND`, 미존재 프로젝트와 본문 동일, 저장소에 파일 없음 | 통합 |
@@ -556,6 +650,11 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | R13 | 원본 파일명에 개인정보 포함 가능 | 구성원에게만 표시 [결정], 로그 미기록 |
 | R14 | Windows 경로·원자적 이동 | 임시 파일을 저장 루트와 같은 볼륨에 두고 `ATOMIC_MOVE`, 실패 시 `500`. Windows 수동 검증 |
 | R15 | `ProjectText` 재사용으로 document → project 도메인 의존 | 단방향 의존(순환 없음)으로 수용. 공통화 리팩터링은 범위 밖 |
+| R16 | PDF 최소 구조 검증은 내부 손상·복잡한 구조의 PDF를 통과시키고, `startxref`가 틀린 복구 가능 PDF는 거부할 수 있음 | 보장 범위를 §5.5.2에 명시, 정상 PDF 표본으로 과잉 거부 확인 (§12.1) |
+| R17 | `[Content_Types].xml`과 주 문서 파트만으로 OOXML 패키지 전체 유효성을 보장하지 않음 (관계·다른 파트·스키마 미검증), 비표준 위치의 주 문서는 거부 가능 | 보장 범위를 §5.5.3에 명시, 정상 표본으로 확인 |
+| R18 | XML 파서 설정 실수 시 외부 엔티티(XXE)·외부 리소스 접근 위험 | JDK 기본 구현 명시 생성, DTD·외부 엔티티·외부 접근 차단, `DOCTYPE` 거부, 보안 단위 테스트 (§5.5.3) |
+| R19 | OOXML 검사 상한이 잠정값이라 정상 대용량 문서를 거부할 수 있음 | 상한 초과는 실패로 처리(부분 성공 없음), 구현 시 표본 측정 후 필요하면 승인받아 조정 (§5.5.4) |
+| R20 | 문서 행이 남으면 기존 테스트의 `projects`·`users` 정리가 FK `RESTRICT`로 실패 | 문서 테스트의 자체 정리 순서 보장 (§10.2) |
 
 ### 12.1 구현 시 검증 사항 (정책 결정 아님)
 
@@ -564,7 +663,10 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 - `file` 파트 누락을 `VALIDATION_FAILED`로 응답하는 바인딩 방식
 - 목록 조회의 N+1 방지 쿼리 형태
 - 트랜잭션 완료 콜백 기반 보상의 정확한 구현 방식과 커밋 결과 불명확 상태 처리
-- OOXML 검증 상한값(엔트리 수, 엔트리당·전체 압축 해제량)의 최종 수치
+- OOXML 검사 상한 잠정값(§5.5.4)의 적정성: 정상 표본의 엔트리 수, `[Content_Types].xml` 크기, 주 문서 파트 크기, 검사 시간 측정
+- PDF 최소 구조 검증(§5.5.2)의 과잉 거부 여부: 일반 도구로 만든 정상 PDF 표본 확인
+- JDK StAX 파서의 보안 속성 동작(`DOCTYPE` 이벤트 처리, 외부 엔티티 차단) 확인
+- `DataIntegrityViolationException` 원인 체인에서 제약 이름 확인(§10.2.1 원인 검증)
 - 로컬 기본 저장 경로의 정확한 위치와 `.gitignore` 항목
 
 ## 13. 후속 SPEC과의 관계
@@ -605,7 +707,10 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | D5 | `DOCFLOW_STORAGE_DIR`, 로컬 기본 경로, Git 제외, 테스트별 임시 디렉터리, UUID 키, 원본 파일명 미사용 (`.env.example`·`.gitignore`·설정 변경은 구현 단계) | §5.4 |
 | D6 | 형식·빈 파일·파일명 오류는 `VALIDATION_FAILED` + `fieldErrors.file`, 20MiB 초과는 `FILE_TOO_LARGE` | §5.5, §6.4 |
 | D7 | 파일명 최대 255자, 초과 시 자르지 않고 400, 경로 구분자 제거, 제어·양방향·표시 위장 문자 거부, 정규화된 이름만 표시 | §5.7 |
-| D8 | OOXML: ZIP 구조, 필수 엔트리, 제한된 크기 안 읽기 검증, 엔트리 수·압축 해제량 제한, 손상·위장 거부, XML 파서·전체 파싱 없음. JDK 기본 기능으로 구현 | §5.5 |
+| D8 | OOXML: ZIP 구조, 필수 엔트리, 제한된 크기 안 읽기 검증, 엔트리 수·압축 해제량 제한, 손상·위장 거부, XML 외부 엔티티 처리·전체 Office 문서 파싱 없음. JDK 기본 기능으로 구현. (v0.1의 "XML 파서 미사용"은 v0.2 D10으로 대체) | §5.5.3 |
+| D9 | PDF는 헤더와 최소 구조(헤더·`%%EOF`·`startxref`·교차 참조 위치)만 검증. 전체 무결성·렌더링 가능 여부는 보장하지 않으며 위험 명시. 전체 PDF 파싱 라이브러리 미도입 (v0.2) | §5.5.2, AC-DOC-04, AC-DOC-05, R16 |
+| D10 | OOXML `[Content_Types].xml`은 JDK 기본 XML 파서로 파싱(DTD·외부 엔티티·외부 리소스 차단)해 주 문서 PartName–ContentType 대응을 검증. 주 문서 파트는 크기 상한 안에서 끝까지 읽어 크기·CRC 확인. 신규 라이브러리 없음 (v0.2) | §5.5.3, AC-DOC-04, AC-DOC-05, R17, R18 |
+| D11 | 업로드 크기 제한과 ZIP 검사 자원 상한을 구분. 상한 초과는 검증 실패. 상한 수치는 잠정값(엔트리 10,000개, `[Content_Types].xml` 1MiB, 주 문서 파트 128MiB)이며 구현 시 표본 측정으로 확인 (v0.2) | §5.5.4, R19 |
 
 ### 14.2 미결정 사항
 
@@ -615,14 +720,16 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 
 0. [x] 설계 결정 확정 (Q1~Q14, D1~D8, 2026-10-27)
 1. [x] GitHub Issue #15 생성, `feat/15/document-create` 브랜치 생성
-2. [x] 문서: 이 SPEC Draft v0.1, `specs/README.md`, ADR-0001 Q2 확정
-3. [ ] SPEC 검토·승인 (Draft → 확정)
-4. [ ] Backend: V5 마이그레이션, `Document`·`DocumentVersion`, `FileStorage`·`LocalFileStorage`, 형식·파일명 검증, `ProjectPermissionService` 문서 등록 권한, API, `FILE_TOO_LARGE`, multipart 설정, `DOCFLOW_STORAGE_DIR`(`.env.example`·`.gitignore`) + 단위·통합 테스트
+2. [x] 문서: 이 SPEC Draft v0.1, `specs/README.md`, ADR-0001 Q2 확정 (v0.2에서 `spec.md` §16.1 갱신)
+3. [x] 최종 설계 리뷰 반영 (Draft v0.2: B1·B2·R1·R2·R3)
+3-1. [ ] SPEC 검토·승인 (Draft → 확정)
+4. [ ] Backend: V5 마이그레이션, `Document`·`DocumentVersion`, `FileStorage`·`LocalFileStorage`, 형식·파일명 검증, `ProjectPermissionService` 문서 등록 권한, API, `FILE_TOO_LARGE`, multipart 설정, `DOCFLOW_STORAGE_DIR`(`.env.example`·`.gitignore`) + 단위·통합 테스트 (§10.2.1 DB 실패 보상 테스트 포함)
+4-1. [ ] OOXML 검사 상한·PDF 최소 구조 검증의 정상 표본 측정 기록 (§5.5.4, §12.1)
 5. [ ] CI 확인 (Backend)
 6. [ ] Frontend: `api-client` FormData 지원, 문서 API·타입·검증, 목록 섹션·등록·상세 화면, `next.config.ts` `proxyClientMaxBodySize` + Vitest
 7. [ ] Frontend lint·test·build (클라우드) → CI 확인
 8. [ ] 실제 업로드 경로 검증 (§10.4)
-9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록, `spec.md` §16.1 파일 저장소 상태 갱신
+9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
 10. [ ] Windows 로컬 수동 검증 (사용자, §10.5)
 11. [ ] PR (`Closes #15`), 병합은 사용자
 
