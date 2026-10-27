@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createProject, fetchProject, fetchProjects } from "./api";
+import { addMember, createProject, fetchMembers, fetchProject, fetchProjects, removeMember } from "./api";
 
 const fetchMock = vi.fn();
 
@@ -70,5 +70,40 @@ describe("projects api", () => {
       code: "VALIDATION_FAILED",
       fieldErrors: [{ field: "name", message: "프로젝트 이름을 입력해 주세요." }],
     });
+  });
+
+  it("fetchMembers는 GET /api/projects/{projectId}/members를 호출한다", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(200, []));
+
+    await fetchMembers("7");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/projects/7/members");
+    expect(fetchMock.mock.calls[0][1].method).toBe("GET");
+  });
+
+  it("addMember는 POST 본문에 email만 CSRF 헤더와 함께 보낸다", async () => {
+    fetchMock.mockImplementation(async () =>
+      jsonResponse(201, { userId: 2, displayName: "Reviewer", role: "MEMBER", addedAt: "2026-01-01T00:00:00Z" }),
+    );
+
+    await addMember("7", "reviewer@docflow.local");
+
+    const [path, init] = fetchMock.mock.calls[0];
+    expect(path).toBe("/api/projects/7/members");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ email: "reviewer@docflow.local" });
+    expect(init.headers["X-XSRF-TOKEN"]).toBe("token-1");
+  });
+
+  it("removeMember는 DELETE /api/projects/{projectId}/members/{userId}를 호출한다", async () => {
+    fetchMock.mockImplementation(async () => new Response(null, { status: 204 }));
+
+    await expect(removeMember("7", 2)).resolves.toBeUndefined();
+
+    const [path, init] = fetchMock.mock.calls[0];
+    expect(path).toBe("/api/projects/7/members/2");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+    expect(init.headers["X-XSRF-TOKEN"]).toBe("token-1");
   });
 });

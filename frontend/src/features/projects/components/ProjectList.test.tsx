@@ -56,9 +56,9 @@ describe("ProjectList (AC-PROJECT-18)", () => {
 
   it("서버 응답 순서를 그대로 표시하고 상세 링크와 생성일을 보여 준다", async () => {
     fetchProjectsMock.mockResolvedValue([
-      { id: 3, name: "가장 최근", createdAt: "2026-01-03T00:00:00Z" },
-      { id: 9, name: "중간", createdAt: "2026-01-02T00:00:00Z" },
-      { id: 1, name: "가장 오래됨", createdAt: "2026-01-01T00:00:00Z" },
+      { id: 3, name: "가장 최근", createdAt: "2026-01-03T00:00:00Z", myRole: "OWNER" },
+      { id: 9, name: "중간", createdAt: "2026-01-02T00:00:00Z", myRole: "MEMBER" },
+      { id: 1, name: "가장 오래됨", createdAt: "2026-01-01T00:00:00Z", myRole: "OWNER" },
     ]);
     render(<ProjectList />);
 
@@ -66,6 +66,9 @@ describe("ProjectList (AC-PROJECT-18)", () => {
     expect(links.map((link) => link.getAttribute("href"))).toEqual(["/projects/3", "/projects/9", "/projects/1"]);
     expect(links[0]).toHaveTextContent("가장 최근");
     expect(links[0].querySelector("time")).toHaveAttribute("dateTime", "2026-01-03T00:00:00Z");
+    // 내 역할 표시 (AC-MEMBER-18)
+    expect(links[0]).toHaveTextContent("Owner");
+    expect(links[1]).toHaveTextContent("Member");
   });
 
   it("오류가 나면 오류와 다시 시도 버튼을 표시하고, 다시 시도하면 목록을 다시 불러온다", async () => {
