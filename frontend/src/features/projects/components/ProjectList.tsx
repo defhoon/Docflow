@@ -85,7 +85,10 @@ export function ProjectList() {
             href={`/projects/${project.id}`}
             className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-zinc-50"
           >
-            <span className="font-medium break-all">{project.name}</span>
+            <span className="break-all">
+              <span className="font-medium">{project.name}</span>
+              <span className="ml-2 text-sm text-zinc-500">{project.myRole === "OWNER" ? "Owner" : "Member"}</span>
+            </span>
             <time dateTime={project.createdAt} className="shrink-0 text-sm text-zinc-500">
               {formatDateTime(project.createdAt)}
             </time>
