@@ -107,12 +107,40 @@ describe("프로젝트 화면 인증 연동", () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === "/api/auth/me"
         ? json(200, user)
-        : json(200, [{ id: 3, name: "DocFlow", createdAt: "2026-01-01T00:00:00Z" }]),
+        : json(200, [{ id: 3, name: "DocFlow", createdAt: "2026-01-01T00:00:00Z", myRole: "OWNER" }]),
     );
     renderWithAuth(<ProjectsPage />);
 
     expect((await screen.findByText("DocFlow")).closest("a")).toHaveAttribute("href", "/projects/3");
     expect(screen.getByRole("heading", { name: "내 프로젝트" })).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("AC-MEMBER-21: 구성원 목록 조회가 401이면 세션 만료 안내와 함께 로그인 화면으로 이동한다", async () => {
+    pathname = "/projects/7";
+    params = { projectId: "7" };
+    let meCalls = 0;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/auth/me") {
+        meCalls++;
+        return meCalls === 1 ? json(200, user) : unauthorized();
+      }
+      if (url === "/api/projects/7") {
+        return json(200, {
+          id: 7,
+          name: "DocFlow",
+          description: null,
+          owner: { id: 1, displayName: "Author" },
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          myRole: "OWNER",
+        });
+      }
+      return unauthorized();
+    });
+    renderWithAuth(<ProjectDetailPage />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?next=%2Fprojects%2F7&reason=expired"));
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/projects/7/members");
   });
 });

@@ -11,6 +11,7 @@ import { fetchProject } from "../api";
 import { failureMessage, isUnauthenticated } from "../errors";
 import { formatDateTime } from "../format";
 import type { Project } from "../types";
+import { ProjectMembers } from "./ProjectMembers";
 
 type DetailResult =
   | { kind: "not-found" }
@@ -118,6 +119,7 @@ export function ProjectDetail() {
               <p className="text-zinc-500">설명이 없습니다.</p>
             )}
           </section>
+          <ProjectMembers projectId={projectId} myRole={project.myRole} onProjectChanged={retry} />
           <ProjectsLink />
         </article>
       );

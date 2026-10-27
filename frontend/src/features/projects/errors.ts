@@ -15,3 +15,8 @@ export function failureMessage(error: unknown): string {
   }
   return "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
 }
+
+/** 서버 오류 코드. 상태 코드만으로 구분할 수 없는 404(프로젝트 없음·구성원 없음·사용자 없음)를 나눌 때 사용한다. */
+export function errorCode(error: unknown): string | null {
+  return error instanceof ApiError ? error.code : null;
+}

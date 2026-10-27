@@ -111,3 +111,25 @@ export function validateProjectInput(
 
   return { value: { name: normalizedName, description: normalizedDescription }, errors };
 }
+
+export const MEMBER_EMAIL_MAX_LENGTH = 255;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+$/;
+
+/**
+ * 구성원 추가 이메일 검증 (SPEC-02 §5.4). 서버(`@NotBlank`, `@Email`, `@Size(max = 255)`)가 최종 기준이며,
+ * 여기서는 앞뒤 공백 제거 후 기본 형식만 확인한다.
+ */
+export function validateMemberEmail(email: string): { value: string; error?: string } {
+  const value = email.trim();
+  if (!value) {
+    return { value, error: "이메일을 입력해 주세요." };
+  }
+  if (value.length > MEMBER_EMAIL_MAX_LENGTH) {
+    return { value, error: "이메일은 255자 이하로 입력해 주세요." };
+  }
+  if (!EMAIL_PATTERN.test(value)) {
+    return { value, error: "이메일 형식이 올바르지 않습니다." };
+  }
+  return { value };
+}

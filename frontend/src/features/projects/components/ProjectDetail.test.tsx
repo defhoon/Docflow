@@ -7,6 +7,7 @@ import { ProjectDetail } from "./ProjectDetail";
 
 const refresh = vi.fn();
 const fetchProjectMock = vi.fn();
+const fetchMembersMock = vi.fn();
 let params: { projectId: string };
 
 vi.mock("next/navigation", () => ({
@@ -19,6 +20,7 @@ vi.mock("@/features/auth/AuthProvider", () => ({
 
 vi.mock("../api", () => ({
   fetchProject: (...args: unknown[]) => fetchProjectMock(...args),
+  fetchMembers: (...args: unknown[]) => fetchMembersMock(...args),
 }));
 
 const project = {
@@ -28,12 +30,15 @@ const project = {
   owner: { id: 1, displayName: "Author" },
   createdAt: "2026-01-02T03:04:05Z",
   updatedAt: "2026-01-02T03:04:05Z",
+  myRole: "OWNER",
 };
 
 describe("ProjectDetail", () => {
   beforeEach(() => {
     refresh.mockReset();
     fetchProjectMock.mockReset();
+    fetchMembersMock.mockReset();
+    fetchMembersMock.mockResolvedValue([]);
     params = { projectId: "7" };
   });
 
@@ -114,5 +119,25 @@ describe("ProjectDetail", () => {
 
     await act(async () => resolveFirst(project));
     expect(screen.getByRole("heading", { name: "두 번째" })).toBeInTheDocument();
+  });
+
+  it("상세 화면에 구성원 섹션을 표시하고 myRole로 Owner 전용 UI를 나눈다 (AC-MEMBER-18, 19)", async () => {
+    fetchMembersMock.mockResolvedValue([
+      { userId: 1, displayName: "Author", role: "OWNER", addedAt: null },
+      { userId: 2, displayName: "Reviewer", role: "MEMBER", addedAt: "2026-01-03T00:00:00Z" },
+    ]);
+    fetchProjectMock.mockResolvedValueOnce(project).mockResolvedValueOnce({ ...project, myRole: "MEMBER" });
+
+    const { unmount } = render(<ProjectDetail />);
+    expect(await screen.findByRole("list", { name: "구성원 목록" })).toHaveTextContent("Reviewer");
+    expect(fetchMembersMock).toHaveBeenCalledWith("7");
+    expect(screen.getByLabelText("구성원 이메일")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reviewer 제거" })).toBeInTheDocument();
+    unmount();
+
+    render(<ProjectDetail />);
+    expect(await screen.findByRole("list", { name: "구성원 목록" })).toHaveTextContent("Reviewer");
+    expect(screen.queryByLabelText("구성원 이메일")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /제거/ })).not.toBeInTheDocument();
   });
 });

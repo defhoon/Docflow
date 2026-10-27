@@ -6,6 +6,7 @@ import {
   MESSAGES,
   trimEdges,
   trimEdgesToNull,
+  validateMemberEmail,
   validateProjectInput,
 } from "./validation";
 
@@ -141,5 +142,17 @@ describe("Java ProjectText와의 문자 기준 일치", () => {
     expect(isAllowedDescription("설명 ​‮")).toBe(true);
     expect(isAllowedDescription(null)).toBe(true);
     expect(isAllowedDescription("설명\u007F")).toBe(false);
+  });
+});
+
+describe("validateMemberEmail (SPEC-02 §5.4)", () => {
+  it("앞뒤 공백을 제거하고 올바른 이메일은 통과한다", () => {
+    expect(validateMemberEmail("  reviewer@docflow.local ")).toEqual({ value: "reviewer@docflow.local" });
+  });
+
+  it("빈 값·형식 오류·255자 초과는 서버와 같은 문구로 거부한다", () => {
+    expect(validateMemberEmail("   ").error).toBe("이메일을 입력해 주세요.");
+    expect(validateMemberEmail("not-an-email").error).toBe("이메일 형식이 올바르지 않습니다.");
+    expect(validateMemberEmail(`${"a".repeat(250)}@x.com`).error).toBe("이메일은 255자 이하로 입력해 주세요.");
   });
 });
