@@ -1,6 +1,6 @@
 # SPEC-03: 문서 등록
 
-- 상태: **Draft v0.2 (2026-10-27) — 설계 보완 완료, 구현 미승인**
+- 상태: **설계 확정 (v0.2 승인, 2026-10-27) — Backend 구현·검증 완료, Frontend 미착수**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -17,6 +17,10 @@
     - DB 롤백·보상 삭제(시나리오 A)와 저장 키 충돌·덮어쓰기 방지(시나리오 B)를 분리 (§10.2.1)
     - 최종 배치를 `ATOMIC_MOVE`에서 배타적 생성(`CREATE_NEW`)으로 변경: `ATOMIC_MOVE`는 기존 파일을 교체할 수 있음을 확인 (§5.4)
     - 보상 삭제 대상을 "이 요청이 생성에 성공한 파일"로 한정 (§7.2)
+  - v0.2 확정·Backend 구현 (2026-10-27): 설계 확정 및 Backend 구현 승인. 구현 중 확인한 사항을 반영.
+    - `FileStorage` 실제 시그니처(저장 키 반환, 임시 파일 삭제 메서드, `IOException`) 반영 (§5.4)
+    - 파일 저장 실패 통합 테스트를 "최종 배치 경로의 상위가 일반 파일"인 실제 I/O 오류로 구체화 (§10.2)
+    - 크기 초과 응답 전달 결과와 CSRF 헤더 없는 크기 초과 요청의 응답 형식 차이 기록 (§12.1, §16) — 정책 변경 없음, 후속 승인 필요 항목으로 보고
 
 표기: **[기존]** 이미 구현·확정된 내용, **[결정 Qn·Dn]** 사용자가 확정한 결정, **[제안]** 이 SPEC의 설계안, **[검증 필요]** 구현 단계에서 실제 실행으로 확인할 사항.
 
@@ -162,14 +166,18 @@ CREATE TABLE document_versions (
 ### 5.4 파일 저장소 [결정 Q6, D5]
 
 ```java
-// [제안] com.docflow.document.storage
+// [구현] com.docflow.document.storage
 public interface FileStorage {
-    /** 검증·해시 계산이 끝난 임시 파일 내용을 서버가 만든 저장 키 위치에 새 파일로 배치한다. 대상이 이미 있으면 실패한다(덮어쓰지 않음). */
-    StoredFile store(Path validatedTempFile);
+    /** 업로드 스트림을 받을 임시 파일 (저장 루트 아래 tmp/) */
+    Path createTempFile() throws IOException;
+    /** 검증·해시 계산이 끝난 임시 파일 내용을 서버가 만든 저장 키 위치에 CREATE_NEW로 새로 만들고 저장 키를 반환한다.
+        대상이 이미 있으면 StorageKeyConflictException(FileAlreadyExistsException)으로 실패하고 기존 파일은 건드리지 않는다.
+        생성 후 복사·force 중 실패하면 이 호출이 만든 파일만 삭제한다. */
+    String store(Path validatedTempFile) throws IOException;
     /** 보상 삭제. 이 요청이 store()로 생성한 저장 키에만 호출한다. 없으면 아무 일도 하지 않는다. */
-    void delete(String storageKey);
-    /** 업로드 스트림을 받을 임시 파일 (저장 루트와 같은 볼륨) */
-    Path createTempFile();
+    void delete(String storageKey) throws IOException;
+    /** 임시 파일 삭제 (tmp/ 밖의 경로는 거부) */
+    void deleteTemp(Path tempFile) throws IOException;
 }
 ```
 
@@ -537,7 +545,7 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | 목록 | 정렬, 최신 버전 번호, 작성자 표시 이름, 빈 목록 |
 | 제거된 구성원 | 문서 유지·작성자 이름 표시, 제거된 사용자는 `404` |
 | **크기 경계** | 실제 HTTP(`webEnvironment = RANDOM_PORT`)로 1MiB, 19MiB, 20,971,520바이트(`201`), 20,971,521바이트·21MiB(`413 FILE_TOO_LARGE`) — MockMvc는 Tomcat multipart 상한을 거치지 않으므로 사용하지 않는다 |
-| **파일 저장 실패** | `DOCFLOW_STORAGE_DIR`를 일반 파일로 지정해 실제 I/O 오류 → `500`, DB 행 없음, 응답에 경로 없음 |
+| **파일 저장 실패** | 저장 키의 상위 경로가 일반 파일이 되도록 만들어 최종 배치 단계의 실제 I/O 오류 → `500`, DB 행 없음, 임시 파일 정리, 응답에 경로 없음 (구현 시 `DOCFLOW_STORAGE_DIR` 자체를 일반 파일로 두는 방식 대신 임시 파일 복사·형식 검증까지 통과한 뒤 실패하는 방식으로 구체화) |
 | **저장 키 충돌·덮어쓰기 방지** | §10.2.1 시나리오 B — 기존 행과 파일이 있는 저장 키로 업로드 → `500`, 새 행 없음, 기존 파일 내용·SHA-256 불변, 기존 행 유지 |
 | **DB 실패 보상** | §10.2.1 시나리오 A — 파일 배치 성공 후 Version INSERT가 저장 키 UNIQUE 위반으로 실패 → `500`, 원인 제약 확인, `documents`·`document_versions` 행 수 불변, 새로 만든 파일 보상 삭제, 기존 행 유지 |
 | 공통 | 미인증 `401`, CSRF 없음 `403`(DB·저장소 변화 없음), JSON 요청 `415`, 숫자가 아닌 경로 변수 `400`, `file` 누락 `400 VALIDATION_FAILED` |
@@ -704,6 +712,48 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 - `CREATE_NEW` 배타적 생성이 Linux(CI)와 Windows에서 기존 파일을 보존하며 실패하는지 확인 (§5.4, AC-DOC-28)
 - 로컬 기본 저장 경로의 정확한 위치와 `.gitignore` 항목
 
+**확인 결과 (2026-10-27, Claude Code 클라우드: JDK 21 + PostgreSQL 16 / GitHub Actions CI: JDK 25 + PostgreSQL 16)**
+
+| 항목 | 결과 |
+| --- | --- |
+| `file` 파트 누락 바인딩 | `@ModelAttribute` 요청 레코드에 `MultipartFile file`을 두고 `@NotNull`로 검증 → `400 VALIDATION_FAILED`, `fieldErrors[file]` "파일을 선택해 주세요." `file`을 텍스트 값으로 보낸 경우의 형 변환 오류는 내부 타입 정보가 담긴 기본 메시지 대신 "입력 형식이 올바르지 않습니다."로 응답하도록 [기존] `GlobalExceptionHandler`의 필드 오류 변환에 바인딩 실패 분기를 추가했다 |
+| 목록 N+1 | JPQL 생성자 표현식 + `MAX(version_number)` 스칼라 서브쿼리 + 작성자 `join` 한 번. 문서 5개 목록 조회 시 Hibernate 통계상 SQL 2회(접근 확인 1 + 목록 1) |
+| 보상 구현 | `TransactionTemplate` 안에서 `TransactionSynchronization`을 등록하고 `afterCompletion`에서 `STATUS_ROLLED_BACK`일 때만 삭제, `STATUS_UNKNOWN`이면 보존·WARN 로그. 트랜잭션 시작(연결 획득) 전 실패는 동기화 등록 전이므로 서비스가 직접 삭제하고 삭제 실패는 원래 예외의 suppressed로 붙인다. 커밋 실패(`TransactionSystemException`)는 Spring이 `STATUS_UNKNOWN`으로 통지함을 `AbstractPlatformTransactionManager` 기반 테스트로 확인 |
+| 제약 이름 원인 확인 | 시나리오 A에서 PostgreSQL 오류 로그에 `uk_document_versions_storage_key`가 나타남(클라우드·CI 로그 모두) |
+| StAX 보안 | `XMLInputFactory.newDefaultFactory()` + `SUPPORT_DTD=false` 등 설정에서 내부 서브셋 `DOCTYPE`·미선언 엔티티는 파싱 오류, 외부 `SYSTEM` DTD만 있는 문서는 DTD 이벤트로 거부. 로컬 HTTP 서버 접속 횟수 0 (외부 DTD·외부 일반 엔티티·외부 파라미터 엔티티) |
+| 암호화 엔트리 | 중앙 디렉터리 일반 목적 플래그 bit 0이 설정된 ZIP은 JDK `ZipFile`이 열 때 `ZipException`으로 실패 → 손상으로 거부 |
+| `CREATE_NEW` (Linux) | 같은 키 파일이 있으면 `FileAlreadyExistsException`, 기존 내용 불변(단위·통합 시나리오 B). 두 스레드가 같은 키로 동시에 생성하면 정확히 하나만 성공. Windows는 미확인(사용자 수동 검증) |
+| 기본 저장 경로 | `docflow.storage.dir: ${DOCFLOW_STORAGE_DIR:./storage}` → `backend/`에서 실행 시 `backend/storage`. `backend/.gitignore`에 `/storage/` 추가, 이 경로에 파일을 만들어 `git status`에 나타나지 않음을 확인. 빈 값이면 작업 디렉터리 전체가 루트가 되므로 시작 시 거부하고 `.env.example`은 주석 처리된 예시로 둠 |
+| 20MiB 경계 (Backend 직접, 실제 HTTP) | 1MiB·19MiB·20,971,520바이트 `201`(저장 크기 일치), 20,971,521바이트 `413 FILE_TOO_LARGE`(공통 형식) |
+| 요청 상한(21MiB) 초과 응답 전달 (R6) | **재현됨.** 인증 세션 + CSRF 헤더가 있는 22MiB 요청: 서버가 본문 약 6~8MB만 읽은 뒤 `413 FILE_TOO_LARGE`(공통 형식) + `Connection: close`로 응답하고 연결을 닫는다. 응답을 본문 전송 중에도 읽는 클라이언트(소켓 테스트)는 413을 받지만, 본문을 다 보낸 뒤 읽는 클라이언트(Java `HttpClient`)는 `IOException`(연결 종료)으로 끝났다. 브라우저·Next.js rewrite 경유 결과는 미확인(§10.4). `max-swallow-size` 등 설정은 변경하지 않았다 [결정 D4] |
+| CSRF 헤더 없는 크기 초과 요청 | `X-XSRF-TOKEN` 헤더가 없으면 CSRF 필터가 요청 파라미터(`_csrf`)를 읽으면서 multipart 해석이 먼저 일어나, 파일 상한·요청 상한 초과 시 인증·CSRF 판단 전에 `413`이 나간다. 이때 본문은 공통 형식이 아닌 Spring Boot 기본 오류 형식(`timestamp`, `status`, `error`, `path`)이다. 프로젝트·문서 정보는 없다. 정상 SPA 요청(헤더 포함)은 공통 형식 `FILE_TOO_LARGE`. 정책 변경 없이 보고 항목으로 남김 (§16) |
+| 25MB 초과 요청 (R5) | Backend 직접 요청에서는 30MiB도 위와 같이 `413` 후 연결 종료. Next.js 경유(잘린 multipart) 결과는 미확인 |
+
+**정상 표본 측정 (클라우드, `DocumentFileValidator` 직접 실행, 표본은 저장소에 커밋하지 않음)**
+
+MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 없어 측정하지 못했다(사용자 Windows 수동 검증으로 남김).
+
+| 표본 (생성 도구) | 파일 크기 | 엔트리 | `[Content_Types].xml` | 주 문서 파트 | 검사 시간 | 결과 |
+| --- | --- | --- | --- | --- | --- | --- |
+| DOCX (python-docx, 소형) | 37,836 | 17 | 1,738 | 5,174 | 0ms | 통과 |
+| DOCX (LibreOffice 7 변환) | 21,442 | 15 | 2,077 | 25,176 | 0~1ms | 통과 |
+| DOCX (python-docx, 텍스트 6만 문단) | 8,831,605 | 17 | 1,738 | 17,821,789 | 106~110ms | 통과 |
+| DOCX (python-docx, 무작위 텍스트, 약 15MiB) | 15,797,258 | 17 | 1,738 | 27,394,598 | 142~153ms | 통과 |
+| XLSX (openpyxl, 5시트×2,000행) | 540,866 | 14 | 1,655 | 1,226 | 0ms | 통과 |
+| XLSX (LibreOffice 변환) | 732,522 | 16 | 2,285 | 1,169 | 1~2ms | 통과 |
+| PPTX (python-pptx, 30슬라이드) | 59,993 | 96 | 7,049 | 4,178 | 0ms | 통과 |
+| PPTX (LibreOffice 변환, 30슬라이드) | 103,339 | 123 | 16,576 | 2,093 | 1ms | 통과 |
+| PPTX (python-pptx, 300슬라이드·이미지 300개) | 348,291 | 891 | 42,670 | 13,025 | 2~3ms | 통과 |
+| PDF (LibreOffice 내보내기 ×3) | 54,723 / 96,284 / 2,072,127 | — | — | — | 0~4ms | 통과 |
+| PDF (Chromium 인쇄) | 44,485 | — | — | — | 0ms | 통과 |
+| PDF (기존 파일 2종: LibreOffice 배포 PDF, 기타 생성 PDF) | 21,204 / 124,310 | — | — | — | 0ms | 통과 |
+| DOCX (인위적: 같은 문장 40만 문단, 압축률 약 257배) | 291,279 | 17 | 1,738 | 65,601,548 | 8ms | 통과 |
+| DOCX (인위적: 같은 문장 120만 문단, 압축률 약 258배) | 800,226 | 17 | 1,738 | 196,801,548 | 0ms | **거부** (주 문서 128MiB 상한, 선언 크기로 즉시 거부) |
+
+- 측정 범위의 정상 표본에서는 엔트리 수(최대 891), `[Content_Types].xml`(최대 42,670바이트), 주 문서 파트(최대 약 26MiB)가 잠정 상한(10,000개 / 1MiB / 128MiB)보다 충분히 작았고, 과잉 거부는 없었다. 잠정값을 바꾸지 않는다.
+- 다만 텍스트만으로 된 매우 큰 DOCX는 주 문서 파트 압축률에 따라 128MiB를 넘을 수 있다(일반 문장 압축률 5~10배 가정 시 업로드 13~26MiB 부근). 위 거부 사례는 같은 문장 반복이라 실제 문서보다 압축률이 훨씬 높다. 실제 Office 대용량 텍스트 표본 측정은 미실행이다.
+- PDF: 일반 도구로 만든 표본에서 과잉 거부는 없었다. 증분 업데이트 PDF는 단위 테스트에서 통과. 선형화 PDF, `startxref`가 틀린 복구 가능 PDF 표본은 만들지 못해 미확인이다.
+
 ## 13. 후속 SPEC과의 관계
 
 | 후속 SPEC | 이 SPEC이 제공하는 것 | 후속에서 결정할 것 |
@@ -757,10 +807,10 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 1. [x] GitHub Issue #15 생성, `feat/15/document-create` 브랜치 생성
 2. [x] 문서: 이 SPEC Draft v0.1, `specs/README.md`, ADR-0001 Q2 확정 (v0.2에서 `spec.md` §16.1 갱신)
 3. [x] 최종 설계 리뷰 반영 (Draft v0.2: B1·B2·R1·R2·R3)
-3-1. [ ] SPEC 검토·승인 (Draft → 확정)
-4. [ ] Backend: V5 마이그레이션, `Document`·`DocumentVersion`, `FileStorage`·`LocalFileStorage`, 형식·파일명 검증, `ProjectPermissionService` 문서 등록 권한, API, `FILE_TOO_LARGE`, multipart 설정, `DOCFLOW_STORAGE_DIR`(`.env.example`·`.gitignore`) + 단위·통합 테스트 (§10.2.1 DB 실패 보상 테스트 포함)
-4-1. [ ] OOXML 검사 상한·PDF 최소 구조 검증의 정상 표본 측정 기록 (§5.5.4, §12.1)
-5. [ ] CI 확인 (Backend)
+3-1. [x] SPEC 검토·승인 (Draft → 확정, 2026-10-27)
+4. [x] Backend: V5 마이그레이션, `Document`·`DocumentVersion`, `FileStorage`·`LocalFileStorage`, 형식·파일명 검증, `ProjectPermissionService` 문서 등록 권한, API, `FILE_TOO_LARGE`, multipart 설정, `DOCFLOW_STORAGE_DIR`(`.env.example`·`.gitignore`) + 단위·통합 테스트 (§10.2.1 DB 실패 보상 테스트 포함)
+4-1. [x] OOXML 검사 상한·PDF 최소 구조 검증의 정상 표본 측정 기록 (§5.5.4, §12.1) — 클라우드 생성 표본 범위. MS Office·Google Docs 표본은 미실행
+5. [x] CI 확인 (Backend)
 6. [ ] Frontend: `api-client` FormData 지원, 문서 API·타입·검증, 목록 섹션·등록·상세 화면, `next.config.ts` `proxyClientMaxBodySize` + Vitest
 7. [ ] Frontend lint·test·build (클라우드) → CI 확인
 8. [ ] 실제 업로드 경로 검증 (§10.4)
@@ -770,11 +820,50 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 
 ## 16. 검증 결과
 
-**미실행.** 설계 문서 단계이며 구현과 테스트는 시작하지 않았다.
+**Backend 구현·검증 완료 (2026-10-27). Frontend·실제 업로드 경로·Windows 수동 검증은 미실행.**
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 미실행 | 미실행 | 미실행 |
-| Frontend lint·test·build | 미실행 | 미실행 | 미실행 |
-| 실제 업로드 경로 (§10.4) | 미실행 | — | 미실행 |
+| Backend build·test | 통과: 전체 254개(기존 127 + 신규 127), 실패 0 (JDK 21 + 임시 PostgreSQL 16, `./gradlew test`) | 통과 (run 52, `5231d58`, JDK 25 + PostgreSQL 16) | 미실행 |
+| Frontend lint·test·build | 변경 없음 (이번 단계 범위 밖) | 통과 (run 52, 기존 코드 회귀) | 미실행 |
+| 실제 업로드 경로 (§10.4) | Backend 직접 HTTP만 확인 (§12.1). Next.js 경유 미실행 | — | 미실행 |
 | 수동 E2E (§10.5) | — | — | 미실행 |
+
+**신규 테스트 (127개)**
+
+| 테스트 클래스 | 수 | 대상 AC |
+| --- | --- | --- |
+| `DocumentFileNameTest` | 24 | AC-DOC-04, 10 |
+| `PdfStructureValidatorTest` | 23 | AC-DOC-04, 05 (P1~P5, 증분 업데이트, 내부 손상 통과) |
+| `OoxmlPackageValidatorTest` | 29 | AC-DOC-04, 05 (위장, Content Type 대응, XXE·DTD, 엔트리 수·크기 상한, CRC, 암호화) |
+| `LocalFileStorageTest` | 9 | AC-DOC-11, 28 (`CREATE_NEW`, 동시 생성, 루트 이탈) |
+| `StoredFileCompensationTest` | 3 | AC-DOC-12, 13, 14 |
+| `DocumentServiceTransactionTest` | 7 | AC-DOC-12, 13, 14 (커밋·롤백·불명확·시작 실패·보상 실패) |
+| `DocumentApiIntegrationTest` | 20 | AC-DOC-01~04, 06, 10, 15~21 |
+| `DocumentStorageIntegrationTest` | 5 | AC-DOC-11, 12, 14, 28 (§10.2.1 A·B) |
+| `DocumentUploadSizeIntegrationTest` | 3 | AC-DOC-07, AC-DOC-09 일부(Backend 직접) |
+| `DocumentSchemaIntegrationTest` | 3 | AC-DOC-22 |
+| `ProjectPermissionServiceTest` (추가) | 1 | §7.1 |
+
+**Backend AC 결과**
+
+| AC | 결과 |
+| --- | --- |
+| AC-DOC-01~07, 10~22 | 통과 (자동 테스트, 클라우드·CI) |
+| AC-DOC-28 | 자동 테스트 부분 통과(저장 경로·루트 이탈·덮어쓰기 방지·Git 제외 확인). Windows 동작은 미실행 |
+| AC-DOC-30 | Backend·Frontend 기존 테스트 통과, `SecurityConfig` 변경 없음 |
+| AC-DOC-08 | 미실행 (Next.js 경유) |
+| AC-DOC-09 | Backend 직접 경로에서 연결 종료 재현 (§12.1) — 보고 후 승인 필요 [결정 D4] |
+| AC-DOC-23~27, 29 | 미실행 (Frontend·수동, 이번 단계 범위 밖) |
+
+**미실행·제약**
+
+- 동시성 선택 테스트(접근 확인 후 구성원 제거 커밋 → 등록 성공, D5)는 작성하지 않았다.
+- 실제 커밋 중 연결 단절은 재현하지 않고 트랜잭션 관리자 테스트 대역으로 `STATUS_UNKNOWN` 처리를 확인했다(§10.2 허용 범위).
+- 강제 종료 시 고아 파일(R1)은 자동 정리하지 않는다(범위 밖).
+
+**후속 승인이 필요한 사항 (정책 변경 없음)**
+
+1. 21MiB 초과 요청의 `413` 전달: 서버가 본문을 다 읽지 않고 응답 후 연결을 닫아 일부 클라이언트에서 연결 오류가 된다. 정상 UI는 20MiB 사전 검사로 이런 요청을 보내지 않는다. 대안: (a) 현행 유지 + Frontend 사전 검사와 연결 오류 문구로 대응, (b) `server.tomcat.max-swallow-size` 상향(남은 본문을 읽어 413 전달 가능성 증가, 대역폭·처리 시간 증가), (c) Next.js 경유 결과 확인 후 결정. Next.js·브라우저 경로 확인(§10.4) 후 판단을 제안한다.
+2. CSRF 헤더 없는 크기 초과 요청의 Spring Boot 기본 오류 형식 `413`: 공통 오류 형식(D3)과 다르다. 대안: (a) 현행 유지(정상 SPA 경로는 공통 형식이고 노출 정보 없음), (b) 서블릿 오류 경로(`/error`)의 `413`을 공통 형식으로 바꾸는 전역 오류 처리 추가(전역 설정 변경). (a)를 제안한다.
+3. OOXML 주 문서 파트 128MiB 상한: 측정 범위에서는 문제가 없었다. 실제 Office 대용량 텍스트 문서 표본으로 Windows에서 확인한 뒤 필요하면 조정한다.
