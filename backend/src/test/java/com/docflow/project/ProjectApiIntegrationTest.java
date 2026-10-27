@@ -89,6 +89,7 @@ class ProjectApiIntegrationTest {
 			.andExpect(jsonPath("$.owner.id").value(this.author.getId()))
 			.andExpect(jsonPath("$.owner.displayName").value("Author"))
 			.andExpect(jsonPath("$.owner.*", hasSize(2)))
+			.andExpect(jsonPath("$.myRole").value("OWNER"))
 			.andExpect(jsonPath("$.createdAt").value(matchesPattern("\\d{4}-\\d{2}-\\d{2}T.+Z")))
 			.andExpect(jsonPath("$.updatedAt").value(matchesPattern("\\d{4}-\\d{2}-\\d{2}T.+Z")))
 			.andReturn()
@@ -263,7 +264,8 @@ class ProjectApiIntegrationTest {
 			.andExpect(jsonPath("$[1].id").value(tieSecond))
 			.andExpect(jsonPath("$[2].id").value(tieFirst))
 			.andExpect(jsonPath("$[3].id").value(oldest))
-			.andExpect(jsonPath("$[0].owner").doesNotExist());
+			.andExpect(jsonPath("$[0].owner").doesNotExist())
+			.andExpect(jsonPath("$[0].myRole").value("OWNER"));
 	}
 
 	// AC-PROJECT-10: 빈 목록
@@ -284,7 +286,8 @@ class ProjectApiIntegrationTest {
 		this.mockMvc.perform(get("/api/projects/" + id).with(as(this.author)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(id))
-			.andExpect(jsonPath("$.owner.displayName").value("Author"));
+			.andExpect(jsonPath("$.owner.displayName").value("Author"))
+			.andExpect(jsonPath("$.myRole").value("OWNER"));
 
 		String otherUser = this.mockMvc.perform(get("/api/projects/" + id).with(as(this.reviewer)))
 			.andExpect(status().isNotFound())
