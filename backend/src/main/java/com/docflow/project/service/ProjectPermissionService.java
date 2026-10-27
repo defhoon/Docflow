@@ -26,4 +26,15 @@ public class ProjectPermissionService {
 		}
 	}
 
+	/**
+	 * 문서 등록 권한 (SPEC-03 §7.1, 결정 Q1). 현재 OWNER·MEMBER 모두 허용하며, 접근 확인을 통과한 프로젝트에만
+	 * 사용한다.
+	 */
+	public void requireDocumentCreator(Project accessibleProject, Long userId) {
+		ProjectRole role = resolveRole(accessibleProject, userId);
+		if (role != ProjectRole.OWNER && role != ProjectRole.MEMBER) {
+			throw new BusinessException(ErrorCode.ACCESS_DENIED);
+		}
+	}
+
 }

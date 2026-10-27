@@ -18,6 +18,8 @@ public enum ErrorCode {
 	PROJECT_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트 구성원을 찾을 수 없습니다."),
 	PROJECT_MEMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 프로젝트 구성원입니다."),
 	PROJECT_OWNER_NOT_REMOVABLE(HttpStatus.BAD_REQUEST, "프로젝트 Owner는 제거할 수 없습니다."),
+	DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다."),
+	FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "파일은 20MB 이하만 업로드할 수 있습니다."),
 	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 이메일로 가입한 사용자를 찾을 수 없습니다."),
 	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
 	UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),

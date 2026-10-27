@@ -18,6 +18,16 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      # 업로드 파일 20MiB(20,971,520바이트), 요청 전체 21MiB (SPEC-03 §5.6, 결정 D2). 초과 시 413 FILE_TOO_LARGE.
+      max-file-size: 20MB
+      max-request-size: 21MB
+
+docflow:
+  storage:
+    # 문서 파일 저장 루트 (SPEC-03 §5.4). 기본값은 backend/에서 실행할 때 backend/storage이며 Git에서 제외한다.
+    dir: ${DOCFLOW_STORAGE_DIR:./storage}
 
 management:
   endpoints:

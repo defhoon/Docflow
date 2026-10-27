@@ -12,7 +12,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import com.docflow.document.validation.InvalidDocumentFileException;
 
 /**
  * Controller 처리 중 발생한 예외를 {@link ErrorResponse}로 변환한다.
@@ -22,6 +25,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
 	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+	/** 형 변환 실패 등 바인딩 오류의 기본 메시지에는 내부 타입 정보가 들어 있으므로 노출하지 않는다. */
+	static final String BINDING_FAILURE_MESSAGE = "입력 형식이 올바르지 않습니다.";
 
 	@ExceptionHandler(BusinessException.class)
 	ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex) {
@@ -33,10 +39,25 @@ public class GlobalExceptionHandler {
 		List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult()
 			.getFieldErrors()
 			.stream()
-			.map((error) -> new ErrorResponse.FieldError(error.getField(), error.getDefaultMessage()))
+			.map((error) -> new ErrorResponse.FieldError(error.getField(),
+					error.isBindingFailure() ? BINDING_FAILURE_MESSAGE : error.getDefaultMessage()))
 			.toList();
 		return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
 			.body(ErrorResponse.of(ErrorCode.VALIDATION_FAILED, fieldErrors));
+	}
+
+	/** 업로드 파일 형식·구조·파일명 오류 (SPEC-03 결정 D6). */
+	@ExceptionHandler(InvalidDocumentFileException.class)
+	ResponseEntity<ErrorResponse> handleInvalidDocumentFile(InvalidDocumentFileException ex) {
+		return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
+			.body(ErrorResponse.of(ErrorCode.VALIDATION_FAILED,
+					List.of(new ErrorResponse.FieldError("file", ex.getMessage()))));
+	}
+
+	/** multipart 파일·요청 크기 상한 초과 (SPEC-03 결정 D3). */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+		return toResponse(ErrorCode.FILE_TOO_LARGE);
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
