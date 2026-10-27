@@ -3,6 +3,7 @@
 - 상태: **Accepted** (단, 아래 "잠정 결정" 항목은 **Proposed**)
 - 후속 변경: Java 버전 결정(Java 21)은 [ADR-0004](./0004-java-25-upgrade.md)(2026-10-22, Java 25)로 대체되었다. 아래 본문은 6주차 당시 결정 기록으로 보존한다.
 - 후속 변경: 잠정 결정 Q1(Session 인증), Q9(Entity ID BIGINT IDENTITY)는 [ADR-0005](./0005-session-authentication.md)(2026-10-22)에서 확정되었다.
+- 후속 변경: 잠정 결정 Q2(로컬 파일시스템 저장소)는 SPEC-03(2026-10-27, Issue #15)에서 **확정**되었다. `FileStorage` 인터페이스 + 로컬 파일시스템 구현, 저장 루트 `DOCFLOW_STORAGE_DIR`, 서버 생성 UUID 저장 키를 사용하며 원본 파일명은 저장 경로에 쓰지 않는다. 세부 사항은 [`specs/03-document-create.md`](../../specs/03-document-create.md) §5.4~§5.6, §7.2를 따른다.
 - 날짜: 2026-10-14
 - 관련 문서: [`spec.md`](../../spec.md) §11 기술 컨텍스트, [`CLAUDE.md`](../../CLAUDE.md) §3(버전 변경 승인)
 
@@ -77,7 +78,7 @@
 | ID | 결정 | 재검토 시점 |
 | --- | --- | --- |
 | Q1 | **Session 기반 인증**을 기본 방향으로 한다. 6주차에는 Spring Security·인증을 구현하지 않는다. CSRF, Session Cookie, 권한 검증은 인증 SPEC에서 상세 설계한다. | 인증 SPEC 작성 시 |
-| Q2 | 파일 저장소는 MVP에서 **로컬 파일시스템**을 기본 방향으로 한다. 저장소 인터페이스와 업로드 기능은 해당 SPEC에서 구현한다. | SPEC-03/04 작성 시 |
+| Q2 | 파일 저장소는 MVP에서 **로컬 파일시스템**을 기본 방향으로 한다. 저장소 인터페이스와 업로드 기능은 해당 SPEC에서 구현한다. | SPEC-03/04 작성 시 → **확정** (2026-10-27, SPEC-03) |
 | Q9 | Entity ID는 **BIGINT IDENTITY**를 잠정 채택한다. 이번 단계에서는 Entity·도메인 테이블을 만들지 않는다. | 첫 도메인 SPEC 구현 시 |
 
 ## 이유
