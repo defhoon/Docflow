@@ -3,7 +3,7 @@
 - 상태: **설계 확정 (v3, 2026-10-23 사용자 승인) — Backend·Frontend 구현 완료(CI 통과), Windows 수동 E2E 통과, PR 검토 대기**
 - Issue: [#6](https://github.com/defhoon/Docflow/issues/6)
 - 브랜치: `feat/6/project-create`
-- 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §9, §10, §12, §13, §15, §16 / [`specs/00-auth.md`](./00-auth.md) / [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0003](../docs/adr/0003-development-environment.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
+- 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §9, §10, §12, §13, §15, §16 / [`specs/00-auth.md`](./00-auth.md) / [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0003](../docs/adr/0003-development-environment.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
 - 작성일: 2026-10-23
 - 변경 이력:
   - v1 (2026-10-23): 초안
@@ -167,7 +167,7 @@ com.docflow.project.domain.Project extends BaseTimeEntity
 ```
 
 - `Project.create`는 정규화가 끝난 값을 받는다(§5.5). 정규화는 DTO 한 곳에서만 수행해 규칙이 둘로 갈라지지 않게 한다.
-- Entity는 API 응답으로 직접 반환하지 않는다([기존] `CLAUDE.md` §3-9).
+- Entity는 API 응답으로 직접 반환하지 않는다([기존] `spec.md` §11.4).
 
 ### 5.5 입력 정규화 및 검증 규칙 [결정 Q4, Q13, Q15]
 
@@ -376,7 +376,7 @@ ProjectSummaryResponse (record)
 
 ### 7.3 소유권 검증 위치 [제안]
 
-- 위치는 `ProjectService`다. Controller와 Repository에는 권한 판단을 두지 않는다([기존] `CLAUDE.md` §3-8, §3-10).
+- 위치는 `ProjectService`다. Controller와 Repository에는 권한 판단을 두지 않는다([기존] `spec.md` §11.4, `CLAUDE.md` §4).
 - **접근 확인 진입점:** `getAccessibleProject(projectId, userId)`
   - SPEC-01: `projectRepository.findByIdAndOwnerId(projectId, userId)`. 결과가 없으면 `PROJECT_NOT_FOUND`.
 - **목록:** `findAllByOwnerIdOrderByCreatedAtDescIdDesc(userId)` (`created_at DESC, id DESC`).

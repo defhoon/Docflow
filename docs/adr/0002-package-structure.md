@@ -2,7 +2,7 @@
 
 - 상태: **Accepted**
 - 날짜: 2026-10-14
-- 관련 문서: [`CLAUDE.md`](../../CLAUDE.md) §3, [`spec.md`](../../spec.md) §9, §11
+- 관련 문서: [`CLAUDE.md`](../../CLAUDE.md) §4, [`spec.md`](../../spec.md) §9, §11
 
 ## 배경
 
@@ -63,7 +63,7 @@ frontend/src
 ## 이유
 
 - 기능 SPEC 단위 개발과 AI Agent 작업 지시에서 변경 범위를 패키지 단위로 모을 수 있다.
-- 도메인 내부는 계층으로 나누므로 `CLAUDE.md` §3의 Controller/Service/Entity 규칙을 그대로 적용할 수 있다.
+- 도메인 내부는 계층으로 나누므로 `spec.md` §11.4의 Controller/Service/Entity 규칙을 그대로 적용할 수 있다.
 
 ## 영향
 

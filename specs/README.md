@@ -18,7 +18,7 @@ specs/
 
 ## SPEC과 Issue·브랜치·PR
 
-하나의 기능 SPEC은 하나의 GitHub Issue, 하나의 브랜치, 하나의 PR로 진행한다(`CLAUDE.md` §9).
+하나의 기능 SPEC은 하나의 GitHub Issue, 하나의 브랜치, 하나의 PR로 진행한다(`CLAUDE.md` §2, 브랜치·커밋·PR 규칙은 §7).
 
 ```text
 GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작성·승인  →  구현·테스트  →  PR (Closes #N)
@@ -30,7 +30,7 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC | 파일 | Issue | 상태 |
 | --- | --- | --- | --- |
 | SPEC-AUTH 사용자 인증 | `00-auth.md` | #4 | 구현·병합 완료 |
-| SPEC-01 프로젝트 생성·조회 및 소유권 | `01-project-create.md` | #6 | 구현·검증 완료 (CI, Windows 수동 E2E), PR 검토 대기 |
+| SPEC-01 프로젝트 생성·조회 및 소유권 | `01-project-create.md` | #6 | 구현·검증 완료, main 병합 완료 (PR #10) |
 
 ## 작성 원칙
 

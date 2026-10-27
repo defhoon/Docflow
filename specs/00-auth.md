@@ -3,7 +3,7 @@
 - 상태: **구현·검증 완료 — main 병합 완료 (PR #5)** (2026-10-22, CI 및 Windows 로컬 검증 완료, 결과는 §17)
 - Issue: [#4](https://github.com/defhoon/Docflow/issues/4)
 - 브랜치: `feat/4/auth`
-- 관련 문서: [`spec.md`](../spec.md) §4.1, §11, §12, §16 / [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3
+- 관련 문서: [`spec.md`](../spec.md) §4.1, §11, §12, §16 / [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
 - 작성일: 2026-10-22
 
 ## 1. 배경 & 목적
