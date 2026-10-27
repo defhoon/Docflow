@@ -18,7 +18,7 @@ specs/
 
 ## SPEC과 Issue·브랜치·PR
 
-하나의 기능 SPEC은 하나의 GitHub Issue, 하나의 브랜치, 하나의 PR로 진행한다(`CLAUDE.md` §9).
+하나의 기능 SPEC은 하나의 GitHub Issue, 하나의 브랜치, 하나의 PR로 진행한다(`CLAUDE.md` §2, 브랜치·커밋·PR 규칙은 §7).
 
 ```text
 GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작성·승인  →  구현·테스트  →  PR (Closes #N)
