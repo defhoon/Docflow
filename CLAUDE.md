@@ -1,125 +1,95 @@
 # CLAUDE.md — DocFlow 개발 지침
 
-## 1. 프로젝트 개요
+## 1. 프로젝트와 기준 문서
 
-DocFlow는 문서 작성 이후 발생하는 **문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인** 과정을 관리하는 Document Review Workflow 시스템이다.
+DocFlow는 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 Document Review Workflow 시스템이다. Google Docs와 같은 실시간 공동 편집 도구가 아니다.
 
-DocFlow는 Google Docs와 같은 실시간 공동 편집 도구가 아니다. 프로젝트의 요구사항, MVP 범위, 상태 전이 및 완료 기준은 저장소 루트의 [`spec.md`](./spec.md)를 기준으로 한다.
+문서의 역할과 우선순위는 다음 순서를 따른다.
 
-## 2. 문서의 역할과 우선순위
+| 문서 | 역할 |
+| --- | --- |
+| `spec.md` | 목표, 범위(In Scope / Post-MVP / Out of Scope), 핵심 Workflow, 공통 정책, MVP Acceptance Criteria. 기술 스택(§11.1), 패키지 구조(§11.3), 개발 규칙(§11.4), 비밀정보(§11.5), DoD(§14), 검증 명령(§15) |
+| `specs/*.md` | 기능별 상세 동작, 예외 처리, Acceptance Criteria. 진행 중인 SPEC·Issue·브랜치와 상태는 `specs/README.md` 표 |
+| `CLAUDE.md` | 작업 절차, 승인 경계, 보고 방식, Git 규칙 |
+| `docs/` | 아키텍처 설명, 결정 기록(`docs/adr/`: 기술 스택·버전, 패키지 구조, 인증 등) |
 
-- `spec.md`: 프로젝트 목표, 범위, 핵심 Workflow, 공통 정책 및 MVP Acceptance Criteria
-- `specs/*.md`: 개별 기능의 상세 동작, 예외 처리 및 Acceptance Criteria (작성된 경우)
-- `CLAUDE.md`: Claude Code의 작업 절차, 코드 작성 원칙 및 보고 방식
-- `docs/`: 아키텍처 설명, 결정 기록 및 연구 자료 (생성된 경우)
+- 문서 간 충돌, 불명확한 요구사항, 구현에 영향을 주는 미결정 정책은 임의로 해석하지 않고 사용자에게 확인한다. 불확실한 내용은 "미결정"으로 표시한다.
+- 실행 명령어는 `spec.md` §15와 `README.md`를 따른다.
 
-작업을 시작하기 전에 `spec.md`와 해당 기능의 상세 SPEC을 읽는다. 문서 간 충돌이나 미결정 사항이 발견되면 **임의로 해석하지 말고 사용자에게 확인한다.**
+## 2. 작업 절차 (SPEC-driven)
 
-## 3. 기본 작업 규칙
+| 단계 | 내용 | 산출물 |
+| --- | --- | --- |
+| 1. Analyze | 관련 SPEC·코드·의존성·테스트·제약·Open Questions 확인 | 현황과 질문 |
+| 2. Draft SPEC | 기능 SPEC(`specs/NN-*.md`) 초안: 범위, 정상·실패 흐름, Acceptance Criteria | 초안 |
+| 3. Review | 질문에 대한 결정 반영, Acceptance Criteria 확정 | 확정 SPEC |
+| 4. Approval | 구현 범위, 접근 방식·대안, 변경 대상 파일, 검증 방법 제시 후 승인 | 승인 |
+| 5. Implement | 승인된 범위만 구현, 작은 단위로 커밋 | 커밋 |
+| 6. Test | 자동 테스트 → CI → 수동 검증(사용자). 결과를 SPEC 검증 절에 기록 | 검증 기록 |
+| 7. PR | 템플릿에 따라 작성, `Closes #N` | PR |
 
-1. `spec.md`의 **In Scope / Post-MVP / Out of Scope** 구분을 준수한다.
-2. 기능 구현은 가능한 한 하나의 기능 SPEC 단위로 진행한다.
-3. 구현 전에 기존 코드, 관련 명세, 제약 조건 및 Open Questions를 확인한다.
-4. 요구사항이 불명확하거나 미확정 정책이 구현에 영향을 준다면 추측하지 않고 질문한다.
-5. **사용자의 승인 전에는 코드나 설정 파일을 생성·수정하지 않는다.** 먼저 계획, 대안, 변경 대상 파일을 제안한다.
-6. 새로운 의존성이나 아키텍처 변경이 필요하면 도입 이유, 대안 및 영향을 설명한다.
-7. 실제 필요성이 확인되지 않은 Redis, Kafka, Microservices 등의 인프라를 임의로 도입하지 않는다.
-8. Controller는 HTTP 요청·응답을 담당하고, 핵심 비즈니스 규칙은 Service에서 처리한다.
-9. Controller가 Repository를 직접 호출하지 않으며, Entity를 API 응답으로 직접 반환하지 않는다.
-10. 권한 검증과 허용 가능한 상태 전이 검증은 Backend에서 수행한다.
-11. 일관성이 필요한 데이터 변경은 Transaction으로 처리한다.
-12. Acceptance Criteria를 기준으로 정상·실패 시나리오를 테스트한다.
-13. 실행하지 않은 테스트를 성공했다고 보고하지 않는다. 실행 불가 시 이유를 명시한다.
-14. 비밀번호, API Key, 실제 `.env` 파일 등의 비밀정보를 Git에 포함하지 않는다.
+- 기능 SPEC 하나는 Issue 하나, 브랜치 하나, PR 하나로 설계·구현·테스트한다.
+- SPEC 범위 밖 작업(보안·의존성 업데이트, 공통 문서 정리 등)은 별도 Issue·브랜치로 분리한다.
+- 구현 중 SPEC과 다른 결정이나 새 Edge Case가 생기면 SPEC에 반영한다. 명세대로 구현하기 부적절한 기술적 이유가 있으면 임의로 바꾸지 않고 보고한다.
 
-## 4. 개발 작업 절차
+## 3. 승인 경계
 
-1. **Issue 확인:** 작업에 해당하는 GitHub Issue를 확인하거나, 사용자 승인 후 생성한다.
-2. **브랜치 생성:** 최신 `origin/main`에서 §9 규칙에 따라 브랜치를 생성한다.
-3. **명세 확인:** `spec.md` 및 관련 `specs/*.md` 읽기
-4. **현황 파악:** 관련 코드, 의존성, 설정, 테스트 확인
-5. **질문 정리:** Open Questions와 모호한 정책 식별
-6. **계획 제안:** 구현 범위, 접근 방식, 대안, 변경 예정 파일, 검증 방법 제시
-7. **승인 대기:** 사용자가 승인하기 전에는 파일을 변경하지 않음
-8. **구현:** 승인된 범위만 작업하고 §9 규칙에 따라 커밋
-9. **검증:** 관련 빌드·테스트·수동 확인 수행
-10. **결과 보고:** 변경 파일, 실행 명령어, 실제 결과, 실패·미해결 사항 정리
-11. **문서 갱신 제안:** 실제 구현과 SPEC 사이의 차이 또는 새로 결정된 사항을 보고
+| 행위 | 조건 |
+| --- | --- |
+| Issue·브랜치 생성 | 사용자 승인 후 |
+| 문서 생성·수정 | 사용자 승인 후. 승인 전에는 대화로 초안을 제시한다. 단, 승인된 작업 범위 안의 SPEC 작성과 검증 기록 갱신은 추가 승인 없이 진행한다 |
+| 코드·설정 파일 생성·수정 | 계획(범위, 대안, 변경 대상 파일) 승인 후, 승인된 범위만 |
+| 새 의존성, 버전 변경, 아키텍처 변경 | 도입 이유·대안·영향 설명 → 승인 → ADR 기록 |
+| Redis, Kafka, Microservices 등 인프라 | 실제 필요성이 확인되지 않으면 도입하지 않는다 |
+| PR 생성 | 사용자 요청 시 |
+| `main` 병합·직접 수정 | 하지 않는다. 병합은 사용자가 직접 수행한다 |
 
-## 5. 기술 스택
+- 승인된 범위 안의 커밋·Push는 진행한다. 한 번의 승인은 그 범위에만 적용한다.
 
-6주차 프로젝트 초기화에서 확정·설치한 버전은 다음과 같다. 상세 버전, 선택 이유 및 대안은 `spec.md` §11과 [`docs/adr/0001-technology-stack.md`](./docs/adr/0001-technology-stack.md)를 기준으로 한다.
+## 4. 개발 원칙
 
-- **Frontend:** Node.js 22, npm, Next.js 16.4 (App Router), React 19.3, TypeScript 5.9, Tailwind CSS 4, ESLint CLI, Vitest
-- **Backend:** Java 25 (2026-10-22 Java 21에서 변경, ADR-0004), Spring Boot 4.1.1, Gradle 9.8 (Groovy DSL), Spring Data JPA, Flyway
-- **Database:** PostgreSQL 16 (로컬은 Docker Compose)
-- **AI (Post-MVP):** Python, FastAPI, LLM API — 아직 설치하지 않음
+- `spec.md`의 In Scope / Post-MVP / Out of Scope 구분을 지키고, SPEC 범위 밖 기능 추가·리팩터링을 하지 않는다.
+- `spec.md` §11.4를 따른다. Controller는 HTTP 요청·응답만 담당하고 핵심 비즈니스 규칙은 Service에서 처리한다. Controller는 Repository를 직접 호출하지 않으며 Entity를 API 응답으로 반환하지 않는다. 일관성이 필요한 데이터 변경은 Transaction으로 처리한다.
+- 권한 검증과 허용 가능한 상태 전이 검증은 Backend에서 수행한다. Frontend 검증은 사용성 보조다.
+- 비밀번호, API Key, 실제 `.env` 등 비밀정보를 Git에 포함하지 않는다(`spec.md` §11.5).
+- 보안 기능을 끄거나 테스트를 건너뛰는 방식으로 테스트를 통과시키지 않는다.
 
-- 패키지 구조는 `spec.md` §11.3과 [`docs/adr/0002-package-structure.md`](./docs/adr/0002-package-structure.md)를 따른다.
-- 실행·검증 명령어는 `spec.md` §15와 `README.md`를 따른다.
-- 버전 변경이나 새 의존성 추가는 이유와 대안을 제안하고 사용자 승인 후 ADR에 기록한다.
-- 인증(Spring Security 세션)과 Entity ID(BIGINT IDENTITY)는 SPEC-AUTH에서 확정되었다([ADR-0005](./docs/adr/0005-session-authentication.md)).
-- 파일 저장소(로컬 파일시스템)는 **잠정 결정(Proposed)** 이다. 해당 기능 구현 전에 재검토한다.
+## 5. 탐색 범위 (효율성 원칙)
 
-## 6. 현재 개발 단계 — 7주차 (SPEC-01)
+- 작업과 직접 관련된 파일부터 확인한다: 해당 SPEC → 변경 대상 코드와 테스트 → 직접 의존하는 코드.
+- `spec.md`와 ADR은 작업에 필요한 절을 중심으로 읽는다. 이미 확인했고 이후 바뀌지 않은 문서는 가능하면 다시 읽지 않는다.
+- 근거가 부족하거나 영향 범위가 불분명하면 범위를 넓혀 확인한다.
 
-6주차(프로젝트 초기화, 개발환경 구축), Java 25 전환(ADR-0004), SPEC-AUTH(Issue #4, 세션 기반 사용자 인증)는 완료되었다.
+## 6. 검증과 보고
 
-현재 목표는 **SPEC-01: 프로젝트 생성·조회 및 소유권**이다.
-
-- Issue: [#6](https://github.com/defhoon/Docflow/issues/6)
-- 브랜치: `feat/6/project-create`
-- SPEC: [`specs/01-project-create.md`](./specs/01-project-create.md)
-
-### 진행 단계
-
-1. SPEC-01 상세 설계 문서 작성·확정 (완료)
-2. Backend 구현: Flyway V3 `projects`, `Project`, 입력 정규화·검증, 프로젝트 API, 타입 불일치 400 처리 (완료, CI 통과)
-3. Frontend 구현: `/projects`, `/projects/new`, `/projects/[projectId]` (완료, CI 확인)
-4. Windows 로컬 수동 E2E 검증 (완료)
-5. PR [#10](https://github.com/defhoon/Docflow/pull/10) (`Closes #6`) (현재 단계 — 사용자 검토·병합 대기)
-
-### 이번 단계에서 구현하지 않을 것
-
-- 프로젝트 수정·삭제, 프로젝트 멤버 관리(SPEC-02)
-- 문서·버전·검토 등 다른 기능 SPEC
-- 목록 페이징·검색·정렬 옵션
-- AI 기능, 실시간 공동 편집, 근거 없이 추가하는 Redis, Kafka, Microservices 등
-
-## 7. 검증 및 완료 보고 원칙
-
-- 빌드·테스트 성공 여부는 실제 실행 결과를 기준으로 판단한다.
-- 클라우드 환경에서 검증한 항목과 로컬 환경에서 검증한 항목을 구분한다.
-- 웹 환경의 제약으로 Docker, PostgreSQL 또는 로컬 실행을 확인하지 못했다면 미검증 상태로 보고한다.
-- 구현 완료 여부는 관련 SPEC의 Acceptance Criteria를 기준으로 판단한다.
-- 테스트 실패, 환경 문제, 남은 Open Questions를 숨기지 않는다.
-
-## 8. 응답 및 코드 작성 규칙
-
-- 사용자에게 제공하는 설명, 설계안, 작업 보고는 **한국어**로 작성한다.
-- 코드의 변수명, 함수명, 클래스명, API 경로 등은 일관된 **영어** 명명 규칙을 사용한다.
-- 중요한 기술적 결정에는 **선택 이유와 고려한 대안**을 함께 설명한다.
+- 성공 여부는 실제 실행 결과로만 판단한다. 실행하지 않은 테스트를 성공했다고 보고하지 않는다.
+- Acceptance Criteria를 기준으로 정상·실패 시나리오를 테스트하고, 완료 여부는 SPEC의 Acceptance Criteria와 `spec.md` §14 DoD로 판단한다.
+- 검증 환경을 구분한다: Claude Code 클라우드 / GitHub Actions CI / 로컬(사용자). 환경 제약으로 Docker, PostgreSQL, JDK, 로컬 실행 등을 확인하지 못했다면 미검증으로 보고한다.
+- 보고는 한국어로 간결하게 작성한다. SPEC 내용을 다시 옮겨 적지 않는다.
+  1. 변경 파일
+  2. 실행한 명령과 실제 결과
+  3. 실패·미실행 항목과 사유, 미해결 사항, 남은 Open Questions (생략하지 않는다)
+  4. 상태 한 줄
+- 중요한 기술 결정에는 선택 이유와 고려한 대안을 함께 적는다.
 - 프로젝트에 존재하지 않는 파일, 명령어, 테스트 결과를 존재하는 것처럼 설명하지 않는다.
-- 불확실한 내용은 추측으로 확정하지 않고 **미결정 사항**으로 표시한다.
+- 코드의 변수명, 함수명, 클래스명, API 경로 등은 일관된 영어 명명 규칙을 사용한다.
 
-## 9. Git 컨벤션
-
-SPEC-AUTH(Issue #4)부터 적용한다. 그 이전 브랜치·커밋 기록은 변경하지 않는다.
+## 7. Git 컨벤션
 
 모든 작업은 실제 GitHub Issue 번호를 기준으로 한다. Issue 없이 브랜치나 커밋을 만들지 않는다.
 
-### 9.1 브랜치
+### 7.1 브랜치
 
 형식: `type/issueNumber/kebab-case-description`
 
-- `type`: `feat`(기능), `fix`(버그 수정), `hotfix`(main 긴급 수정)
+- `type`: `feat`(기능), `fix`(버그 수정), `docs`(문서만 변경), `hotfix`(main 긴급 수정)
 - `issueNumber`: 실제 GitHub Issue 번호 (숫자만, `#` 금지)
 - `description`: 소문자 kebab-case
-- 예: `feat/4/auth`, `fix/12/login-error-message`
+- 예: `feat/4/auth`, `fix/12/login-error-message`, `docs/11/claude-md-cleanup`
 - 최신 `origin/main`에서 생성하고, PR로 `main`에 병합한다.
-- 하나의 기능 SPEC은 하나의 Issue와 하나의 브랜치에서 설계·구현·테스트한다.
+- CI는 `docs/**` 브랜치 push에서는 실행되지 않으며 PR에서 실행된다.
 
-### 9.2 커밋 메시지
+### 7.2 커밋 메시지
 
 형식: `type/#issueNumber: subject`
 
@@ -141,7 +111,7 @@ SPEC-AUTH(Issue #4)부터 적용한다. 그 이전 브랜치·커밋 기록은 �
 - Claude Code가 작성하는 커밋은 본문 끝에 `Co-Authored-By`, `Claude-Session` trailer를 둘 수 있다. 제목은 반드시 위 형식을 따른다.
 - 예: `docs/#4: add SPEC-AUTH detailed spec`, `feat/#4: add session login API`
 
-### 9.3 Pull Request
+### 7.3 Pull Request
 
 - 제목은 커밋 메시지와 같은 형식(`type/#issueNumber: subject`)을 사용한다.
 - 본문은 `.github/pull_request_template.md`를 따르며 `Closes #issueNumber`를 포함한다.
