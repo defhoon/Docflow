@@ -1,6 +1,6 @@
 # SPEC-03: 문서 등록
 
-- 상태: **설계 확정 (v0.2 승인) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증 완료. D4는 MVP 알려진 제한사항으로 유지(미해결, 후속 개선 대상). AC-DOC-09 변경 승인(2026-10-28) — 검증 5번(등록 결과 재확인 안내) 부분 충족, Windows E2E 미실행. Done 아님**
+- 상태: **설계 확정 (v0.2 승인) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증 완료. D4는 MVP 알려진 제한사항으로 유지(미해결, 후속 개선 대상). AC-DOC-09 변경 승인(2026-10-28) — ①~⑤ 클라우드 확인 완료, 완료 조건(Windows E2E) 미실행. Done 아님**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -24,6 +24,7 @@
   - Frontend 구현·Next.js 경유 검증 (2026-10-28): Backend 조건부 승인 후 Frontend 구현 승인. `proxyClientMaxBodySize: '25mb'` 적용, 실제 Next.js rewrite·Chromium 경로 검증 결과와 D4 원인 분석 기록 (§16). 정책 변경 없음
   - D4 처리 결정 기록·Windows E2E 체크리스트 (2026-10-28): 사용자 결정으로 현행 설정 유지, 21MiB 초과 요청의 413 전달 미보장을 알려진 제한사항으로 잠정 수용(§5.6, §12 R6, §14 D4-1). AC-DOC-09는 미충족으로 유지하고 AC 문구 변경은 별도 승인 대상으로 남김. Windows E2E 체크리스트 추가(§16.2). 수용 기준 변경 없음
   - AC-DOC-09 변경 (2026-10-28, 사용자 승인): "21MiB 업로드에 413 도달" 요구를 "크기 제한으로 거부된 업로드는 저장되지 않고 사용자가 실패를 인지할 수 있다"로 변경하고 검증 방법 5개·완료 조건을 정의. D4는 해결된 것이 아니며 알려진 제한사항(D4-1)·후속 개선 대상으로 유지(§16.3). 다른 AC, 크기 제한, API 계약, 보안 정책 변경 없음
+  - AC-DOC-09 ⑤ 문구 보완 (2026-10-28, 사용자 승인): Frontend 네트워크 오류 안내에 등록 결과(문서 목록) 재확인 안내 추가(`features/documents/errors.ts`, 테스트 1곳). 오류 처리 로직·API 호출 변경 없음. ③ 요청별 검증(고유 제목) 결과와 Windows 체크리스트 보강 반영
 
 표기: **[기존]** 이미 구현·확정된 내용, **[결정 Qn·Dn]** 사용자가 확정한 결정, **[제안]** 이 SPEC의 설계안, **[검증 필요]** 구현 단계에서 실제 실행으로 확인할 사항.
 
@@ -827,7 +828,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록 (2026-10-28)
 10. [ ] Windows 로컬 수동 검증 (사용자, §10.5·§16.2 체크리스트)
 10-1. [x] AC-DOC-09 처리 결정 — 수용 기준 변경 승인 (2026-10-28). D4는 미해결·후속 개선 대상
-10-2. [ ] AC-DOC-09 ⑤ 네트워크 오류 안내에 "등록 결과 재확인" 문구 보완 (Frontend 변경, 별도 승인 필요 — §16)
+10-2. [x] AC-DOC-09 ⑤ 네트워크 오류 안내에 "등록 결과 재확인" 문구 보완 (2026-10-28 승인·반영, 클라우드 Chromium 확인)
 10-3. [ ] D4 후속 GitHub Issue 생성 여부 결정 (사용자 승인, 초안은 §16.3)
 11. [ ] PR (`Closes #15`), 병합은 사용자
 
@@ -867,7 +868,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 | --- | --- |
 | 1. Backend 직접 | Tomcat이 `Content-Length`로 요청 상한 초과를 바로 판단해 본문 약 6~8MB만 읽고 `413 FILE_TOO_LARGE`(공통 형식) + `Connection: close`로 응답 후 연결을 닫는다. Node fetch·소켓은 413을 받았고, 본문을 다 보낸 뒤 읽는 Java `HttpClient`는 연결 오류(2026-10-27) |
 | 2. Next.js rewrite 경유 | Next.js 프록시(`proxy-request.js`, httpxy)는 Backend 응답 스트림이 닫히면 정리 과정에서 **클라이언트 요청 스트림을 파기**(`innerReq.destroy`)한다. 클라이언트가 아직 본문을 보내는 중이므로 연결이 리셋되고, 413은 거의 전달되지 않는다. Next.js 로그: `Failed to proxy … Error: write EPIPE` |
-| 3. 실제 브라우저(Chromium) | 정상 UI는 20MiB 사전 검사로 이런 요청을 보내지 않는다. 사전 검사를 거치지 않는 브라우저 `fetch`는 `TypeError: Failed to fetch`. 같은 상황이 화면에 오면 api-client는 네트워크 오류로 분류하고 폼은 "업로드 중 서버와의 연결이 끊어졌습니다. 파일 크기(20MB 이하)와 네트워크 상태를 확인한 뒤 다시 시도해 주세요."를 표시한다(Vitest로 확인) |
+| 3. 실제 브라우저(Chromium) | 정상 UI는 20MiB 사전 검사로 이런 요청을 보내지 않는다. 사전 검사를 거치지 않는 브라우저 `fetch`는 `TypeError: Failed to fetch`. 같은 상황이 화면에 오면 api-client는 네트워크 오류로 분류하고 폼은 네트워크 오류 안내를 표시한다(Vitest로 확인). 안내 문구는 2026-10-28 "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요."로 보완했다(AC-DOC-09 ⑤) |
 | 4. 413·공통 오류 본문 전달 | Backend 직접: 전달됨. Next.js 경유: 20MiB+1(요청 21MiB 이하)은 전달됨, 21MiB 초과는 fetch·브라우저에서 전달되지 않음 |
 | 5. 연결 종료·타임아웃 | 21MiB 초과는 Next.js 경유 시 연결 리셋. 타임아웃은 아래 별도 확인 |
 
@@ -895,6 +896,21 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 | 등록 후 목록·상세 반영 (Chromium) | 프로젝트 상세 문서 섹션에 최신순 표시, 상세에 파일명·크기·버전·업로드 시각 표시, 다운로드 UI 없음 |
 | multipart 요청 형식 (Chromium) | `Content-Type: multipart/form-data; boundary=----WebKitFormBoundary…`(브라우저 설정), `X-XSRF-TOKEN` 포함 |
 
+**AC-DOC-09 ③ 요청별 증거 (2026-10-28 2차 시험, 클라우드)**
+
+새 DB·빈 저장소로 다시 기동한 뒤, 크기 초과 요청마다 고유 제목을 붙이고 요청 전후로 해당 제목의 DB 행, 저장소 `documents/`의 신규 파일, `tmp/` 파일, 전체 문서 행 수를 비교했다.
+
+| 경로 | 크기 | 요청 수 | 응답 | 해당 제목 DB 행 (전→후) | 신규 파일 | `tmp` | 전체 행 증가 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Next.js 경유 (Node fetch) | 20,971,521 | 2 | `413 FILE_TOO_LARGE` 2 | 0→0 | 0 | 0 | 0 |
+| Next.js 경유 (Node fetch) | 23,068,672 | 3 | 연결 종료(`ECONNRESET`) 3 | 0→0 | 0 | 0 | 0 |
+| Next.js 경유 (Node fetch) | 27,262,976 | 2 | 연결 종료(`ECONNRESET`) 2 | 0→0 | 0 | 0 | 0 |
+| Next.js 경유 (소켓) | 23,068,672 | 4 | 연결 종료 3, `413 FILE_TOO_LARGE` 1 | 0→0 | 0 | 0 | 0 |
+| Backend 직접 (Node fetch) | 23,068,672 | 2 | `413 FILE_TOO_LARGE` 2 | 0→0 | 0 | 0 | 0 |
+
+- 13건 모두 미저장. `413` 6건은 크기 제한 거부가 직접 확인됨. 연결 종료 7건은 같은 크기의 Backend 직접 요청이 `413`이고, 시험 동안 Backend 로그의 `Document created`(등록 성공 시 남는 INFO 로그)와 ERROR가 0건이었다. 크기 초과 `413`은 Backend가 로그로 남기지 않아 연결 종료 요청의 개별 거부 기록은 없다(간접 증거).
+- 1차 시험(앞 표)의 "문서 10건 = 저장 파일 10개"는 의도한 성공 요청 10건(19MiB·20MiB 4, UI 2, CSRF 재시도 1, MEMBER 1, 느린 업로드 1, 정지 후 재개 Backend 직접 1)과 ID 1~10이 일치한 결과이며, 개별 초과 요청의 미저장 판단은 이 2차 시험을 근거로 한다.
+
 **신규 Frontend 테스트 (46개)**: `api-client`(FormData 4), 문서 검증 7, 문서 API 3, `DocumentCreateForm` 17(검증·중복 제출·오류 코드별 표시 14, Activity 재진입 3), `DocumentList` 4, `DocumentDetail` 6, 화면 인증 연동 5, `ProjectDetail` 문서 섹션 표시 1(기존 테스트에 단언 추가, 개수 불변) — 합계 169개.
 
 **신규 테스트 (127개)**
@@ -921,7 +937,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 | AC-DOC-28 | 자동 테스트 부분 통과(저장 경로·루트 이탈·덮어쓰기 방지·Git 제외 확인). Windows 동작은 미실행 |
 | AC-DOC-30 | Backend·Frontend 기존 테스트 통과, `SecurityConfig` 변경 없음 |
 | AC-DOC-08 | 통과 (클라우드: Next.js 경유 19MiB·20MiB, 크기·SHA-256 일치). Windows 미실행 |
-| AC-DOC-09 (2026-10-28 변경) | **부분 충족 — 완료 아님.** ① 확인(클라우드): Next.js 경유 20MiB+1 → `413 FILE_TOO_LARGE` (Node fetch 5/5, Chromium fetch 3/3). ② 기록: 22MiB·26MiB Next.js 경유 연결 리셋(fetch 5/5, Chromium 3/3) → D4-1·§16.3. ③ 확인(클라우드): 같은 요청을 Backend 직접 보내면 `413 FILE_TOO_LARGE`(크기 제한 거부), Next.js 경유 소켓 관찰에서도 Backend의 `413`이 10회 중 7회 중계됨. 모든 크기 초과 시험 후 문서 10건 = 저장 파일 10개(저장 키 일치), 임시 파일 없음. Next.js 경유에서 연결이 리셋된 개별 요청의 Backend 거부 응답은 Backend 접근 로그가 없어 직접 기록하지 못했다. ④ 확인: Chromium에서 20MiB+1·22MiB 선택 시 파일 필드 오류, POST 없음 (Vitest 포함). ⑤ **부분:** 네트워크 오류 시 "업로드 중 서버와의 연결이 끊어졌습니다. 파일 크기(20MB 이하)와 네트워크 상태를 확인한 뒤 다시 시도해 주세요."를 표시해 실패 가능성은 인지할 수 있으나, 등록 결과(문서 목록) 재확인은 안내하지 않는다 → 문구 보완 필요(Frontend 변경, 승인 대기). 완료 조건의 Windows E2E는 미실행 |
+| AC-DOC-09 (2026-10-28 변경) | **클라우드에서 ①~⑤ 확인, 완료 조건(Windows E2E) 미실행 — 완료 아님.** ① 확인: Next.js 경유 20MiB+1 → `413 FILE_TOO_LARGE` (2차 시험 Node fetch 2/2, 1차 Node fetch 5/5·Chromium fetch 3/3). ② 기록: 21MiB 초과 Next.js 경유 연결 종료(1차 fetch 10/10·Chromium 6/6, 2차 아래 표) → D4-1·§16.3. ③ 확인(요청별, 아래 "AC-DOC-09 ③ 요청별 증거"): 고유 제목 크기 초과 요청 13건 모두 해당 제목 DB 행 0, 신규 저장 파일 0, 임시 파일 0. 응답이 `413 FILE_TOO_LARGE`인 6건은 서버의 크기 제한 거부가 직접 확인되고, 연결이 종료된 7건은 같은 크기 요청을 Backend 직접 보냈을 때 `413`인 점과 시험 중 Backend의 문서 생성 로그(`Document created`)·ERROR 로그가 0건인 점으로 간접 확인했다(크기 초과 `413`은 Backend가 로그를 남기지 않아 개별 거부 기록은 없다). ④ 확인: Chromium에서 20MiB+1·22MiB 선택 시 파일 필드 오류, POST 없음 (Vitest 포함). ⑤ 확인(2026-10-28 문구 보완 후): 실제 Chromium에서 오프라인 상태·연결 리셋(`connectionreset`)으로 업로드가 실패하면 폼에 "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요."가 표시되고 버튼이 다시 활성화된다. 안내대로 문서 목록을 확인하면 미등록(DB 0건, 목록 0건)을 알 수 있다. Vitest 기대 문구 갱신. Windows E2E는 미실행 |
 | AC-DOC-23~27 | 통과 (Vitest, 클라우드·CI) |
 | AC-DOC-29 | 미실행 (Windows 수동). Chromium 자동화로 §10.5의 1·3~7·9 일부 흐름 확인 |
 
@@ -934,7 +950,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 **후속 승인이 필요한 사항 (정책 변경 없음)**
 
 1. **D4 — 21MiB 초과 요청의 413 전달:** 미해결, 알려진 제한사항(D4-1)으로 유지. 원인·재현·영향·선택지·우회 동작과 후속 Issue 초안은 §16.3.
-1-1. **AC-DOC-09 ⑤ 문구 보완 (승인 필요):** 네트워크 오류 문구를 예: "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요."로 바꾸고 관련 Vitest 기대 문구를 갱신한다(`features/documents/errors.ts`, `DocumentCreateForm.test.tsx` 기대 문구 1곳). 연결이 끊겨도 서버가 등록을 마쳤을 수 있으므로(응답 유실), 재시도 전에 목록을 확인하도록 안내해 중복 등록을 줄인다.
+1-1. **AC-DOC-09 ⑤ 문구 보완 (2026-10-28 승인·반영 완료):** 네트워크 오류 문구를 예: "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요."로 바꾸고 관련 Vitest 기대 문구를 갱신한다(`features/documents/errors.ts`, `DocumentCreateForm.test.tsx` 기대 문구 1곳). 연결이 끊겨도 서버가 등록을 마쳤을 수 있으므로(응답 유실), 재시도 전에 목록을 확인하도록 안내해 중복 등록을 줄인다.
 2. CSRF 헤더 없는 크기 초과 요청의 Spring Boot 기본 오류 형식 `413`(Next.js 경유 20MiB+1에서도 같음): (a) 현행 유지를 제안한다. 정상 SPA 요청은 항상 헤더를 보낸다.
 3. 업로드 중 30초 이상 전송이 멈추면 Next.js가 공통 형식이 아닌 `500 Internal Server Error`를 반환한다. 화면은 5xx 문구로 처리된다. 현행 유지를 제안한다.
 4. Backend는 클라이언트 중단(`MultipartException`/`EOFException`)을 catch-all에서 ERROR 로그와 500으로 처리한다(응답은 클라이언트에 도달하지 않음). 로그 수준 조정은 Backend 변경이라 하지 않았다.
@@ -988,8 +1004,8 @@ DOCX·XLSX·PPTX·PDF 표본은 MS Office(Word·Excel·PowerPoint)로 각각 새
 | 6 | 등록 후 목록·상세 | 프로젝트 상세의 문서 섹션 확인, 항목 클릭 | 최신순 정렬, 제목·상태·작성자·v1·등록 시각. 상세에 다운로드 버튼 없음. 없는 문서 ID는 "문서를 찾을 수 없습니다." | 미실행 |
 | 7 | 19MiB·20MiB 업로드 | UI로 `report-19mib.pdf`, `report-20mib.pdf` 등록 | 둘 다 성공. 상세 크기 "19.0 MB"/"20.0 MB"(마우스를 올리면 19,922,944 / 20,971,520 바이트) | 미실행 |
 | 8 | 20MiB 초과 클라이언트 차단 | UI에서 `report-20mib-plus1.pdf`·`report-22mib.pdf` 선택 → 등록. DevTools Network 탭 확인 | 파일 필드 "파일은 20MB 이하만 업로드할 수 있습니다.", `/documents` POST 요청 없음 | 미실행 |
-| 9 | AC-DOC-09 ①②③ Next.js 경유 413·연결 종료, 저장 없음 | 아래 "9번 절차" (시험 전후 DB 행 수·파일 수 기록) | ① 20MiB+1: Next.js 경유 `413` + `FILE_TOO_LARGE`. ② 22MiB: Next.js 경유는 `Failed to fetch`(또는 curl 연결 오류·`413`·`500`)로 끝날 수 있음 — D4-1로 기록. ③ 같은 파일을 Backend 직접(8080) 보내면 `413 FILE_TOO_LARGE`(크기 제한 거부 확인), 시험 전후 문서 행 수·`backend\storage\documents` 파일 수 불변, `tmp` 비어 있음 | 미실행 |
-| 9-1 | AC-DOC-09 ⑤ 네트워크 오류 안내 | 등록 화면에서 제목·19MiB 파일 입력 → DevTools Network 탭 throttling을 **Offline**으로 바꾼 뒤 "문서 등록" 클릭 → 문구 확인 → Online으로 복구 후 프로젝트 문서 목록 확인 | 폼에 "업로드 중 서버와의 연결이 끊어졌습니다. 파일 크기(20MB 이하)와 네트워크 상태를 확인한 뒤 다시 시도해 주세요." 표시, 버튼 다시 활성화. 목록에 새 문서 없음. (현재 문구는 등록 결과 재확인을 안내하지 않음 — §16 1-1 보완 대기) | 미실행 |
+| 9 | AC-DOC-09 ①②③ Next.js 경유 413·연결 종료, 요청별 미저장 | 아래 "9번 절차". 크기 초과 요청마다 고유 제목(`D4-<경로>-<크기>-<번호>`)을 쓰고, 요청마다 응답 종류와 해당 제목의 DB 행·신규 파일을 기록 표에 남긴다 | ① 20MiB+1: Next.js 경유 `413` + `FILE_TOO_LARGE`. ② 22MiB: Next.js 경유는 `Failed to fetch`·curl 연결 오류(또는 `413`·`500`)로 끝날 수 있음 — D4-1로 기록하되 응답 종류를 요청별로 구분. ③ 같은 크기를 Backend 직접(8080)으로 보내면 `413 FILE_TOO_LARGE`. **모든 시험 제목의 DB 행 0건, 요청마다 신규 파일 0개**, `tmp` 비어 있음 | 미실행 |
+| 9-1 | AC-DOC-09 ⑤ 네트워크 오류 안내 | 등록 화면에서 제목·작은 PDF 입력 → DevTools Network 탭 throttling을 **Offline**으로 바꾼 뒤 "문서 등록" 클릭 → 문구 확인 → Online으로 복구 후 "프로젝트로 돌아가기"로 문서 목록 확인 | 폼에 "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요." 표시, 버튼 다시 활성화. 목록에 해당 제목 문서 없음 | 미실행 |
 | 10 | Windows `CREATE_NEW` 충돌 시 기존 파일 보존 | `cd backend; .\gradlew.bat test --tests "com.docflow.document.storage.LocalFileStorageTest" --tests "com.docflow.document.DocumentStorageIntegrationTest"` → `build\reports\tests\test\index.html` | 모두 통과. 특히 `existingKeyIsNeverOverwrittenOrDeleted`, `concurrentStoresToSameKeyCreateExactlyOneFile`, `scenarioB_existingFileIsNeitherOverwrittenNorDeleted` 통과(기존 파일 내용 불변) | 미실행 |
 | 11 | 저장 실패 후 DB·파일 상태 | (a) 10번의 `scenarioA_…`, `storageFailureLeavesNoRowsAndNoTempFiles`, `compensationFailureKeepsOriginalErrorAndLeavesOrphan` 통과 확인. (b) 수동: `"x" \| Set-Content "$E2E\not-a-dir"` → Backend를 `$env:DOCFLOW_STORAGE_DIR="$E2E\not-a-dir"`로 재시작 → UI 등록 → 확인 후 변수 제거·재시작. (c) 정상 저장소로 돌아온 뒤 DB 행 수와 파일 수 비교: `docker compose exec postgres psql -U docflow -d docflow -At -c "SELECT count(*) FROM document_versions"` / `(Get-ChildItem backend\storage\documents -File).Count` / `Get-ChildItem backend\storage\tmp` | (a) 통과. (b) 화면 "서버 오류가 발생했습니다…", 문서 행 수 변화 없음, 응답에 경로 없음. (c) 행 수 = 파일 수, `tmp` 비어 있음, `git status`에 `backend/storage` 없음 | 미실행 |
 | 12 | 기존 기능 회귀 | 로그인·로그아웃·세션 만료(SPEC-AUTH), 프로젝트 생성·목록·상세(SPEC-01 §10.4), 구성원 추가·제거와 MEMBER 제한(SPEC-02 §10.4) | 기존 절차대로 동작. 프로젝트 상세에 문서 섹션이 추가된 것 외 변화 없음 | 미실행 |
@@ -1000,19 +1016,21 @@ DOCX·XLSX·PPTX·PDF 표본은 MS Office(Word·Excel·PowerPoint)로 각각 새
 
 ```js
 const PID = 1; // 실제 프로젝트 ID
-async function up(size) {
+async function up(size, n) {
   if (!document.cookie.includes("XSRF-TOKEN=")) await fetch("/api/auth/csrf");
   const token = decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)[1]);
+  const title = `D4-browser-${size}-${n}`;   // 요청마다 고유 제목
   const form = new FormData();
-  form.append("title", `size ${size}`);
+  form.append("title", title);
   form.append("file", new File([new Uint8Array(size)], "big.pdf", { type: "application/pdf" }));
   try {
     const res = await fetch(`/api/projects/${PID}/documents`, { method: "POST", body: form, headers: { "X-XSRF-TOKEN": token } });
-    console.log(size, res.status, await res.text());
-  } catch (e) { console.log(size, "ERROR", e.message); }
+    console.log(title, "→", res.status, await res.text());       // 응답을 받은 요청
+  } catch (e) { console.log(title, "→ 연결 종료:", e.message); }   // 연결이 종료된 요청
 }
-await up(20971521);   // 예상: 413 {"code":"FILE_TOO_LARGE",...}
-await up(23068672);   // 예상: ERROR Failed to fetch (D4-1), 드물게 413
+await up(20971521, 1);   // 예상: 413 {"code":"FILE_TOO_LARGE",...}
+await up(23068672, 1);   // 예상: 연결 종료 Failed to fetch (D4-1), 드물게 413
+await up(23068672, 2);
 ```
 
 curl (Backend 직접 `8080`과 Next.js 경유 `3000` 비교, 로그인 본문은 파일로 전달):
@@ -1027,20 +1045,40 @@ foreach ($base in "http://localhost:8080", "http://localhost:3000") {
   curl.exe -s -b $jar -c $jar "$base/api/auth/csrf" | Out-Null
   $t = (Select-String -Path $jar -Pattern 'XSRF-TOKEN\s+(\S+)$').Matches[0].Groups[1].Value
   foreach ($f in "report-20mib-plus1.pdf", "report-22mib.pdf") {
-    Write-Host "$base $f"
-    curl.exe -s -b $jar -H "X-XSRF-TOKEN: $t" -F "title=curl $f" -F "file=@$E2E\$f" -w " -> HTTP %{http_code}`n" "$base/api/projects/1/documents"
+    $title = "D4-curl$($base.Split(':')[-1])-$($f.Replace('.pdf',''))"   # 요청마다 고유 제목
+    Write-Host "$title"
+    curl.exe -s -b $jar -H "X-XSRF-TOKEN: $t" -F "title=$title" -F "file=@$E2E\$f" -w " -> HTTP %{http_code} (curl exit $LASTEXITCODE)`n" "$base/api/projects/1/documents"
   }
 }
 Remove-Item "$E2E\login.json"
 ```
 
-시험 전후 상태 비교(AC-DOC-09 ③):
+요청별 미저장 확인(AC-DOC-09 ③) — 저장소 루트에서 실행:
 
 ```powershell
-docker compose exec postgres psql -U docflow -d docflow -At -c "SELECT count(*) FROM documents; SELECT count(*) FROM document_versions"
-(Get-ChildItem backend\storage\documents -File -ErrorAction SilentlyContinue).Count
+# (1) 크기 초과 시험 시작 전 저장 파일 목록 스냅숏
+$before = Get-ChildItem backend\storage\documents -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+# (2) 위 브라우저·curl 요청을 실행하고, 요청마다 응답 종류(413 / 연결 종료 / 기타)를 기록한다
+# (3) 시험 제목별 DB 행 확인 — 결과가 0행이어야 한다 (제목 단위 확인)
+docker compose exec postgres psql -U docflow -d docflow -c "SELECT d.id, d.title, v.storage_key FROM documents d JOIN document_versions v ON v.document_id = d.id WHERE d.title LIKE 'D4-%'"
+# (4) 신규 저장 파일 확인 — 출력이 없어야 한다 (파일 단위 확인)
+$after = Get-ChildItem backend\storage\documents -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+Compare-Object @($before) @($after)
 Get-ChildItem backend\storage\tmp -ErrorAction SilentlyContinue        # 비어 있어야 한다
 ```
+
+- 요청을 하나씩 보내고 매번 (3)·(4)를 확인하면 요청별 결과가 분명해진다. 여러 요청을 묶어 확인할 때도 제목이 모두 다르므로 (3)은 제목 단위로 판단할 수 있다.
+- **DB 행 수와 저장 파일 수가 같다는 사실만으로 개별 요청이 저장되지 않았다고 단정하지 않는다.** 판단 근거는 (3) 시험 제목의 행 0건과 (4) 신규 파일 0개다.
+- 응답을 받은 요청(`413 FILE_TOO_LARGE`)은 서버의 크기 제한 거부가 직접 확인된다. 연결이 종료된 요청은 같은 크기의 Backend 직접 요청이 `413`인지, Backend 콘솔에 `Document created` 로그가 없는지로 함께 판단한다.
+
+기록 표(예시):
+
+| 요청 제목 | 경로 | 크기 | 응답 (413 / 연결 종료 / 기타) | 해당 제목 DB 행 | 신규 파일 |
+| --- | --- | --- | --- | --- | --- |
+| D4-browser-20971521-1 | Next.js (브라우저) | 20,971,521 | | | |
+| D4-browser-23068672-1 | Next.js (브라우저) | 23,068,672 | | | |
+| D4-curl8080-report-22mib | Backend 직접 | 23,068,672 + multipart | | | |
+| D4-curl3000-report-22mib | Next.js (curl) | 23,068,672 + multipart | | | |
 
 예상: `8080`은 두 파일 모두 `413 FILE_TOO_LARGE`(curl은 조기 응답을 읽는 편이다). `3000`은 20MiB+1이 `413`, 22MiB는 `HTTP 000`/연결 리셋 또는 `413`·`500`이 섞일 수 있다(클라우드에서 소켓 클라이언트 10회 중 413 7회, 500 1회, 리셋 2회). 실행 후 문서 목록과 `backend\storage\documents` 파일 수가 변하지 않았는지 확인한다.
 
@@ -1055,7 +1093,7 @@ Get-ChildItem backend\storage\tmp -ErrorAction SilentlyContinue        # 비어 
 | 재현 조건 | 인증 세션·CSRF 헤더가 있는 요청, 전체 크기 > 21MB(클라우드에서 22MiB·26MiB로 재현), Next.js(`next start`) 경유. 요청 전체 21MB 이하(파일 20MiB+1 등)는 Backend가 본문을 끝까지 읽고 응답하므로 `413`이 정상 전달된다. Backend 직접 호출은 대부분의 클라이언트에서 `413`을 받는다(본문을 다 보낸 뒤 응답을 읽는 Java `HttpClient`는 예외) |
 | 재현 결과 (2026-10-28, 클라우드) | Node fetch 5/5·Chromium fetch 3/3 연결 리셋. 응답을 동시에 읽는 소켓 클라이언트는 10회 중 `413` 7회, Next.js `500` 1회, 리셋 2회 |
 | 사용자 영향 | 정상 UI는 20,971,520바이트 초과 파일을 전송 전에 차단하므로 일반 사용 경로에서는 발생하지 않는다. 발생 대상은 UI를 거치지 않는 API 클라이언트, 사전 검사를 우회한 요청이다. 발생해도 문서 행·저장 파일은 생기지 않는다(AC-DOC-09 ③ 확인). 사용자는 정확한 원인(크기 초과) 대신 연결 오류를 보게 된다 |
-| 현재 우회 동작 | ① 등록 화면의 20MB 사전 검사(파일 선택 즉시 오류 표시, 전송 안 함). ② 네트워크 오류 시 "업로드 중 서버와의 연결이 끊어졌습니다. 파일 크기(20MB 이하)와 네트워크 상태를 확인한 뒤 다시 시도해 주세요." 표시(등록 결과 재확인 안내는 보완 대기 — §16 1-1). ③ 20MiB~21MiB 구간은 `413`이 전달되어 파일 필드에 크기 오류 표시 |
+| 현재 우회 동작 | ① 등록 화면의 20MB 사전 검사(파일 선택 즉시 오류 표시, 전송 안 함). ② 네트워크 오류 시 "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요." 표시(2026-10-28 보완). ③ 20MiB~21MiB 구간은 `413`이 전달되어 파일 필드에 크기 오류 표시 |
 | 개선 선택지 | (b) `server.tomcat.max-swallow-size` 상향 — Next.js 쪽 파기 동작 때문에 효과 불확실, 실측 필요, 거부 요청마다 추가 수신. (c) `max-request-size`를 Next.js 본문 상한(25MiB)과 맞춤 — 25MiB 이하 요청은 `413` 전달 예상(실측 필요), 25MiB 초과는 Next.js가 본문을 잘라 여전히 미보장, D2 변경. (d) Next.js 쪽에서 `Content-Length`로 프록시 전에 `413` 응답 — 가장 확실하나 Next.js 구조 변경·새 코드. (e) Next.js 업그레이드 시 프록시의 요청 스트림 파기 동작 재확인 |
 | 관련 위치 | §5.6, §12 R6, §14 D4·D4-1, §16.1, AC-DOC-09 |
 
