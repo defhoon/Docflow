@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -62,15 +63,27 @@ public final class DocumentTestSupport {
 		}
 	}
 
-	/** 저장 루트 아래 일반 파일 (임시 파일 포함), 루트 기준 상대 경로. */
+	/**
+	 * 저장 루트 아래 일반 파일 (임시 파일 포함). DB의 {@code storage_key}와 직접 비교할 수 있도록 루트 기준 상대 경로를
+	 * OS와 무관한 논리 키 형식({@code documents/<UUID>}, {@code /} 구분)으로 반환한다.
+	 */
 	public static List<String> storedFiles() {
 		try (Stream<Path> paths = Files.walk(STORAGE_ROOT)) {
-			return paths.filter(Files::isRegularFile).map((path) -> STORAGE_ROOT.relativize(path).toString()).sorted()
+			return paths.filter(Files::isRegularFile)
+				.map((path) -> toLogicalKey(STORAGE_ROOT.relativize(path)))
+				.sorted()
 				.toList();
 		}
 		catch (IOException ex) {
 			throw new UncheckedIOException(ex);
 		}
+	}
+
+	/** {@code Path.toString()}은 Windows에서 역슬래시 구분자를 쓰므로 이름 요소를 {@code /}로 직접 잇는다. */
+	static String toLogicalKey(Path relativePath) {
+		List<String> names = new ArrayList<>();
+		relativePath.forEach((name) -> names.add(name.toString()));
+		return String.join("/", names);
 	}
 
 	private static Path createRoot() {

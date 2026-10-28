@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -16,6 +17,11 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -150,7 +156,14 @@ class DocumentUploadSizeIntegrationTest {
 			.POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray())));
 	}
 
-	/** 본문 쓰기가 실패해도(서버 조기 종료) 이미 도착한 응답을 읽는다. */
+	/**
+	 * 본문을 보내는 동안 별도 스레드가 응답을 계속 읽는다.
+	 * <p>
+	 * 서버는 요청 상한 초과를 본문 수신 전에 판단해 {@code 413}을 보내고 연결을 닫는다. 남은 본문을 계속 보내면 RST가
+	 * 돌아오는데, Windows는 RST를 받으면 애플리케이션이 아직 읽지 않은 수신 데이터를 버린다. 본문을 다 보낸 뒤에 읽으면
+	 * Windows에서 {@code 413}을 잃으므로, 읽기를 먼저 대기시켜 응답이 도착하는 즉시 받는다. 응답이 오기 시작하거나 쓰기가
+	 * 실패하면 전송을 멈춘다. 읽기 중 연결이 끊기면 그때까지 받은 바이트를 결과로 쓴다.
+	 */
 	private String uploadOverRawSocket(long fileSize) throws Exception {
 		String boundary = "----docflow" + UUID.randomUUID();
 		byte[] head = ("--" + boundary
@@ -164,28 +177,68 @@ class DocumentUploadSizeIntegrationTest {
 			.map((cookie) -> cookie.getName() + "=" + cookie.getValue())
 			.reduce((a, b) -> a + "; " + b)
 			.orElseThrow();
-		try (Socket socket = new Socket("localhost", this.port)) {
+		byte[] requestHead = ("POST /api/projects/" + this.projectId + "/documents HTTP/1.1\r\nHost: localhost\r\n"
+				+ "Content-Type: multipart/form-data; boundary=" + boundary + "\r\nContent-Length: "
+				+ (head.length + fileSize + tail.length) + "\r\nCookie: " + cookieHeader + "\r\nX-XSRF-TOKEN: "
+				+ csrfToken() + "\r\n\r\n")
+			.getBytes(StandardCharsets.UTF_8);
+
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		Socket socket = new Socket("localhost", this.port);
+		try {
 			socket.setSoTimeout(30_000);
-			OutputStream out = socket.getOutputStream();
-			try {
-				out.write(("POST /api/projects/" + this.projectId + "/documents HTTP/1.1\r\nHost: localhost\r\n"
-						+ "Content-Type: multipart/form-data; boundary=" + boundary + "\r\nContent-Length: "
-						+ (head.length + fileSize + tail.length) + "\r\nCookie: " + cookieHeader
-						+ "\r\nX-XSRF-TOKEN: " + csrfToken() + "\r\n\r\n")
-					.getBytes(StandardCharsets.UTF_8));
-				out.write(head);
-				byte[] chunk = new byte[64 * 1024];
-				for (long sent = 0; sent < fileSize; sent += chunk.length) {
-					out.write(chunk, 0, (int) Math.min(chunk.length, fileSize - sent));
+			AtomicBoolean responseStarted = new AtomicBoolean();
+			// 쓰기보다 먼저 읽기를 대기시킨다.
+			Future<byte[]> response = executor.submit(() -> readResponse(socket.getInputStream(), responseStarted));
+			Future<?> request = executor.submit(() -> {
+				try {
+					OutputStream out = socket.getOutputStream();
+					out.write(requestHead);
+					out.write(head);
+					byte[] chunk = new byte[64 * 1024];
+					for (long sent = 0; sent < fileSize && !responseStarted.get(); sent += chunk.length) {
+						out.write(chunk, 0, (int) Math.min(chunk.length, fileSize - sent));
+					}
+					if (!responseStarted.get()) {
+						out.write(tail);
+						out.flush();
+					}
 				}
-				out.write(tail);
-				out.flush();
-			}
-			catch (IOException expected) {
-				// 서버가 본문을 다 읽기 전에 응답하고 연결을 닫음
-			}
-			return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+				catch (IOException expected) {
+					// 서버가 본문을 다 읽기 전에 응답하고 연결을 닫음
+				}
+				return null;
+			});
+			byte[] received = response.get(60, TimeUnit.SECONDS);
+			request.get(10, TimeUnit.SECONDS);
+			return new String(received, StandardCharsets.UTF_8);
 		}
+		finally {
+			// 소켓을 닫아 막혀 있는 읽기·쓰기를 풀고 스레드를 정리한다.
+			socket.close();
+			executor.shutdownNow();
+			assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+		}
+	}
+
+	/** 연결이 닫히거나 chunked 응답이 끝날 때까지 읽는다. 읽기 중 연결이 끊기면 받은 데이터까지만 반환한다. */
+	private static byte[] readResponse(InputStream in, AtomicBoolean responseStarted) {
+		ByteArrayOutputStream received = new ByteArrayOutputStream();
+		byte[] buffer = new byte[8192];
+		try {
+			int read;
+			while ((read = in.read(buffer)) != -1) {
+				received.write(buffer, 0, read);
+				responseStarted.set(true);
+				if (received.toString(StandardCharsets.ISO_8859_1).contains("\r\n0\r\n\r\n")) {
+					break;
+				}
+			}
+		}
+		catch (IOException connectionClosed) {
+			// 부분 응답을 그대로 반환하고, 판단은 호출한 테스트의 단언에 맡긴다.
+		}
+		return received.toByteArray();
 	}
 
 	private HttpResponse<String> send(HttpRequest.Builder request) throws IOException, InterruptedException {
