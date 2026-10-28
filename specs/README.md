@@ -33,7 +33,7 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-AUTH 사용자 인증 | `00-auth.md` | #4 | 구현·병합 완료 |
 | SPEC-01 프로젝트 생성·조회 및 소유권 | `01-project-create.md` | #6 | 구현·검증 완료, main 병합 완료 (PR #10) |
 | SPEC-02 프로젝트 구성원 관리 | `02-project-members.md` | #13 | 구현·검증 완료, main 병합 완료 (PR #14) |
-| SPEC-03 문서 등록 | `03-document-create.md` | #15 | Backend·Frontend 구현, Next.js 경유 검증 완료 (D4 승인 대기, Windows 수동 검증 미실행) |
+| SPEC-03 문서 등록 | `03-document-create.md` | #15 | Backend·Frontend 구현, 클라우드·CI 검증 완료. Windows E2E 미실행, AC-DOC-09 미충족(D4 알려진 제한사항 잠정 수용, AC 변경안 승인 대기) |
 
 ## 작성 원칙
 

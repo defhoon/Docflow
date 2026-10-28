@@ -1,6 +1,6 @@
 # SPEC-03: 문서 등록
 
-- 상태: **설계 확정 (v0.2 승인) — Backend 조건부 승인(2026-10-28), Frontend 구현·Next.js 경유 검증 완료. D4(21MiB 초과 요청의 413 전달) 미해결, 승인 대기**
+- 상태: **설계 확정 (v0.2 승인) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증 완료. D4는 MVP 알려진 제한사항으로 잠정 수용(미해결), AC-DOC-09 미충족(변경안 승인 대기), Windows E2E 미실행**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -22,6 +22,7 @@
     - 파일 저장 실패 통합 테스트를 "최종 배치 경로의 상위가 일반 파일"인 실제 I/O 오류로 구체화 (§10.2)
     - 크기 초과 응답 전달 결과와 CSRF 헤더 없는 크기 초과 요청의 응답 형식 차이 기록 (§12.1, §16) — 정책 변경 없음, 후속 승인 필요 항목으로 보고
   - Frontend 구현·Next.js 경유 검증 (2026-10-28): Backend 조건부 승인 후 Frontend 구현 승인. `proxyClientMaxBodySize: '25mb'` 적용, 실제 Next.js rewrite·Chromium 경로 검증 결과와 D4 원인 분석 기록 (§16). 정책 변경 없음
+  - D4 처리 결정 기록·Windows E2E 체크리스트 (2026-10-28): 사용자 결정으로 현행 설정 유지, 21MiB 초과 요청의 413 전달 미보장을 알려진 제한사항으로 잠정 수용(§5.6, §12 R6, §14 D4-1). AC-DOC-09는 미충족으로 유지하고 AC 문구 변경은 별도 승인 대상으로 남김. Windows E2E 체크리스트 추가(§16.2). 수용 기준 변경 없음
 
 표기: **[기존]** 이미 구현·확정된 내용, **[결정 Qn·Dn]** 사용자가 확정한 결정, **[제안]** 이 SPEC의 설계안, **[검증 필요]** 구현 단계에서 실제 실행으로 확인할 사항.
 
@@ -307,6 +308,12 @@ SPEC-03은 PDF의 **헤더와 최소 구조**만 검증한다. 파일의 앞부�
   - [검증 필요] Backend가 본문을 다 읽기 전에 응답하면(크기 초과, 미인증) Tomcat이 남은 본문이 2MB를 넘을 때 연결을 닫아, 클라이언트·프록시가 `413`/`401` 대신 연결 오류를 받을 수 있다.
   - [검증 필요] 느린 네트워크에서 20MiB 업로드가 30초 프록시 타임아웃을 넘을 수 있다.
   - 재현되면 원인과 대안을 보고하고 추가 승인 후 변경한다.
+- **알려진 제한사항 (2026-10-28 사용자 결정 D4-1, 미해결):** 위 설정(파일 20MB, 요청 21MB, Next.js `25mb`, `max-swallow-size` 기본값)을 유지한다. 구현·검증 결과(§16.1)는 다음과 같다.
+  - 20,971,520바이트를 넘는 파일은 정상 UI가 전송 전에 차단한다(파일 필드 오류).
+  - UI를 거치지 않는 직접 API 요청에는 `413 FILE_TOO_LARGE`가 반환될 수 있다(요청 전체 21MiB 이하이거나 Backend 직접 호출일 때 확인).
+  - 요청 전체가 21MiB를 넘으면 Next.js rewrite 경유 응답이 `413` 대신 연결 리셋으로 끝날 수 있다(Tomcat 조기 응답·연결 종료 + Next.js 프록시의 클라이언트 요청 스트림 파기).
+  - Frontend는 연결이 끊기면 파일 크기(20MB 이하)와 네트워크 상태를 확인하라는 안내를 표시한다.
+  - 따라서 **모든 크기 초과 요청에서 `413` 응답 전달을 보장하지 않는다.** 이 제한 때문에 AC-DOC-09는 충족되지 않는다(§16).
 
 ### 5.7 원본 파일명 [결정 Q8, D7]
 
@@ -683,7 +690,7 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | R3 | Next.js rewrite 10MB 본문 잘림 | `experimental.proxyClientMaxBodySize: '25mb'` [결정 D1], 실제 경로 검증(AC-DOC-08) |
 | R4 | experimental 옵션 변경 가능성, 본문 복제 메모리(동시 업로드 × 최대 25MB) | MVP 수용, Next.js 업그레이드 시 재확인 |
 | R5 | 25MB를 넘는 요청은 여전히 잘려 Backend가 손상된 multipart를 받을 수 있음 | 클라이언트 사전 검사, 서버는 손상 multipart를 4xx로 처리하는지 구현 시 확인 |
-| R6 | 크기 초과·미인증 시 Tomcat 미소비 본문(2MB 초과)으로 연결 종료 → `413`·`401` 미전달 가능 | [결정 D4] 설정 유지, 실제 경로 검증(AC-DOC-09), 재현 시 보고 후 승인 |
+| R6 | 크기 초과·미인증 시 Tomcat 미소비 본문(2MB 초과)으로 연결 종료 → `413`·`401` 미전달 가능 | [결정 D4] 설정 유지, 실제 경로 검증(AC-DOC-09), 재현 시 보고 후 승인. **2026-10-28 재현 확인(요청 21MiB 초과·Next.js 경유 연결 리셋), 미인증은 `401` 전달 확인. 알려진 제한사항으로 잠정 수용 [D4-1], 미해결** |
 | R7 | 느린 네트워크에서 30초 프록시 타임아웃 | [결정 D4] 유지, 검증 후 판단 |
 | R8 | 형식 검증이 안전성을 보증하지 않음 (악성 콘텐츠, 매크로, 폴리글랏, ZIP 헤더 불일치) | 실행·렌더링하지 않음, 다운로드 보안은 SPEC-05. 악성코드 검사 범위 밖 |
 | R9 | 저장소 고갈 | 파일 크기 상한만 적용. 할당량·모니터링 범위 밖 |
@@ -790,6 +797,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 | D2 | `max-file-size=20MB`, `max-request-size=21MB`(구현 단계). 20MB = 20,971,520바이트, 1바이트 초과 시 413 | §5.6 |
 | D3 | `FILE_TOO_LARGE`(413), 공통 형식, 내부 정보 비노출 | §5.6, §6.4 |
 | D4 | `max-swallow-size`·`proxyTimeout` 유지, 실제 경로 검증 후 재현 시 보고·승인 | §5.6, §10.4, §12 R6·R7 |
+| D4-1 | (2026-10-28) D4 재현 결과 보고 후 결정: 현행 설정(파일 20MB, 요청 21MB, Next.js `25mb`, `max-swallow-size` 기본값) 유지. 21MiB 초과 요청에서 Next.js 경유 `413` 전달이 보장되지 않는 동작을 MVP 알려진 제한사항으로 **잠정 수용**하며 해결된 것으로 보지 않는다. AC-DOC-09 문구 변경은 별도 승인 대상 | §5.6, §12 R6, §16 |
 | D5 | `DOCFLOW_STORAGE_DIR`, 로컬 기본 경로, Git 제외, 테스트별 임시 디렉터리, UUID 키, 원본 파일명 미사용 (`.env.example`·`.gitignore`·설정 변경은 구현 단계) | §5.4 |
 | D6 | 형식·빈 파일·파일명 오류는 `VALIDATION_FAILED` + `fieldErrors.file`, 20MiB 초과는 `FILE_TOO_LARGE` | §5.5, §6.4 |
 | D7 | 파일명 최대 255자, 초과 시 자르지 않고 400, 경로 구분자 제거, 제어·양방향·표시 위장 문자 거부, 정규화된 이름만 표시 | §5.7 |
@@ -814,14 +822,15 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 5. [x] CI 확인 (Backend)
 6. [x] Frontend: `api-client` FormData 지원, 문서 API·타입·검증, 목록 섹션·등록·상세 화면, `next.config.ts` `proxyClientMaxBodySize` + Vitest
 7. [x] Frontend lint·test·build (클라우드) → CI 확인
-8. [x] 실제 업로드 경로 검증 (§10.4) — 클라우드 범위. D4 미해결(승인 대기)
-9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록 (§16 기록 완료, README·architecture는 미갱신)
-10. [ ] Windows 로컬 수동 검증 (사용자, §10.5)
+8. [x] 실제 업로드 경로 검증 (§10.4) — 클라우드 범위. D4는 알려진 제한사항으로 잠정 수용(미해결)
+9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록 (2026-10-28)
+10. [ ] Windows 로컬 수동 검증 (사용자, §10.5·§16.2 체크리스트)
+10-1. [ ] AC-DOC-09 처리 결정 (AC 변경 또는 미충족 유지, 사용자 승인)
 11. [ ] PR (`Closes #15`), 병합은 사용자
 
 ## 16. 검증 결과
 
-**Backend 구현·검증 완료 (2026-10-27, 2026-10-28 조건부 승인). Frontend 구현·Next.js 경유 검증 완료 (2026-10-28). D4 미해결. Windows 수동 검증 미실행.**
+**Backend 구현·검증 완료 (2026-10-27, 2026-10-28 조건부 승인). Frontend 구현·Next.js 경유 검증 완료 (2026-10-28). D4는 알려진 제한사항으로 잠정 수용(미해결), AC-DOC-09 미충족. Windows E2E 미실행(§16.2). `spec.md` §14 DoD 기준으로 SPEC-03은 아직 Done이 아니다.**
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
@@ -909,7 +918,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 | AC-DOC-28 | 자동 테스트 부분 통과(저장 경로·루트 이탈·덮어쓰기 방지·Git 제외 확인). Windows 동작은 미실행 |
 | AC-DOC-30 | Backend·Frontend 기존 테스트 통과, `SecurityConfig` 변경 없음 |
 | AC-DOC-08 | 통과 (클라우드: Next.js 경유 19MiB·20MiB, 크기·SHA-256 일치). Windows 미실행 |
-| AC-DOC-09 | **미해결.** 20MiB+1은 Next.js 경유로도 413 전달, 21MiB 초과는 Next.js 경유 시 연결 리셋 (§16.1) — 승인 대기 [결정 D4] |
+| AC-DOC-09 | **미충족.** 20MiB+1은 Next.js 경유로도 413 전달, 21MiB 초과는 Next.js 경유 시 연결 리셋 (§16.1). 2026-10-28 사용자 결정으로 알려진 제한사항 잠정 수용 [D4-1]. AC 문구 변경 여부는 승인 대기 |
 | AC-DOC-23~27 | 통과 (Vitest, 클라우드·CI) |
 | AC-DOC-29 | 미실행 (Windows 수동). Chromium 자동화로 §10.5의 1·3~7·9 일부 흐름 확인 |
 
@@ -921,7 +930,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 
 **후속 승인이 필요한 사항 (정책 변경 없음)**
 
-1. **D4 — 21MiB 초과 요청의 413 전달 (미해결).**
+1. **D4 — 21MiB 초과 요청의 413 전달 (미해결, 2026-10-28 알려진 제한사항으로 잠정 수용 [D4-1]).** 아래 분석과 선택지는 결정 당시 기록이며, 현행 설정 (a)를 유지하기로 했다. AC-DOC-09 처리(문구 변경 또는 미충족 유지)는 별도 승인 대상이다.
    - 원인: Tomcat이 요청 상한 초과를 본문 수신 전에 판단해 조기 응답·연결 종료 + Next.js 프록시가 Backend 응답 종료 시 클라이언트 요청 스트림을 파기.
    - 영향 범위: 요청 전체가 21MiB를 넘는 경우만. 정상 UI는 20MiB 사전 검사로 보내지 않으며, 20MiB~21MiB 구간(20MiB+1 포함)은 413이 전달된다. 발생해도 DB·저장소 변화는 없고 화면은 연결 오류 문구를 표시한다. UI를 거치지 않는 클라이언트·사전 검사가 없는 이전 빌드가 영향을 받는다.
    - 선택지:
@@ -934,3 +943,98 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 3. 업로드 중 30초 이상 전송이 멈추면 Next.js가 공통 형식이 아닌 `500 Internal Server Error`를 반환한다. 화면은 5xx 문구로 처리된다. 현행 유지를 제안한다.
 4. Backend는 클라이언트 중단(`MultipartException`/`EOFException`)을 catch-all에서 ERROR 로그와 500으로 처리한다(응답은 클라이언트에 도달하지 않음). 로그 수준 조정은 Backend 변경이라 하지 않았다.
 5. OOXML 주 문서 파트 128MiB 상한: 측정 범위에서는 문제가 없었다. 실제 Office 대용량 텍스트 문서 표본으로 Windows에서 확인한 뒤 필요하면 조정한다.
+
+### 16.2 Windows E2E 체크리스트 (사용자 실행, **미실행**)
+
+클라우드에서는 Windows를 사용할 수 없어 실행하지 않았다. 아래 결과는 **예상 결과**이며, 실행 후 결과 칸을 채운다. PowerShell 기준이며 저장소 루트(`C:\...\Docflow`)에서 시작한다. 표본 파일은 저장소 밖(`$env:TEMP\docflow-e2e`)에 만든다.
+
+**준비**
+
+```powershell
+git fetch origin; git checkout feat/15/document-create; git pull
+java -version; node -v; docker version          # JDK 25, Node 22, Docker Desktop 실행 중
+# .env: POSTGRES_PASSWORD = DB_PASSWORD, DEV_SEED_PASSWORD 설정. DOCFLOW_STORAGE_DIR는 비워 두지 말고 주석 상태 유지(기본 backend\storage)
+$E2E = "$env:TEMP\docflow-e2e"; New-Item -ItemType Directory -Force $E2E | Out-Null
+```
+
+정확한 크기의 PDF 표본 생성 스크립트 (Backend 테스트와 같은 최소 PDF 구조):
+
+```powershell
+@'
+import fs from "node:fs";
+const [size, out] = [Number(process.argv[2]), process.argv[3]];
+const head = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n";
+const tailBase = "xref\n0 2\n0000000000 65535 f \n0000000009 00000 n \ntrailer\n<< /Size 2 /Root 1 0 R >>\nstartxref\n";
+let pad = 0;
+for (let i = 0; i < 4; i++) { const t = head.length + pad + tailBase.length + String(head.length + pad).length + 7; if (t === size) break; pad += size - t; }
+const tail = tailBase + (head.length + pad) + "\n%%EOF\n";
+const buf = Buffer.alloc(head.length + pad + tail.length, 0x20);
+buf.write(head, 0, "latin1"); buf[head.length] = 0x25; buf[head.length + pad - 1] = 0x0a; buf.write(tail, head.length + pad, "latin1");
+if (buf.length !== size) throw new Error("size mismatch"); fs.writeFileSync(out, buf);
+'@ | Set-Content -Encoding utf8 "$E2E\make-pdf.mjs"
+node "$E2E\make-pdf.mjs" 19922944 "$E2E\report-19mib.pdf"        # 19MiB
+node "$E2E\make-pdf.mjs" 20971520 "$E2E\report-20mib.pdf"        # 20MiB (경계, 허용)
+node "$E2E\make-pdf.mjs" 20971521 "$E2E\report-20mib-plus1.pdf"  # 20MiB + 1
+node "$E2E\make-pdf.mjs" 23068672 "$E2E\report-22mib.pdf"        # 요청 21MiB 초과
+Get-ChildItem $E2E\*.pdf | Select-Object Name, Length
+"%PDF-1.4 not a pdf" | Set-Content "$E2E\fake.pdf"
+```
+
+DOCX·XLSX·PPTX·PDF 표본은 MS Office(Word·Excel·PowerPoint)로 각각 새로 만들고 저장한다(Word의 "PDF로 저장" 포함). 실제 Office 표본은 클라우드 미실행 항목(§12.1)이므로 이 단계가 첫 확인이다.
+
+| # | 항목 | 실행 방법 | 예상 결과 | 결과 |
+| --- | --- | --- | --- | --- |
+| 1 | PostgreSQL 16 실행, Flyway V5 적용 | `docker compose up -d` → `docker compose ps` / Backend 기동 후 `docker compose exec postgres psql -U docflow -d docflow -c "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank"` / `... -c "\d document_versions"` | `healthy`. 이력에 `5 \| create documents \| t`. `uk_document_versions_storage_key`, `ck_document_versions_sha256` 등 제약 표시 | 미실행 |
+| 2 | Spring Boot 실행, 스키마 검증 | `cd backend; .\gradlew.bat clean build` → `.\gradlew.bat bootRun --args="--spring.profiles.active=local"` → `curl.exe http://localhost:8080/actuator/health` | build 성공(테스트 254개 통과), 기동 로그에 스키마 검증 오류 없음(`ddl-auto=validate`), `{"status":"UP"}` | 미실행 |
+| 3 | Next.js 실행, 로그인 | 새 창 `cd frontend; npm ci; npm run lint; npm run test; npm run build; npm run start` → `http://localhost:3000` 로그인(`author@docflow.local`) | lint 오류 0, 테스트 169개 통과, build 성공. 로그인 후 `/` 이동 | 미실행 |
+| 4 | OWNER·MEMBER·비구성원 권한 | Author로 프로젝트 생성 → Reviewer를 Member로 추가. 비구성원 계정 생성: `docker compose exec postgres psql -U docflow -d docflow -c "INSERT INTO users (email, password_hash, display_name) SELECT 'outsider@docflow.local', password_hash, 'Outsider' FROM users WHERE email='reviewer@docflow.local'"` (개발 DB 전용, 비밀번호는 DEV_SEED_PASSWORD와 같음). 각 계정으로 `/projects/{id}`, `/projects/{id}/documents/new`, 문서 상세 URL 접근 | Author·Reviewer: 문서 섹션 표시, 등록 가능. Outsider: 모든 화면 "프로젝트를 찾을 수 없습니다.", 등록 시도도 같은 문구 | 미실행 |
+| 5 | PDF·DOCX·XLSX·PPTX 등록 | Office로 만든 4개 파일을 각각 등록 (설명 입력 포함 1건) | 각각 `201` → 상세로 이동, 상태 "초안", v1, 원본 파일명·크기 표시 | 미실행 |
+| 6 | 등록 후 목록·상세 | 프로젝트 상세의 문서 섹션 확인, 항목 클릭 | 최신순 정렬, 제목·상태·작성자·v1·등록 시각. 상세에 다운로드 버튼 없음. 없는 문서 ID는 "문서를 찾을 수 없습니다." | 미실행 |
+| 7 | 19MiB·20MiB 업로드 | UI로 `report-19mib.pdf`, `report-20mib.pdf` 등록 | 둘 다 성공. 상세 크기 "19.0 MB"/"20.0 MB"(마우스를 올리면 19,922,944 / 20,971,520 바이트) | 미실행 |
+| 8 | 20MiB 초과 클라이언트 차단 | UI에서 `report-20mib-plus1.pdf`·`report-22mib.pdf` 선택 → 등록. DevTools Network 탭 확인 | 파일 필드 "파일은 20MB 이하만 업로드할 수 있습니다.", `/documents` POST 요청 없음 | 미실행 |
+| 9 | Next.js 경유 413·연결 리셋 | 아래 "9번 절차" | 20MiB+1: `413` + `FILE_TOO_LARGE`. 22MiB: Next.js 경유는 `Failed to fetch`(또는 curl 연결 오류)로 끝날 수 있음, Backend 직접은 `413`. 어느 경우에도 문서·파일 추가 없음 (D4-1 알려진 제한) | 미실행 |
+| 10 | Windows `CREATE_NEW` 충돌 시 기존 파일 보존 | `cd backend; .\gradlew.bat test --tests "com.docflow.document.storage.LocalFileStorageTest" --tests "com.docflow.document.DocumentStorageIntegrationTest"` → `build\reports\tests\test\index.html` | 모두 통과. 특히 `existingKeyIsNeverOverwrittenOrDeleted`, `concurrentStoresToSameKeyCreateExactlyOneFile`, `scenarioB_existingFileIsNeitherOverwrittenNorDeleted` 통과(기존 파일 내용 불변) | 미실행 |
+| 11 | 저장 실패 후 DB·파일 상태 | (a) 10번의 `scenarioA_…`, `storageFailureLeavesNoRowsAndNoTempFiles`, `compensationFailureKeepsOriginalErrorAndLeavesOrphan` 통과 확인. (b) 수동: `"x" \| Set-Content "$E2E\not-a-dir"` → Backend를 `$env:DOCFLOW_STORAGE_DIR="$E2E\not-a-dir"`로 재시작 → UI 등록 → 확인 후 변수 제거·재시작. (c) 정상 저장소로 돌아온 뒤 DB 행 수와 파일 수 비교: `docker compose exec postgres psql -U docflow -d docflow -At -c "SELECT count(*) FROM document_versions"` / `(Get-ChildItem backend\storage\documents -File).Count` / `Get-ChildItem backend\storage\tmp` | (a) 통과. (b) 화면 "서버 오류가 발생했습니다…", 문서 행 수 변화 없음, 응답에 경로 없음. (c) 행 수 = 파일 수, `tmp` 비어 있음, `git status`에 `backend/storage` 없음 | 미실행 |
+| 12 | 기존 기능 회귀 | 로그인·로그아웃·세션 만료(SPEC-AUTH), 프로젝트 생성·목록·상세(SPEC-01 §10.4), 구성원 추가·제거와 MEMBER 제한(SPEC-02 §10.4) | 기존 절차대로 동작. 프로젝트 상세에 문서 섹션이 추가된 것 외 변화 없음 | 미실행 |
+
+**9번 절차 — 브라우저(DevTools Console)와 curl 비교**
+
+브라우저: Author로 로그인한 `http://localhost:3000/projects/{id}` 탭의 Console에서 실행(`{id}`를 실제 프로젝트 ID로 바꾼다).
+
+```js
+const PID = 1; // 실제 프로젝트 ID
+async function up(size) {
+  if (!document.cookie.includes("XSRF-TOKEN=")) await fetch("/api/auth/csrf");
+  const token = decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)[1]);
+  const form = new FormData();
+  form.append("title", `size ${size}`);
+  form.append("file", new File([new Uint8Array(size)], "big.pdf", { type: "application/pdf" }));
+  try {
+    const res = await fetch(`/api/projects/${PID}/documents`, { method: "POST", body: form, headers: { "X-XSRF-TOKEN": token } });
+    console.log(size, res.status, await res.text());
+  } catch (e) { console.log(size, "ERROR", e.message); }
+}
+await up(20971521);   // 예상: 413 {"code":"FILE_TOO_LARGE",...}
+await up(23068672);   // 예상: ERROR Failed to fetch (D4-1), 드물게 413
+```
+
+curl (Backend 직접 `8080`과 Next.js 경유 `3000` 비교, 로그인 본문은 파일로 전달):
+
+```powershell
+foreach ($base in "http://localhost:8080", "http://localhost:3000") {
+  $jar = "$E2E\jar-$($base.Split(':')[-1]).txt"; Remove-Item $jar -ErrorAction SilentlyContinue
+  '{"email":"author@docflow.local","password":"<DEV_SEED_PASSWORD 값>"}' | Set-Content -Encoding ascii "$E2E\login.json"
+  curl.exe -s -c $jar "$base/api/auth/csrf" | Out-Null
+  $t = (Select-String -Path $jar -Pattern 'XSRF-TOKEN\s+(\S+)$').Matches[0].Groups[1].Value
+  curl.exe -s -b $jar -c $jar -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $t" --data "@$E2E\login.json" "$base/api/auth/login" | Out-Null
+  curl.exe -s -b $jar -c $jar "$base/api/auth/csrf" | Out-Null
+  $t = (Select-String -Path $jar -Pattern 'XSRF-TOKEN\s+(\S+)$').Matches[0].Groups[1].Value
+  foreach ($f in "report-20mib-plus1.pdf", "report-22mib.pdf") {
+    Write-Host "$base $f"
+    curl.exe -s -b $jar -H "X-XSRF-TOKEN: $t" -F "title=curl $f" -F "file=@$E2E\$f" -w " -> HTTP %{http_code}`n" "$base/api/projects/1/documents"
+  }
+}
+Remove-Item "$E2E\login.json"
+```
+
+예상: `8080`은 두 파일 모두 `413 FILE_TOO_LARGE`(curl은 조기 응답을 읽는 편이다). `3000`은 20MiB+1이 `413`, 22MiB는 `HTTP 000`/연결 리셋 또는 `413`·`500`이 섞일 수 있다(클라우드에서 소켓 클라이언트 10회 중 413 7회, 500 1회, 리셋 2회). 실행 후 문서 목록과 `backend\storage\documents` 파일 수가 변하지 않았는지 확인한다.
