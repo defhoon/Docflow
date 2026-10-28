@@ -10,7 +10,7 @@ import { MESSAGES } from "./validation";
 export function uploadFailureMessage(error: unknown): string {
   if (error instanceof ApiError && error.kind === "network") {
     // 업로드 중 연결이 끊긴 경우(서버 조기 응답 후 연결 종료, 프록시 타임아웃 등)도 여기에 해당한다.
-    return "업로드 중 서버와의 연결이 끊어졌습니다. 파일 크기(20MB 이하)와 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
+    return "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요.";
   }
   if (error instanceof ApiError && error.status === 413) {
     return MESSAGES.fileTooLarge;
