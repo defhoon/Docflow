@@ -5,6 +5,8 @@
  * - 변경 요청에는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 보낸다.
  * - 자동 재시도는 서버가 `403 CSRF_INVALID`로 거부한 요청에 한해 토큰 갱신 후 최대 1회만 수행한다.
  *   그 밖의 403, 네트워크 오류, 5xx는 재시도하지 않는다.
+ * - 본문이 `FormData`이면 JSON으로 변환하지 않고 그대로 보내며, `Content-Type`은 브라우저가 boundary와 함께
+ *   정하도록 지정하지 않는다 (SPEC-03 §8.3). 재시도 시 같은 `FormData`를 다시 보낸다.
  */
 
 export const CSRF_COOKIE_NAME = "XSRF-TOKEN";
@@ -95,7 +97,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
 async function send(path: string, method: string, body: unknown, unsafe: boolean): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) {
+  const formData = body instanceof FormData;
+  if (body !== undefined && !formData) {
     headers["Content-Type"] = "application/json";
   }
   if (unsafe) {
@@ -108,7 +111,7 @@ async function send(path: string, method: string, body: unknown, unsafe: boolean
     return await fetch(path, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : formData ? body : JSON.stringify(body),
       credentials: "same-origin",
       cache: "no-store",
     });
