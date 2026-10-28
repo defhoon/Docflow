@@ -18,6 +18,11 @@ vi.mock("@/features/auth/AuthProvider", () => ({
   useAuth: () => ({ refresh }),
 }));
 
+// 문서 섹션(SPEC-03)은 자체 테스트에서 검증한다. 여기서는 프로젝트 ID를 전달해 표시하는지만 확인한다.
+vi.mock("@/features/documents/components/DocumentList", () => ({
+  DocumentList: ({ projectId }: { projectId: string }) => <section aria-label="문서">문서 섹션 {projectId}</section>,
+}));
+
 vi.mock("../api", () => ({
   fetchProject: (...args: unknown[]) => fetchProjectMock(...args),
   fetchMembers: (...args: unknown[]) => fetchMembersMock(...args),
@@ -53,6 +58,7 @@ describe("ProjectDetail", () => {
     expect(screen.getByText(/1행/)).toHaveTextContent("1행 2행");
     expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-01-02T03:04:05Z");
     expect(screen.getByRole("link", { name: "프로젝트 목록으로" })).toHaveAttribute("href", "/projects");
+    expect(screen.getByRole("region", { name: "문서" })).toHaveTextContent("문서 섹션 7");
   });
 
   it("설명이 없으면 안내 문구를 표시한다", async () => {
