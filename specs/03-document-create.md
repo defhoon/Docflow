@@ -1,6 +1,6 @@
 # SPEC-03: 문서 등록
 
-- 상태: **설계 확정 (v0.2 승인, 2026-10-27) — Backend 구현·검증 완료, Frontend 미착수**
+- 상태: **설계 확정 (v0.2 승인) — Backend 조건부 승인(2026-10-28), Frontend 구현·Next.js 경유 검증 완료. D4(21MiB 초과 요청의 413 전달) 미해결, 승인 대기**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -21,6 +21,7 @@
     - `FileStorage` 실제 시그니처(저장 키 반환, 임시 파일 삭제 메서드, `IOException`) 반영 (§5.4)
     - 파일 저장 실패 통합 테스트를 "최종 배치 경로의 상위가 일반 파일"인 실제 I/O 오류로 구체화 (§10.2)
     - 크기 초과 응답 전달 결과와 CSRF 헤더 없는 크기 초과 요청의 응답 형식 차이 기록 (§12.1, §16) — 정책 변경 없음, 후속 승인 필요 항목으로 보고
+  - Frontend 구현·Next.js 경유 검증 (2026-10-28): Backend 조건부 승인 후 Frontend 구현 승인. `proxyClientMaxBodySize: '25mb'` 적용, 실제 Next.js rewrite·Chromium 경로 검증 결과와 D4 원인 분석 기록 (§16). 정책 변경 없음
 
 표기: **[기존]** 이미 구현·확정된 내용, **[결정 Qn·Dn]** 사용자가 확정한 결정, **[제안]** 이 SPEC의 설계안, **[검증 필요]** 구현 단계에서 실제 실행으로 확인할 사항.
 
@@ -811,23 +812,78 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 4. [x] Backend: V5 마이그레이션, `Document`·`DocumentVersion`, `FileStorage`·`LocalFileStorage`, 형식·파일명 검증, `ProjectPermissionService` 문서 등록 권한, API, `FILE_TOO_LARGE`, multipart 설정, `DOCFLOW_STORAGE_DIR`(`.env.example`·`.gitignore`) + 단위·통합 테스트 (§10.2.1 DB 실패 보상 테스트 포함)
 4-1. [x] OOXML 검사 상한·PDF 최소 구조 검증의 정상 표본 측정 기록 (§5.5.4, §12.1) — 클라우드 생성 표본 범위. MS Office·Google Docs 표본은 미실행
 5. [x] CI 확인 (Backend)
-6. [ ] Frontend: `api-client` FormData 지원, 문서 API·타입·검증, 목록 섹션·등록·상세 화면, `next.config.ts` `proxyClientMaxBodySize` + Vitest
-7. [ ] Frontend lint·test·build (클라우드) → CI 확인
-8. [ ] 실제 업로드 경로 검증 (§10.4)
-9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록
+6. [x] Frontend: `api-client` FormData 지원, 문서 API·타입·검증, 목록 섹션·등록·상세 화면, `next.config.ts` `proxyClientMaxBodySize` + Vitest
+7. [x] Frontend lint·test·build (클라우드) → CI 확인
+8. [x] 실제 업로드 경로 검증 (§10.4) — 클라우드 범위. D4 미해결(승인 대기)
+9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §16 결과 기록 (§16 기록 완료, README·architecture는 미갱신)
 10. [ ] Windows 로컬 수동 검증 (사용자, §10.5)
 11. [ ] PR (`Closes #15`), 병합은 사용자
 
 ## 16. 검증 결과
 
-**Backend 구현·검증 완료 (2026-10-27). Frontend·실제 업로드 경로·Windows 수동 검증은 미실행.**
+**Backend 구현·검증 완료 (2026-10-27, 2026-10-28 조건부 승인). Frontend 구현·Next.js 경유 검증 완료 (2026-10-28). D4 미해결. Windows 수동 검증 미실행.**
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 통과: 전체 254개(기존 127 + 신규 127), 실패 0 (JDK 21 + 임시 PostgreSQL 16, `./gradlew test`) | 통과 (run 52, `5231d58`, JDK 25 + PostgreSQL 16) | 미실행 |
-| Frontend lint·test·build | 변경 없음 (이번 단계 범위 밖) | 통과 (run 52, 기존 코드 회귀) | 미실행 |
-| 실제 업로드 경로 (§10.4) | Backend 직접 HTTP만 확인 (§12.1). Next.js 경유 미실행 | — | 미실행 |
-| 수동 E2E (§10.5) | — | — | 미실행 |
+| Backend build·test | 통과: 전체 254개(기존 127 + 신규 127), 실패 0 (JDK 21 + 임시 PostgreSQL 16). 2026-10-28 재실행도 254개 통과 | 통과 (run 52 `5231d58`, run 53 `e2be108`, run 54 `c9b16ef`; JDK 25 + PostgreSQL 16) | 미실행 |
+| Frontend lint·test·build | 통과: lint 오류 0, Vitest 169개(기존 123 + 신규 46) 실패 0, `next build` 성공(새 동적 경로 2개 Partial Prerender) | 통과 (run 54 `c9b16ef`) | 미실행 |
+| 실제 업로드 경로 (§10.4) | 실행: `next start`(프로덕션 빌드) → rewrite → Spring Boot jar, Node fetch·소켓 클라이언트·Chromium(Playwright) (아래) | — | 미실행 |
+| 수동 E2E (§10.5) | Chromium 자동화로 일부 대체(아래) | — | 미실행 |
+
+### 16.1 Frontend·Next.js 경유 검증 (2026-10-28, 클라우드)
+
+환경: PostgreSQL 16(임시), Spring Boot jar(JDK 21, `local` 프로파일, 임시 저장 디렉터리), Next.js 16.4.1 `next start`(`proxyClientMaxBodySize: '25mb'`), Chromium(Playwright 내장). 사용자: author(OWNER), reviewer(MEMBER), outsider(비구성원).
+
+**`proxyClientMaxBodySize` 단위 확인:** Next.js는 문자열을 `bytes.parse`로 해석한다. `'25mb'`는 26,214,400바이트(25MiB)이며 Spring의 요청 상한 `21MB`(22,020,096바이트)보다 크다. 25MiB까지는 본문이 잘리지 않고 Backend에 전달되며, 이를 넘는 요청은 Next.js가 앞부분만 전달하고 경고를 남긴다(`body-streams.js`).
+
+**크기 경계 (title + PDF, 같은 세션·CSRF)**
+
+| 크기 | Backend 직접 (Node fetch) | Next.js 경유 (Node fetch) | Next.js 경유 (Chromium) | 저장 결과 |
+| --- | --- | --- | --- | --- |
+| 19MiB | `201` | `201` | UI 업로드 `201` → 상세 이동 | 크기·SHA-256 일치 |
+| 20MiB (20,971,520) | `201` | `201` | UI 업로드 `201` → 상세 이동 | 크기·SHA-256 일치 |
+| 20MiB + 1 | `413 FILE_TOO_LARGE` 5/5 | `413 FILE_TOO_LARGE` 5/5 | UI: 사전 검사로 요청 없음, 파일 필드 "파일은 20MB 이하만 업로드할 수 있습니다." / 브라우저 fetch: `413` 공통 형식 3/3 | 행·파일 없음 |
+| 22MiB (요청 21MiB 초과, 25MiB 미만) | `413 FILE_TOO_LARGE` 5/5 | **연결 리셋 5/5** (`ECONNRESET`) | 브라우저 fetch: **`TypeError: Failed to fetch` 3/3** (30~165ms) | 행·파일 없음 |
+| 26MiB (Next 25MiB 초과) | `413 FILE_TOO_LARGE` 5/5 | **연결 리셋 5/5** | 브라우저 fetch: **`TypeError: Failed to fetch` 3/3** | 행·파일 없음 |
+
+- 22MiB·26MiB를 Next.js 경유로 보낼 때 응답을 쓰기와 동시에 읽는 소켓 클라이언트는 실행마다 결과가 달랐다(10회 중 `413` 7회, Next.js가 만든 `500 Internal Server Error` 1회, 응답 없이 리셋 2회).
+- 업로드 후 DB 문서 10건 = 저장 파일 10개(저장 키 일치), 임시 디렉터리 비어 있음, 고아 파일 없음.
+
+**D4 구분 보고**
+
+| 구분 | 21MiB 초과 요청 결과 |
+| --- | --- |
+| 1. Backend 직접 | Tomcat이 `Content-Length`로 요청 상한 초과를 바로 판단해 본문 약 6~8MB만 읽고 `413 FILE_TOO_LARGE`(공통 형식) + `Connection: close`로 응답 후 연결을 닫는다. Node fetch·소켓은 413을 받았고, 본문을 다 보낸 뒤 읽는 Java `HttpClient`는 연결 오류(2026-10-27) |
+| 2. Next.js rewrite 경유 | Next.js 프록시(`proxy-request.js`, httpxy)는 Backend 응답 스트림이 닫히면 정리 과정에서 **클라이언트 요청 스트림을 파기**(`innerReq.destroy`)한다. 클라이언트가 아직 본문을 보내는 중이므로 연결이 리셋되고, 413은 거의 전달되지 않는다. Next.js 로그: `Failed to proxy … Error: write EPIPE` |
+| 3. 실제 브라우저(Chromium) | 정상 UI는 20MiB 사전 검사로 이런 요청을 보내지 않는다. 사전 검사를 거치지 않는 브라우저 `fetch`는 `TypeError: Failed to fetch`. 같은 상황이 화면에 오면 api-client는 네트워크 오류로 분류하고 폼은 "업로드 중 서버와의 연결이 끊어졌습니다. 파일 크기(20MB 이하)와 네트워크 상태를 확인한 뒤 다시 시도해 주세요."를 표시한다(Vitest로 확인) |
+| 4. 413·공통 오류 본문 전달 | Backend 직접: 전달됨. Next.js 경유: 20MiB+1(요청 21MiB 이하)은 전달됨, 21MiB 초과는 fetch·브라우저에서 전달되지 않음 |
+| 5. 연결 종료·타임아웃 | 21MiB 초과는 Next.js 경유 시 연결 리셋. 타임아웃은 아래 별도 확인 |
+
+**느린 업로드와 프록시 타임아웃**
+
+- Chromium 업로드 속도 제한 400KB/s로 19MiB: 약 48.9초 걸려 `201` 성공. Next.js `proxyTimeout`(30초)은 전체 전송 시간 상한이 아니라 데이터가 오가지 않는 대기 시간에 적용되는 것으로 관찰됐다.
+- 업로드 도중 1MiB 전송 후 40초 정지(소켓 클라이언트): Next.js 경유는 약 36초 후 Next.js가 만든 `500 Internal Server Error`(일반 텍스트, 공통 형식 아님). 화면은 5xx 문구("서버 오류가 발생했습니다…")를 표시하게 된다. Backend 직접은 전송 재개 후 `201`. DB·저장소 변화 없음(Backend는 잘린 multipart를 `MultipartException`으로 거부).
+
+**인증·CSRF·권한·입력 (Next.js 경유)**
+
+| 항목 | 결과 |
+| --- | --- |
+| 미인증 등록 화면 접근 (Chromium) | `/login?next=%2Fprojects%2F1%2Fdocuments%2Fnew`로 이동 |
+| 미인증 업로드 (CSRF 유효, 작은 파일·22MiB) | `401 AUTH_REQUIRED` (22MiB도 401이 전달됨 — 인증 실패를 multipart 해석 전에 판단) |
+| CSRF 헤더 누락·토큰 불일치 | `403 CSRF_INVALID` |
+| CSRF 쿠키 변조 후 UI 등록 (Chromium) | api-client가 `CSRF_INVALID` 후 토큰 갱신·1회 재시도 → `201`, 상세 이동 |
+| CSRF 헤더 없는 20MiB+1 | Backend·Next 모두 `413`이지만 Spring Boot 기본 오류 형식(§12.1). 22MiB는 Next 경유 시 연결 리셋 |
+| 비구성원 등록·목록·상세 (HTTP·Chromium) | `404 PROJECT_NOT_FOUND`, 화면 "프로젝트를 찾을 수 없습니다." |
+| MEMBER 등록 (Chromium) | `201`, 작성자 Reviewer로 상세 표시 |
+| 없는 문서 (Chromium) | "문서를 찾을 수 없습니다." |
+| 지원하지 않는 형식 `.txt` / 파일 누락 / 제목 201자 (HTTP) | `400 VALIDATION_FAILED`, `fieldErrors` 각각 `file`·`file`·`title` |
+| 형식 위장(.pdf 텍스트) / 파일명 양방향·폭 없는 문자 (Chromium) | `400` → 파일 필드 아래 서버 메시지 표시 |
+| 제목 공백 (Chromium) | 사전 검사, 요청 없음 |
+| JSON 본문 POST / 숫자가 아닌 ID | `415 UNSUPPORTED_MEDIA_TYPE` / `400 BAD_REQUEST` |
+| 등록 후 목록·상세 반영 (Chromium) | 프로젝트 상세 문서 섹션에 최신순 표시, 상세에 파일명·크기·버전·업로드 시각 표시, 다운로드 UI 없음 |
+| multipart 요청 형식 (Chromium) | `Content-Type: multipart/form-data; boundary=----WebKitFormBoundary…`(브라우저 설정), `X-XSRF-TOKEN` 포함 |
+
+**신규 Frontend 테스트 (46개)**: `api-client`(FormData 4), 문서 검증 7, 문서 API 3, `DocumentCreateForm` 17(검증·중복 제출·오류 코드별 표시 14, Activity 재진입 3), `DocumentList` 4, `DocumentDetail` 6, 화면 인증 연동 5, `ProjectDetail` 문서 섹션 표시 1(기존 테스트에 단언 추가, 개수 불변) — 합계 169개.
 
 **신규 테스트 (127개)**
 
@@ -845,16 +901,17 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 | `DocumentSchemaIntegrationTest` | 3 | AC-DOC-22 |
 | `ProjectPermissionServiceTest` (추가) | 1 | §7.1 |
 
-**Backend AC 결과**
+**AC 결과**
 
 | AC | 결과 |
 | --- | --- |
 | AC-DOC-01~07, 10~22 | 통과 (자동 테스트, 클라우드·CI) |
 | AC-DOC-28 | 자동 테스트 부분 통과(저장 경로·루트 이탈·덮어쓰기 방지·Git 제외 확인). Windows 동작은 미실행 |
 | AC-DOC-30 | Backend·Frontend 기존 테스트 통과, `SecurityConfig` 변경 없음 |
-| AC-DOC-08 | 미실행 (Next.js 경유) |
-| AC-DOC-09 | Backend 직접 경로에서 연결 종료 재현 (§12.1) — 보고 후 승인 필요 [결정 D4] |
-| AC-DOC-23~27, 29 | 미실행 (Frontend·수동, 이번 단계 범위 밖) |
+| AC-DOC-08 | 통과 (클라우드: Next.js 경유 19MiB·20MiB, 크기·SHA-256 일치). Windows 미실행 |
+| AC-DOC-09 | **미해결.** 20MiB+1은 Next.js 경유로도 413 전달, 21MiB 초과는 Next.js 경유 시 연결 리셋 (§16.1) — 승인 대기 [결정 D4] |
+| AC-DOC-23~27 | 통과 (Vitest, 클라우드·CI) |
+| AC-DOC-29 | 미실행 (Windows 수동). Chromium 자동화로 §10.5의 1·3~7·9 일부 흐름 확인 |
 
 **미실행·제약**
 
@@ -864,6 +921,16 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 
 **후속 승인이 필요한 사항 (정책 변경 없음)**
 
-1. 21MiB 초과 요청의 `413` 전달: 서버가 본문을 다 읽지 않고 응답 후 연결을 닫아 일부 클라이언트에서 연결 오류가 된다. 정상 UI는 20MiB 사전 검사로 이런 요청을 보내지 않는다. 대안: (a) 현행 유지 + Frontend 사전 검사와 연결 오류 문구로 대응, (b) `server.tomcat.max-swallow-size` 상향(남은 본문을 읽어 413 전달 가능성 증가, 대역폭·처리 시간 증가), (c) Next.js 경유 결과 확인 후 결정. Next.js·브라우저 경로 확인(§10.4) 후 판단을 제안한다.
-2. CSRF 헤더 없는 크기 초과 요청의 Spring Boot 기본 오류 형식 `413`: 공통 오류 형식(D3)과 다르다. 대안: (a) 현행 유지(정상 SPA 경로는 공통 형식이고 노출 정보 없음), (b) 서블릿 오류 경로(`/error`)의 `413`을 공통 형식으로 바꾸는 전역 오류 처리 추가(전역 설정 변경). (a)를 제안한다.
-3. OOXML 주 문서 파트 128MiB 상한: 측정 범위에서는 문제가 없었다. 실제 Office 대용량 텍스트 문서 표본으로 Windows에서 확인한 뒤 필요하면 조정한다.
+1. **D4 — 21MiB 초과 요청의 413 전달 (미해결).**
+   - 원인: Tomcat이 요청 상한 초과를 본문 수신 전에 판단해 조기 응답·연결 종료 + Next.js 프록시가 Backend 응답 종료 시 클라이언트 요청 스트림을 파기.
+   - 영향 범위: 요청 전체가 21MiB를 넘는 경우만. 정상 UI는 20MiB 사전 검사로 보내지 않으며, 20MiB~21MiB 구간(20MiB+1 포함)은 413이 전달된다. 발생해도 DB·저장소 변화는 없고 화면은 연결 오류 문구를 표시한다. UI를 거치지 않는 클라이언트·사전 검사가 없는 이전 빌드가 영향을 받는다.
+   - 선택지:
+     - (a) 현행 유지: 사전 검사 + 연결 오류 문구(파일 크기 안내 포함). 변경 없음. 413 코드는 전달되지 않는다.
+     - (b) `server.tomcat.max-swallow-size` 상향(예: 25MB 이상): Tomcat이 남은 본문을 읽고 닫아 프록시 정리가 늦춰질 가능성. Next.js 쪽 파기 동작 때문에 효과는 실측 필요. 거부되는 요청마다 최대 25MB를 더 수신한다.
+     - (c) `max-request-size`를 Next.js 상한과 맞춤(예: 25MB, 파일 상한 20MB 유지): Tomcat이 본문 전체를 읽은 뒤 파일 상한으로 413을 판단하므로 20MiB+1과 같이 전달될 것으로 예상(실측 필요). 25MiB 초과는 Next.js가 본문을 잘라 여전히 413이 보장되지 않는다. D2 설정 변경이다.
+     - (d) Next.js 쪽에서 `Content-Length`를 보고 프록시 전에 413을 응답(Route Handler·proxy): 가장 확실하지만 Next.js 구조 변경과 새 코드가 필요하다.
+   - 권장: MVP는 (a). 413 코드 전달이 요구사항이면 (c)를 실측 후 적용하고, 25MiB 초과까지 보장해야 하면 (d)를 별도 설계한다.
+2. CSRF 헤더 없는 크기 초과 요청의 Spring Boot 기본 오류 형식 `413`(Next.js 경유 20MiB+1에서도 같음): (a) 현행 유지를 제안한다. 정상 SPA 요청은 항상 헤더를 보낸다.
+3. 업로드 중 30초 이상 전송이 멈추면 Next.js가 공통 형식이 아닌 `500 Internal Server Error`를 반환한다. 화면은 5xx 문구로 처리된다. 현행 유지를 제안한다.
+4. Backend는 클라이언트 중단(`MultipartException`/`EOFException`)을 catch-all에서 ERROR 로그와 500으로 처리한다(응답은 클라이언트에 도달하지 않음). 로그 수준 조정은 Backend 변경이라 하지 않았다.
+5. OOXML 주 문서 파트 128MiB 상한: 측정 범위에서는 문제가 없었다. 실제 Office 대용량 텍스트 문서 표본으로 Windows에서 확인한 뒤 필요하면 조정한다.
