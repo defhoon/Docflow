@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/features/auth/AuthProvider";
+import { DocumentList } from "@/features/documents/components/DocumentList";
 import { ApiError } from "@/lib/api-client";
 
 import { fetchProject } from "../api";
@@ -119,6 +120,7 @@ export function ProjectDetail() {
               <p className="text-zinc-500">설명이 없습니다.</p>
             )}
           </section>
+          <DocumentList projectId={projectId} />
           <ProjectMembers projectId={projectId} myRole={project.myRole} onProjectChanged={retry} />
           <ProjectsLink />
         </article>
