@@ -4,7 +4,7 @@ Document Review Workflow Management System
 
 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 시스템이다. 요구사항과 MVP 범위는 [`spec.md`](./spec.md)를 따른다.
 
-> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현·검증을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10)으로 `main`에 병합되었다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). SPEC-02(프로젝트 구성원 관리)는 구현·검증(자동 테스트·CI, Windows 수동 E2E)을 마치고 PR 검토 중이다([Issue #13](https://github.com/defhoon/Docflow/issues/13), [`specs/02-project-members.md`](./specs/02-project-members.md)). 문서·검토·피드백 기능은 아직 구현되지 않았다.
+> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현·검증을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10)으로 `main`에 병합되었다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). SPEC-02(프로젝트 구성원 관리)는 PR [#14](https://github.com/defhoon/Docflow/pull/14)로 `main`에 병합되었다([Issue #13](https://github.com/defhoon/Docflow/issues/13), [`specs/02-project-members.md`](./specs/02-project-members.md)). SPEC-03(문서 등록·목록·상세)은 `feat/15/document-create` 브랜치에서 구현과 자동·클라우드 검증을 마쳤고 Windows E2E를 남겨 두고 있다([Issue #15](https://github.com/defhoon/Docflow/issues/15), [`specs/03-document-create.md`](./specs/03-document-create.md)). 버전 추가·다운로드·검토·피드백 기능은 아직 구현되지 않았다.
 
 ## 기술 스택
 
@@ -38,6 +38,7 @@ cp .env.example .env
 | `BACKEND_URL` | Frontend | Next.js rewrite 대상 (기본 `http://localhost:8080`) |
 | `DEV_SEED_PASSWORD` | Backend (`local` 프로파일) | 개발 계정 공통 비밀번호. 비어 있으면 계정을 만들지 않음 |
 | `SESSION_COOKIE_SECURE` | Backend | 세션·CSRF 쿠키 `Secure` 속성 (로컬 `false`, 운영 `true`) |
+| `DOCFLOW_STORAGE_DIR` | Backend | 업로드 문서 파일 저장 루트. 지정하지 않으면 `backend/`에서 실행할 때 `backend/storage`(Git 제외). 빈 값이면 Backend가 시작을 거부하므로 쓰지 않을 때는 `.env`에서 주석 처리한다 |
 
 `.env`는 Git에 포함하지 않는다.
 
@@ -104,6 +105,22 @@ npm run dev              # http://localhost:3000
 
 수동 확인 절차는 [`specs/01-project-create.md`](./specs/01-project-create.md) §10.4, [`specs/02-project-members.md`](./specs/02-project-members.md) §10.4를 참고한다(예: `author@docflow.local`이 `reviewer@docflow.local`을 추가·제거).
 
+#### 문서 화면 (SPEC-03)
+
+| 경로 | 화면 |
+| --- | --- |
+| `/projects/{projectId}` | 프로젝트 상세의 "문서" 섹션: 문서 목록(최신순, 제목·상태·작성자·최신 버전·등록 시각)과 "문서 등록" 링크 |
+| `/projects/{projectId}/documents/new` | 문서 등록: 제목(필수, 1~200자), 설명(선택, 0~1000자), 파일(필수). 성공하면 상세로 이동 |
+| `/projects/{projectId}/documents/{documentId}` | 문서 상세: 제목, 상태, 작성자, 등록일, 최신 버전(v1), 원본 파일명, 크기, 업로드 시각, 설명. 다운로드·미리보기는 제공하지 않는다 |
+
+- 프로젝트 Owner와 Member 모두 문서를 등록·조회할 수 있다. 구성원이 아닌 사용자는 "프로젝트를 찾을 수 없습니다."를 본다.
+- 허용 형식은 PDF·DOCX·XLSX·PPTX이며 크기는 1바이트~20MB(20,971,520바이트)다. Backend가 확장자와 함께 파일 내용(PDF 최소 구조, OOXML `[Content_Types].xml`)을 검증한다. 형식 검증은 안전성을 보증하지 않으며 악성코드 검사는 하지 않는다.
+- 등록한 문서의 상태는 "초안"(`DRAFT`)이며, 이 단계에는 상태 변경·새 버전·삭제 기능이 없다.
+- 업로드 파일은 `DOCFLOW_STORAGE_DIR`(기본 `backend/storage`) 아래 `documents/<UUID>`로 저장된다. 원본 파일명은 저장 경로에 쓰지 않는다.
+- **알려진 제한사항:** 20MB를 넘는 파일은 등록 화면이 전송 전에 막는다. 화면을 거치지 않은 요청 중 요청 전체가 21MiB를 넘는 경우에는 Next.js 경유 응답이 `413` 대신 연결 리셋으로 끝날 수 있다(SPEC-03 §5.6, 결정 D4-1, 미해결). 업로드 중 연결이 끊기면 화면은 파일 크기와 네트워크 상태를 확인하라는 안내를 표시한다.
+
+Windows 수동 확인 절차는 [`specs/03-document-create.md`](./specs/03-document-create.md) §16.2를 참고한다.
+
 브라우저는 `localhost:3000`만 호출한다. `/api/*` 요청은 Next.js rewrite로 Backend에 전달되므로 세션 쿠키(`JSESSIONID`)와 CSRF 쿠키(`XSRF-TOKEN`)는 `localhost:3000`에 저장된다.
 
 ## Windows (PowerShell) 실행 절차
@@ -161,6 +178,7 @@ cd backend
 - PowerShell 5.1에서 `curl`은 `Invoke-WebRequest`의 별칭이므로 `curl.exe`를 사용한다.
 - Windows에 PostgreSQL이 이미 설치되어 5432 포트를 사용 중이면 `.env`에서 `POSTGRES_PORT=5433`, `DB_URL=jdbc:postgresql://localhost:5433/docflow`로 변경한다.
 - 저장소의 `.gitattributes`가 `backend/gradlew`는 LF, `*.bat`은 CRLF로 체크아웃되도록 고정한다.
+- 문서 업로드 크기 경계(19·20MB) 확인은 클라우드에서 `npm run build` 후 `npm run start`(프로덕션 모드)로 검증했다. `npm run dev`에서의 동작은 확인하지 않았다. 대용량 업로드는 `next.config.ts`의 `proxyClientMaxBodySize: "25mb"`(Next.js rewrite 본문 상한)에 의존한다.
 
 ## 테스트·검증 명령어
 

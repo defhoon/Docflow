@@ -33,6 +33,15 @@ class ProjectPermissionServiceTest {
 					(ex) -> assertThat(ex.errorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
 	}
 
+	// SPEC-03 §7.1: 문서 등록은 OWNER·MEMBER 모두 허용
+	@Test
+	void ownerAndMemberCanCreateDocuments() {
+		assertThatCode(() -> this.permissionService.requireDocumentCreator(this.project, 1L))
+			.doesNotThrowAnyException();
+		assertThatCode(() -> this.permissionService.requireDocumentCreator(this.project, 2L))
+			.doesNotThrowAnyException();
+	}
+
 	private static User user(Long id) {
 		User user = User.create(id + "@test.local", "hash", "User " + id);
 		ReflectionTestUtils.setField(user, "id", id);

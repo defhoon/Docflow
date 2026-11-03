@@ -4,6 +4,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+### 문서 파일 저장소 기본 경로 (SPEC-03, DOCFLOW_STORAGE_DIR 미지정 시) ###
+/storage/
+
 ### IntelliJ IDEA ###
 .idea/
 *.iws
