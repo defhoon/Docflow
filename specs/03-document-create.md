@@ -1,6 +1,6 @@
 # SPEC-03: 문서 등록
 
-- 상태: **설계 확정 (v0.2 승인) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증 완료. D4는 MVP 알려진 제한사항으로 유지(미해결, 후속 개선 대상). AC-DOC-09 변경 승인(2026-10-28) — ①~⑤ 클라우드 확인 완료, 완료 조건(Windows E2E) 미실행. Done 아님**
+- 상태: **설계 확정 (v0.2 승인) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증 완료. D4는 MVP 알려진 제한사항으로 유지(미해결, 후속 개선 대상). AC-DOC-09 변경 승인(2026-10-28) — ①~⑤ 클라우드 확인, 완료 조건(Windows E2E) 미충족. Windows 자동 테스트 재검증(`test --rerun-tasks`) 통과, Windows 수동 E2E 일부 수행(TC-01~06). AC-DOC-08·09·29 미완료. Done 아님**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -24,6 +24,7 @@
   - Frontend 구현·Next.js 경유 검증 (2026-10-28): Backend 조건부 승인 후 Frontend 구현 승인. `proxyClientMaxBodySize: '25mb'` 적용, 실제 Next.js rewrite·Chromium 경로 검증 결과와 D4 원인 분석 기록 (§16). 정책 변경 없음
   - D4 처리 결정 기록·Windows E2E 체크리스트 (2026-10-28): 사용자 결정으로 현행 설정 유지, 21MiB 초과 요청의 413 전달 미보장을 알려진 제한사항으로 잠정 수용(§5.6, §12 R6, §14 D4-1). AC-DOC-09는 미충족으로 유지하고 AC 문구 변경은 별도 승인 대상으로 남김. Windows E2E 체크리스트 추가(§16.2). 수용 기준 변경 없음
   - AC-DOC-09 변경 (2026-10-28, 사용자 승인): "21MiB 업로드에 413 도달" 요구를 "크기 제한으로 거부된 업로드는 저장되지 않고 사용자가 실패를 인지할 수 있다"로 변경하고 검증 방법 5개·완료 조건을 정의. D4는 해결된 것이 아니며 알려진 제한사항(D4-1)·후속 개선 대상으로 유지(§16.3). 다른 AC, 크기 제한, API 계약, 보안 정책 변경 없음
+  - Windows 재검증 결과 반영 (2026-11-03, 사용자 승인): Windows 자동 테스트 1차 실패(9건)의 원인·수정(`63c44e8`, 테스트 코드만)과 재검증(`test --rerun-tasks` 성공), Linux 반복 결과, 테스트 DB 격리 주의를 §16.4에 기록. §16.2 #2·#4·#10·#11 결과, R20, AC 결과표 갱신. 수동 E2E TC-01~06 보고 반영. AC·정책 변경 없음, D4 미해결 유지
   - AC-DOC-09 ⑤ 문구 보완 (2026-10-28, 사용자 승인): Frontend 네트워크 오류 안내에 등록 결과(문서 목록) 재확인 안내 추가(`features/documents/errors.ts`, 테스트 1곳). 오류 처리 로직·API 호출 변경 없음. ③ 요청별 검증(고유 제목) 결과와 Windows 체크리스트 보강 반영
 
 표기: **[기존]** 이미 구현·확정된 내용, **[결정 Qn·Dn]** 사용자가 확정한 결정, **[제안]** 이 SPEC의 설계안, **[검증 필요]** 구현 단계에서 실제 실행으로 확인할 사항.
@@ -706,7 +707,7 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | R17 | `[Content_Types].xml`과 주 문서 파트만으로 OOXML 패키지 전체 유효성을 보장하지 않음 (관계·다른 파트·스키마 미검증), 비표준 위치의 주 문서는 거부 가능 | 보장 범위를 §5.5.3에 명시, 정상 표본으로 확인 |
 | R18 | XML 파서 설정 실수 시 외부 엔티티(XXE)·외부 리소스 접근 위험 | JDK 기본 구현 명시 생성, DTD·외부 엔티티·외부 접근 차단, `DOCTYPE` 거부, 보안 단위 테스트 (§5.5.3) |
 | R19 | OOXML 검사 상한이 잠정값이라 정상 대용량 문서를 거부할 수 있음 | 상한 초과는 실패로 처리(부분 성공 없음), 구현 시 표본 측정 후 필요하면 승인받아 조정 (§5.5.4) |
-| R20 | 문서 행이 남으면 기존 테스트의 `projects`·`users` 정리가 FK `RESTRICT`로 실패 | 문서 테스트의 자체 정리 순서 보장 (§10.2) |
+| R20 | 문서 행이 남으면 기존 테스트의 `projects`·`users` 정리가 FK `RESTRICT`로 실패 | 문서 테스트의 자체 정리 순서 보장 (§10.2). **2026-11 Windows 재검증 중 테스트 DB에서 외래 키 제약 충돌 발생(사실), 원인 미확정** — R20 유형(남은 문서 행)인지 DB 주소 적용 문제인지 확인하지 못했다(추정). 테스트는 전용·빈 DB(`docflow_test`)에서만 실행한다 (§16.4) |
 
 ### 12.1 구현 시 검증 사항 (정책 결정 아님)
 
@@ -834,7 +835,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 
 ## 16. 검증 결과
 
-**Backend 구현·검증 완료 (2026-10-27, 2026-10-28 조건부 승인). Frontend 구현·Next.js 경유 검증 완료 (2026-10-28). D4는 알려진 제한사항(D4-1)으로 유지, 미해결·후속 개선 대상(§16.3). AC-DOC-09는 2026-10-28 변경되었고 부분 충족(⑤ 보완 필요, Windows 미확인). Windows E2E 미실행(§16.2). `spec.md` §14 DoD 기준으로 SPEC-03은 아직 Done이 아니다.**
+**Backend 구현·검증 완료 (2026-10-27, 2026-10-28 조건부 승인). Frontend 구현·Next.js 경유 검증 완료 (2026-10-28). D4는 알려진 제한사항(D4-1)으로 유지, 미해결·후속 개선 대상(§16.3). AC-DOC-09는 2026-10-28 변경, 클라우드에서 ①~⑤ 확인, 완료 조건(Windows E2E) 미충족. Windows: 자동 테스트 재검증 `test --rerun-tasks` 통과(§16.4), 수동 E2E 일부 수행(§16.2). AC-DOC-08·09·29 미완료. `spec.md` §14 DoD 기준으로 SPEC-03은 아직 Done이 아니다.**
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
@@ -933,13 +934,13 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 
 | AC | 결과 |
 | --- | --- |
-| AC-DOC-01~07, 10~22 | 통과 (자동 테스트, 클라우드·CI) |
-| AC-DOC-28 | 자동 테스트 부분 통과(저장 경로·루트 이탈·덮어쓰기 방지·Git 제외 확인). Windows 동작은 미실행 |
+| AC-DOC-01~07, 10~22 | 통과 (자동 테스트, 클라우드·CI). AC-DOC-15는 Windows 수동 TC-06(비구성원 API 직접 호출 404, 미저장)으로도 확인 |
+| AC-DOC-28 | 자동 테스트 통과 — Linux(클라우드·CI): 저장 경로·루트 이탈·덮어쓰기 방지·Git 제외. Windows(사용자, `test --rerun-tasks`): `CREATE_NEW` 충돌 시 기존 파일 보존 테스트 포함 실패 없음(개별 미집계). Windows 수동 확인(Git 제외 등)은 미실행 |
 | AC-DOC-30 | Backend·Frontend 기존 테스트 통과, `SecurityConfig` 변경 없음 |
 | AC-DOC-08 | 통과 (클라우드: Next.js 경유 19MiB·20MiB, 크기·SHA-256 일치). Windows 미실행 |
 | AC-DOC-09 (2026-10-28 변경) | **클라우드에서 ①~⑤ 확인, 완료 조건(Windows E2E) 미실행 — 완료 아님.** ① 확인: Next.js 경유 20MiB+1 → `413 FILE_TOO_LARGE` (2차 시험 Node fetch 2/2, 1차 Node fetch 5/5·Chromium fetch 3/3). ② 기록: 21MiB 초과 Next.js 경유 연결 종료(1차 fetch 10/10·Chromium 6/6, 2차 아래 표) → D4-1·§16.3. ③ 확인(요청별, 아래 "AC-DOC-09 ③ 요청별 증거"): 고유 제목 크기 초과 요청 13건 모두 해당 제목 DB 행 0, 신규 저장 파일 0, 임시 파일 0. 응답이 `413 FILE_TOO_LARGE`인 6건은 서버의 크기 제한 거부가 직접 확인되고, 연결이 종료된 7건은 같은 크기 요청을 Backend 직접 보냈을 때 `413`인 점과 시험 중 Backend의 문서 생성 로그(`Document created`)·ERROR 로그가 0건인 점으로 간접 확인했다(크기 초과 `413`은 Backend가 로그를 남기지 않아 개별 거부 기록은 없다). ④ 확인: Chromium에서 20MiB+1·22MiB 선택 시 파일 필드 오류, POST 없음 (Vitest 포함). ⑤ 확인(2026-10-28 문구 보완 후): 실제 Chromium에서 오프라인 상태·연결 리셋(`connectionreset`)으로 업로드가 실패하면 폼에 "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요."가 표시되고 버튼이 다시 활성화된다. 안내대로 문서 목록을 확인하면 미등록(DB 0건, 목록 0건)을 알 수 있다. Vitest 기대 문구 갱신. Windows E2E는 미실행 |
 | AC-DOC-23~27 | 통과 (Vitest, 클라우드·CI) |
-| AC-DOC-29 | 미실행 (Windows 수동). Chromium 자동화로 §10.5의 1·3~7·9 일부 흐름 확인 |
+| AC-DOC-29 | **미완료 (Windows 수동 일부 수행).** 사용자 수동 E2E TC-01~TC-06 수행 보고. TC-06(비구성원 API 직접 호출 `404 PROJECT_NOT_FOUND`, 전후 문서·버전·파일 수 동일)만 §16.2 #4와 연결했다. TC-04·TC-05는 Frontend 입력 차단까지만 확인(Backend 직접 검증 미수행, 차단한 입력 종류 미확인). TC-01~TC-03은 수행 보고됨, 세부 검증 범위 미확인. 클라우드에서는 Chromium 자동화로 §10.5의 1·3~7·9 일부 흐름 확인 |
 
 **미실행·제약**
 
@@ -956,9 +957,18 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 4. Backend는 클라이언트 중단(`MultipartException`/`EOFException`)을 catch-all에서 ERROR 로그와 500으로 처리한다(응답은 클라이언트에 도달하지 않음). 로그 수준 조정은 Backend 변경이라 하지 않았다.
 5. OOXML 주 문서 파트 128MiB 상한: 측정 범위에서는 문제가 없었다. 실제 Office 대용량 텍스트 문서 표본으로 Windows에서 확인한 뒤 필요하면 조정한다.
 
-### 16.2 Windows E2E 체크리스트 (사용자 실행, **미실행**)
+### 16.2 Windows E2E 체크리스트 (사용자 실행, **일부 수행**)
 
-클라우드에서는 Windows를 사용할 수 없어 실행하지 않았다. 아래 결과는 **예상 결과**이며, 실행 후 결과 칸을 채운다. PowerShell 기준이며 저장소 루트(`C:\...\Docflow`)에서 시작한다. 표본 파일은 저장소 밖(`$env:TEMP\docflow-e2e`)에 만든다.
+클라우드에서는 Windows를 사용할 수 없어 실행하지 않았다. "예상 결과"는 기준이며, 사용자가 실행·보고한 내용만 "결과" 칸에 기록한다(2026-11-03 기준 #2·#4·#10·#11 일부).
+
+**사용자 수동 E2E TC-01~TC-06 (2026-11, Windows):** TC 번호별 정의는 저장소 문서와 대화 기록에 없어, 보고된 내용만 기록한다.
+
+| TC | 보고된 내용 | §16.2 연결 |
+| --- | --- | --- |
+| TC-01~TC-03 | 수행 보고됨, 세부 검증 범위 미확인 | 연결하지 않음 |
+| TC-04, TC-05 | Frontend 입력 차단까지만 확인. 차단한 입력 종류 미확인, **Backend 직접 검증 미수행** | 연결하지 않음 |
+| TC-06 | 비구성원(Outsider)이 문서 등록 API 직접 호출 → `HTTP 404`, `{"code":"PROJECT_NOT_FOUND","message":"프로젝트를 찾을 수 없습니다."}`. 호출 전후 DB 문서 수·버전 수·물리 저장 파일 수 동일 | #4 (부분) |
+ PowerShell 기준이며 저장소 루트(`C:\...\Docflow`)에서 시작한다. 표본 파일은 저장소 밖(`$env:TEMP\docflow-e2e`)에 만든다.
 
 **준비**
 
@@ -997,17 +1007,17 @@ DOCX·XLSX·PPTX·PDF 표본은 MS Office(Word·Excel·PowerPoint)로 각각 새
 | # | 항목 | 실행 방법 | 예상 결과 | 결과 |
 | --- | --- | --- | --- | --- |
 | 1 | PostgreSQL 16 실행, Flyway V5 적용 | `docker compose up -d` → `docker compose ps` / Backend 기동 후 `docker compose exec postgres psql -U docflow -d docflow -c "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank"` / `... -c "\d document_versions"` | `healthy`. 이력에 `5 \| create documents \| t`. `uk_document_versions_storage_key`, `ck_document_versions_sha256` 등 제약 표시 | 미실행 |
-| 2 | Spring Boot 실행, 스키마 검증 | `cd backend; .\gradlew.bat clean build` → `.\gradlew.bat bootRun --args="--spring.profiles.active=local"` → `curl.exe http://localhost:8080/actuator/health` | build 성공(테스트 254개 통과), 기동 로그에 스키마 검증 오류 없음(`ddl-auto=validate`), `{"status":"UP"}` | 미실행 |
+| 2 | Spring Boot 실행, 스키마 검증 | `cd backend; .\gradlew.bat clean build` → `.\gradlew.bat bootRun --args="--spring.profiles.active=local"` → `curl.exe http://localhost:8080/actuator/health` | build 성공(테스트 254개 통과), 기동 로그에 스키마 검증 오류 없음(`ddl-auto=validate`), `{"status":"UP"}` | **부분 (사용자, Windows, `63c44e8`).** 실행: `.\gradlew.bat test --rerun-tasks` → BUILD SUCCESSFUL (3m 19s), 테스트 전용 DB `docflow_test`. `DB_URL`은 `backend/build.gradle`의 test 작업 `environment`로 임시 지정한 뒤 원복(커밋 없음). **미실행:** `clean build`, 개별 테스트 수(254개) 집계, `bootRun`·health·기동 로그 확인 결과 보고 없음. 이전 1차 `clean build`(`21b8f85`)는 254개 중 9개 실패 → §16.4 |
 | 3 | Next.js 실행, 로그인 | 새 창 `cd frontend; npm ci; npm run lint; npm run test; npm run build; npm run start` → `http://localhost:3000` 로그인(`author@docflow.local`) | lint 오류 0, 테스트 169개 통과, build 성공. 로그인 후 `/` 이동 | 미실행 |
-| 4 | OWNER·MEMBER·비구성원 권한 | Author로 프로젝트 생성 → Reviewer를 Member로 추가. 비구성원 계정 생성: `docker compose exec postgres psql -U docflow -d docflow -c "INSERT INTO users (email, password_hash, display_name) SELECT 'outsider@docflow.local', password_hash, 'Outsider' FROM users WHERE email='reviewer@docflow.local'"` (개발 DB 전용, 비밀번호는 DEV_SEED_PASSWORD와 같음). 각 계정으로 `/projects/{id}`, `/projects/{id}/documents/new`, 문서 상세 URL 접근 | Author·Reviewer: 문서 섹션 표시, 등록 가능. Outsider: 모든 화면 "프로젝트를 찾을 수 없습니다.", 등록 시도도 같은 문구 | 미실행 |
+| 4 | OWNER·MEMBER·비구성원 권한 | Author로 프로젝트 생성 → Reviewer를 Member로 추가. 비구성원 계정 생성: `docker compose exec postgres psql -U docflow -d docflow -c "INSERT INTO users (email, password_hash, display_name) SELECT 'outsider@docflow.local', password_hash, 'Outsider' FROM users WHERE email='reviewer@docflow.local'"` (개발 DB 전용, 비밀번호는 DEV_SEED_PASSWORD와 같음). 각 계정으로 `/projects/{id}`, `/projects/{id}/documents/new`, 문서 상세 URL 접근 | Author·Reviewer: 문서 섹션 표시, 등록 가능. Outsider: 모든 화면 "프로젝트를 찾을 수 없습니다.", 등록 시도도 같은 문구 | **부분 (사용자, Windows).** TC-06: 비구성원(Outsider)이 문서 등록 API를 직접 호출 → `404 PROJECT_NOT_FOUND` ("프로젝트를 찾을 수 없습니다."), 호출 전후 문서 수·버전 수·물리 저장 파일 수 동일. Author·Reviewer 화면 확인과 비구성원의 목록·상세·화면 확인 결과는 보고되지 않음 |
 | 5 | PDF·DOCX·XLSX·PPTX 등록 | Office로 만든 4개 파일을 각각 등록 (설명 입력 포함 1건) | 각각 `201` → 상세로 이동, 상태 "초안", v1, 원본 파일명·크기 표시 | 미실행 |
 | 6 | 등록 후 목록·상세 | 프로젝트 상세의 문서 섹션 확인, 항목 클릭 | 최신순 정렬, 제목·상태·작성자·v1·등록 시각. 상세에 다운로드 버튼 없음. 없는 문서 ID는 "문서를 찾을 수 없습니다." | 미실행 |
 | 7 | 19MiB·20MiB 업로드 | UI로 `report-19mib.pdf`, `report-20mib.pdf` 등록 | 둘 다 성공. 상세 크기 "19.0 MB"/"20.0 MB"(마우스를 올리면 19,922,944 / 20,971,520 바이트) | 미실행 |
 | 8 | 20MiB 초과 클라이언트 차단 | UI에서 `report-20mib-plus1.pdf`·`report-22mib.pdf` 선택 → 등록. DevTools Network 탭 확인 | 파일 필드 "파일은 20MB 이하만 업로드할 수 있습니다.", `/documents` POST 요청 없음 | 미실행 |
 | 9 | AC-DOC-09 ①②③ Next.js 경유 413·연결 종료, 요청별 미저장 | 아래 "9번 절차". 크기 초과 요청마다 고유 제목(`D4-<경로>-<크기>-<번호>`)을 쓰고, 요청마다 응답 종류와 해당 제목의 DB 행·신규 파일을 기록 표에 남긴다 | ① 20MiB+1: Next.js 경유 `413` + `FILE_TOO_LARGE`. ② 22MiB: Next.js 경유는 `Failed to fetch`·curl 연결 오류(또는 `413`·`500`)로 끝날 수 있음 — D4-1로 기록하되 응답 종류를 요청별로 구분. ③ 같은 크기를 Backend 직접(8080)으로 보내면 `413 FILE_TOO_LARGE`. **모든 시험 제목의 DB 행 0건, 요청마다 신규 파일 0개**, `tmp` 비어 있음 | 미실행 |
 | 9-1 | AC-DOC-09 ⑤ 네트워크 오류 안내 | 등록 화면에서 제목·작은 PDF 입력 → DevTools Network 탭 throttling을 **Offline**으로 바꾼 뒤 "문서 등록" 클릭 → 문구 확인 → Online으로 복구 후 "프로젝트로 돌아가기"로 문서 목록 확인 | 폼에 "업로드 중 서버와의 연결이 끊어졌습니다. 문서가 등록되었는지 프로젝트의 문서 목록에서 확인한 뒤, 등록되지 않았다면 파일 크기(20MB 이하)와 네트워크 상태를 확인하고 다시 시도해 주세요." 표시, 버튼 다시 활성화. 목록에 해당 제목 문서 없음 | 미실행 |
-| 10 | Windows `CREATE_NEW` 충돌 시 기존 파일 보존 | `cd backend; .\gradlew.bat test --tests "com.docflow.document.storage.LocalFileStorageTest" --tests "com.docflow.document.DocumentStorageIntegrationTest"` → `build\reports\tests\test\index.html` | 모두 통과. 특히 `existingKeyIsNeverOverwrittenOrDeleted`, `concurrentStoresToSameKeyCreateExactlyOneFile`, `scenarioB_existingFileIsNeitherOverwrittenNorDeleted` 통과(기존 파일 내용 불변) | 미실행 |
-| 11 | 저장 실패 후 DB·파일 상태 | (a) 10번의 `scenarioA_…`, `storageFailureLeavesNoRowsAndNoTempFiles`, `compensationFailureKeepsOriginalErrorAndLeavesOrphan` 통과 확인. (b) 수동: `"x" \| Set-Content "$E2E\not-a-dir"` → Backend를 `$env:DOCFLOW_STORAGE_DIR="$E2E\not-a-dir"`로 재시작 → UI 등록 → 확인 후 변수 제거·재시작. (c) 정상 저장소로 돌아온 뒤 DB 행 수와 파일 수 비교: `docker compose exec postgres psql -U docflow -d docflow -At -c "SELECT count(*) FROM document_versions"` / `(Get-ChildItem backend\storage\documents -File).Count` / `Get-ChildItem backend\storage\tmp` | (a) 통과. (b) 화면 "서버 오류가 발생했습니다…", 문서 행 수 변화 없음, 응답에 경로 없음. (c) 행 수 = 파일 수, `tmp` 비어 있음, `git status`에 `backend/storage` 없음 | 미실행 |
+| 10 | Windows `CREATE_NEW` 충돌 시 기존 파일 보존 | `cd backend; .\gradlew.bat test --tests "com.docflow.document.storage.LocalFileStorageTest" --tests "com.docflow.document.DocumentStorageIntegrationTest"` → `build\reports\tests\test\index.html` | 모두 통과. 특히 `existingKeyIsNeverOverwrittenOrDeleted`, `concurrentStoresToSameKeyCreateExactlyOneFile`, `scenarioB_existingFileIsNeitherOverwrittenNorDeleted` 통과(기존 파일 내용 불변) | **자동 테스트 통과 (사용자, Windows, `63c44e8`).** 위 #2의 `test --rerun-tasks` 성공에 `LocalFileStorageTest`(`existingKeyIsNeverOverwrittenOrDeleted`, `concurrentStoresToSameKeyCreateExactlyOneFile`)와 `DocumentStorageIntegrationTest`(`scenarioB_…`)가 포함되어 실패 없이 끝났다. 개별 결과는 집계하지 않았다. 1차 실행(`21b8f85`)의 `scenarioB` 실패는 기존 파일 보존 단언 뒤의 저장 파일 비교에서 발생했다(테스트 경로 표현 문제, §16.4) |
+| 11 | 저장 실패 후 DB·파일 상태 | (a) 10번의 `scenarioA_…`, `storageFailureLeavesNoRowsAndNoTempFiles`, `compensationFailureKeepsOriginalErrorAndLeavesOrphan` 통과 확인. (b) 수동: `"x" \| Set-Content "$E2E\not-a-dir"` → Backend를 `$env:DOCFLOW_STORAGE_DIR="$E2E\not-a-dir"`로 재시작 → UI 등록 → 확인 후 변수 제거·재시작. (c) 정상 저장소로 돌아온 뒤 DB 행 수와 파일 수 비교: `docker compose exec postgres psql -U docflow -d docflow -At -c "SELECT count(*) FROM document_versions"` / `(Get-ChildItem backend\storage\documents -File).Count` / `Get-ChildItem backend\storage\tmp` | (a) 통과. (b) 화면 "서버 오류가 발생했습니다…", 문서 행 수 변화 없음, 응답에 경로 없음. (c) 행 수 = 파일 수, `tmp` 비어 있음, `git status`에 `backend/storage` 없음 | **(a) 자동 테스트 통과 (사용자, Windows, `63c44e8`)** — #2의 `test --rerun-tasks` 성공에 `scenarioA_…`, `storageFailureLeavesNoRowsAndNoTempFiles`, `compensationFailureKeepsOriginalErrorAndLeavesOrphan` 포함, 개별 결과 미집계. **(b) 저장 경로를 일반 파일로 지정한 수동 시험, (c) DB 행·파일 수동 비교: 미실행** |
 | 12 | 기존 기능 회귀 | 로그인·로그아웃·세션 만료(SPEC-AUTH), 프로젝트 생성·목록·상세(SPEC-01 §10.4), 구성원 추가·제거와 MEMBER 제한(SPEC-02 §10.4) | 기존 절차대로 동작. 프로젝트 상세에 문서 섹션이 추가된 것 외 변화 없음 | 미실행 |
 
 **9번 절차 — 브라우저(DevTools Console)와 curl 비교**
@@ -1131,3 +1141,28 @@ MVP에서는 알려진 제한사항(SPEC-03 결정 D4-1)으로 수용했으며 �
 
 관련: #15, `specs/03-document-create.md` §5.6, §12 R6, §14 D4-1, §16.3
 ```
+
+### 16.4 Windows 자동 테스트 실패 분석·수정·재검증
+
+**1차 실행 (사실, 사용자):** Windows, JDK 25.0.5, Node 22.21.0, Docker PostgreSQL 16, 테스트 전용 DB `docflow_test`, `21b8f85`, `.\gradlew.bat clean build` → 254개 중 9개 실패. 실패 XML에서 JDBC URL `docflow_test`, Flyway 5개 마이그레이션 검증 성공을 확인했다.
+
+| 실패 유형 | 건수 | 원인 | 수정 (`63c44e8`, 테스트 코드만) |
+| --- | --- | --- | --- |
+| Windows 경로 표현 | 8 (`DocumentApiIntegrationTest` 5, `DocumentStorageIntegrationTest` 3) | 테스트 보조 메서드 `DocumentTestSupport.storedFiles()`가 `Path.toString()`으로 OS 경로 문자열(`documents\<UUID>`)을 만들어 DB의 논리 저장 키(`documents/<UUID>`)와 비교했다. 저장 키는 OS와 무관한 논리 키(`/` 구분, §5.4)이며 OS 경로 변환은 `LocalFileStorage.resolve()`에서만 일어난다. 제품 동작은 정상으로 판단했다(실패가 저장 파일 목록 비교에서 발생했으므로, 그보다 앞의 저장 파일 내용 일치·기존 파일 보존 단언은 Windows에서 통과한 것으로 본다 — 실패 위치에 근거한 판단) | `storedFiles()`가 상대 경로의 이름 요소를 `/`로 이어 논리 키로 반환. 단언 강도 동일 |
+| 소켓 연결 종료(RST) | 1 (`DocumentUploadSizeIntegrationTest.rejectsRequestOverMultipartRequestLimitBeforeReadingWholeBody`) | 테스트가 22MiB 본문을 끝까지 쓴 뒤 응답을 읽었다. 서버는 요청 상한 초과를 본문 수신 전에 판단해 `413` 응답 후 연결을 닫고(D4와 같은 메커니즘), 계속 전송한 데이터에 RST가 돌아온다. Windows는 RST를 받으면 아직 읽지 않은 수신 데이터를 버리므로 `readAllBytes()`에서 `SocketException`이 났다(사실: 예외 위치, 해당 요청의 서버 ERROR 로그 없음. 413 전송 자체는 Windows에서 직접 확인하지 않았다) | 연결 직후 읽기 스레드를 먼저 대기시키고 별도 스레드에서 전송, 응답이 오거나 쓰기가 실패하면 전송 중단, 부분 응답 처리, 타임아웃(응답 60초, 쓰기 10초)과 스레드·소켓 정리. 단언(`413`, `Connection: close`, `FILE_TOO_LARGE`, 미저장) 유지 |
+
+**Linux 반복 검증 (Claude Code 클라우드, JDK 21 + PostgreSQL 16 `docflow_test`, `63c44e8` 코드):**
+- `DocumentUploadSizeIntegrationTest`(3개 테스트) 20회 반복: 20회 모두 통과
+- `DocumentApiIntegrationTest`·`DocumentStorageIntegrationTest`·`DocumentServiceTransactionTest`(32개 테스트) 5회 반복: 모두 통과
+- Backend 전체 `clean build`: 254개 통과, 실패 0
+- GitHub Actions CI run 59 (`63c44e8`): Backend·Frontend 성공
+- Windows 역슬래시 경로는 Linux에서 재현할 수 없어, 경로 수정의 Windows 효과는 아래 Windows 재검증으로만 확인된다
+
+**Windows 재검증 (사실, 사용자, `63c44e8`):** `cd backend; .\gradlew.bat test --rerun-tasks` → `BUILD SUCCESSFUL in 3m 19s`, `4 actionable tasks: 4 executed`. 이 실행에서 `DB_URL`(`jdbc:postgresql://localhost:5432/docflow_test`)은 `backend/build.gradle`의 test 작업 `environment`로 임시 지정했고, 실행 후 원래 상태로 복구했다(커밋 없음, 하드코딩 없음).
+- 이는 Linux `clean build` 성공과 별개의 결과다. Windows에서는 `test` 작업만 성공을 확인했다.
+- **미실행:** Windows `clean build`, 소켓 테스트 10회 반복, 개별 테스트 수(254개) 집계.
+
+**테스트 DB 격리 (사실과 추정 구분):**
+- 사실: Windows 재검증 과정에서 테스트 DB의 외래 키 제약 조건 충돌이 자동 테스트 실패 원인 중 하나로 발견되었고, 테스트 전용 DB를 명시적으로 지정한 실행은 성공했다.
+- 추정(미확정): (1) 테스트 DB에 남은 문서 행 때문에 기존 테스트의 `projects`·`users` 정리가 `RESTRICT`로 실패하는 R20 유형, (2) PowerShell 환경 변수 등으로 지정한 DB 주소가 테스트 JVM에 적용되지 않아 다른 DB에 연결된 경우. 어느 쪽인지 확인하지 못했다.
+- 향후 안전 조치(수행 완료 아님): Backend 테스트는 연결된 DB의 데이터를 지우므로 전용·빈 테스트 DB에서만 실행한다. 실행 전 테스트 로그(`build\test-results\test\*.xml`의 system-out)의 JDBC URL이 `docflow_test`인지 확인한다. 개발 DB(`docflow`)에서는 실행하지 않는다. 테스트 DB 주소를 `build.gradle`에 하드코딩하지 않는다.
