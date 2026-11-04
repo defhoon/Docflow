@@ -52,8 +52,12 @@ public class LibreOfficePreviewConverter implements DocumentPreviewConverter {
 
 	private static final Duration CHECK_TIMEOUT = Duration.ofSeconds(30);
 
-	private static final List<String> WINDOWS_CANDIDATES = List.of("C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-			"C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe");
+	/**
+	 * Windows 기본 설치 경로. 콘솔용 {@code soffice.com}을 쓴다: GUI용 {@code soffice.exe}는 표준 출력을 내지 않아
+	 * {@code --version} 자체 점검이 실패한다(Windows 실측, SPEC-05 §18.7).
+	 */
+	static final List<String> WINDOWS_CANDIDATES = List.of("C:\\Program Files\\LibreOffice\\program\\soffice.com",
+			"C:\\Program Files (x86)\\LibreOffice\\program\\soffice.com");
 
 	/** Windows에서 프로세스 실행에 필요한 시스템 변수만 전달한다. */
 	private static final List<String> WINDOWS_PASSTHROUGH = List.of("SystemRoot", "windir", "SystemDrive",
@@ -303,7 +307,7 @@ public class LibreOfficePreviewConverter implements DocumentPreviewConverter {
 			Path configured = Path.of(this.properties.sofficePath());
 			return Files.isRegularFile(configured) ? configured : null;
 		}
-		List<String> names = this.windows ? List.of("soffice.exe") : List.of("soffice");
+		List<String> names = this.windows ? List.of("soffice.com") : List.of("soffice");
 		String path = System.getenv("PATH");
 		if (path != null) {
 			for (String dir : path.split(File.pathSeparator)) {

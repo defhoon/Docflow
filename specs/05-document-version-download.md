@@ -574,10 +574,10 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 
    ```powershell
    winget install --id TheDocumentFoundation.LibreOffice -e   # 또는 공식 설치 파일
-   & "C:\Program Files\LibreOffice\program\soffice.exe" --version   # LibreOffice 버전 출력
+   & "C:\Program Files\LibreOffice\program\soffice.com" --version   # LibreOffice 버전 출력
    ```
 
-   기본 경로가 아니면 `$env:DOCFLOW_PREVIEW_SOFFICE_PATH = "<soffice.exe 경로>"`.
+   기본 경로가 아니면 `$env:DOCFLOW_PREVIEW_SOFFICE_PATH = "<soffice.com 경로>"`. Windows에서는 콘솔용 `soffice.com`을 써야 한다(`soffice.exe`는 출력이 없어 엔진 점검이 실패하고 Office 미리보기가 503이 된다).
 2. Backend 전체 빌드 (전용 테스트 DB):
 
    ```powershell
@@ -614,4 +614,5 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 - 작업 디렉터리 삭제(`PreviewWorkspace`): 작업 루트 안에서만, 심볼릭 링크를 따라가지 않고 삭제하며, 접근 거부가 나면 그 항목의 읽기 전용 속성만 해제하고 한 번 더 시도한다. 그래도 실패하면 예외를 던지고 서비스는 원인과 함께 WARN 로그를 남긴다. 시작·종료 시 정리와 엔진 점검 디렉터리 정리도 같은 방식을 쓴다.
 - 엔진 종료 후 남은 하위 프로세스는 종료까지 최대 5초 기다린다(이 변환 작업의 프로세스만).
 - 테스트: 읽기 전용 알려진 폴더를 만드는 가짜 엔진으로 "결과가 보이는 시점에 작업 루트가 비어 있음"을 검증하고, `PreviewWorkspace` 단위 테스트를 추가했다. 실제 변환 테스트·보안 검증은 그대로다. 클라우드 Backend 365개 통과.
+- 기본 탐색: Windows 기본 경로·PATH 탐색을 `soffice.exe`에서 `soffice.com`으로 바꿨다. 보고된 503은 `soffice.exe`의 `--version` 점검 실패로 판단한다(`soffice.com` 지정 시 해소).
 - 남은 확인: Windows 재실행(§18.6 명령).

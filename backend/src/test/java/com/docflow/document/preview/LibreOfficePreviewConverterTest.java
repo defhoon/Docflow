@@ -70,6 +70,13 @@ class LibreOfficePreviewConverterTest {
 			.containsEntry("TEMP", this.workDir.toString());
 	}
 
+	// Windows는 콘솔용 soffice.com을 찾는다(soffice.exe는 출력이 없어 자체 점검 실패, SPEC-05 §18.7)
+	@Test
+	void windowsDefaultCandidatesUseConsoleLauncher() {
+		assertThat(LibreOfficePreviewConverter.WINDOWS_CANDIDATES).isNotEmpty()
+			.allMatch((candidate) -> candidate.endsWith("\\program\\soffice.com"));
+	}
+
 	@Test
 	void profileSettingsDisableMacrosAndLinkUpdates() {
 		assertThat(LibreOfficePreviewConverter.PROFILE_SETTINGS)

@@ -21,7 +21,7 @@ Document Review Workflow Management System
 - JDK 25 — Gradle이 JDK를 자동으로 다운로드하지 않으므로 직접 설치한다 (예: Eclipse Temurin 25). Java 21에서 변경된 이유는 [ADR-0004](./docs/adr/0004-java-25-upgrade.md) 참고
 - Node.js 22, npm
 - Docker (Docker Compose v2) — 로컬 PostgreSQL 실행용
-- LibreOffice — 문서 미리보기(Office → PDF 변환)와 Backend 테스트에 필요하다(SPEC-05, [ADR-0006](./docs/adr/0006-document-preview-conversion.md)). `soffice`가 PATH에 있거나 Windows 기본 설치 경로(`C:\Program Files\LibreOffice\program\soffice.exe`)에 있으면 자동으로 찾는다. 다른 위치면 `DOCFLOW_PREVIEW_SOFFICE_PATH`로 지정한다. 없으면 Office 미리보기만 사용할 수 없고(503) Backend 미리보기 테스트는 실패한다
+- LibreOffice — 문서 미리보기(Office → PDF 변환)와 Backend 테스트에 필요하다(SPEC-05, [ADR-0006](./docs/adr/0006-document-preview-conversion.md)). `soffice`가 PATH에 있거나 Windows 기본 설치 경로(`C:\Program Files\LibreOffice\program\soffice.com`, 콘솔용 실행 파일)에 있으면 자동으로 찾는다. 다른 위치면 `DOCFLOW_PREVIEW_SOFFICE_PATH`로 지정한다. 없으면 Office 미리보기만 사용할 수 없고(503) Backend 미리보기 테스트는 실패한다
 
 ## 로컬 실행
 
