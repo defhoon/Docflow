@@ -12,6 +12,9 @@ import { ApiError } from "@/lib/api-client";
 import { fetchDocument } from "../api";
 import { formatFileSize, statusLabel } from "../format";
 import type { DocumentDetail as DocumentDetailData } from "../types";
+import type { DocumentVersionSummary } from "../version-files";
+import { DocumentVersionHistory } from "./DocumentVersionHistory";
+import { DocumentVersionPreview } from "./DocumentVersionPreview";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
 
 type DetailResult =
@@ -25,7 +28,7 @@ type DetailState = { kind: "loading" } | DetailResult;
 const ID_PATTERN = /^[0-9]+$/;
 
 /**
- * 문서 상세: 메타데이터와 새 버전 등록 영역(SPEC-04 §9.1)을 표시한다. 다운로드·미리보기·버전 목록은 SPEC-05 범위다.
+ * 문서 상세: 메타데이터, 버전 히스토리·다운로드·미리보기(SPEC-05 §9), 새 버전 등록 영역(SPEC-04 §9.1)을 표시한다.
  */
 export function DocumentDetail() {
   const { projectId, documentId } = useParams<{ projectId: string; documentId: string }>();
@@ -77,15 +80,23 @@ export function DocumentDetail() {
   }, [projectId, documentId, requestKey, validIds, refresh]);
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
+  // 버전 히스토리 갱신 신호와 미리보기 중인 버전 (SPEC-05 §9.2).
+  const [versionsReloadKey, setVersionsReloadKey] = useState(0);
+  const [previewVersion, setPreviewVersion] = useState<DocumentVersionSummary | null>(null);
+  const closePreview = useCallback(() => setPreviewVersion(null), []);
 
   // 새 버전 등록 성공: 응답(갱신된 상세)으로 바로 바꾼다. 로딩 화면을 거치지 않는다.
   const handleVersionUploaded = useCallback(
-    (document: DocumentDetailData) => setResult({ key: requestKey, value: { kind: "success", document } }),
+    (document: DocumentDetailData) => {
+      setResult({ key: requestKey, value: { kind: "success", document } });
+      setVersionsReloadKey((current) => current + 1);
+    },
     [requestKey],
   );
 
   // 409(상태 충돌): 등록 영역의 오류 문구를 유지하도록 로딩 화면 없이 다시 조회한다 (결정 I6). 실패하면 현재 화면을 유지한다.
   const reloadInBackground = useCallback(() => {
+    setVersionsReloadKey((current) => current + 1);
     fetchDocument(projectId, documentId).then(
       (document) =>
         setResult((current) =>
@@ -169,6 +180,22 @@ export function DocumentDetail() {
               <p className="text-zinc-500">설명이 없습니다.</p>
             )}
           </section>
+          <DocumentVersionHistory
+            projectId={projectId}
+            documentId={documentId}
+            reloadKey={versionsReloadKey}
+            selectedVersion={previewVersion?.versionNumber ?? null}
+            onPreview={setPreviewVersion}
+          />
+          {previewVersion && (
+            <DocumentVersionPreview
+              key={previewVersion.versionNumber}
+              projectId={projectId}
+              documentId={documentId}
+              version={previewVersion}
+              onClose={closePreview}
+            />
+          )}
           <DocumentVersionUploadForm
             projectId={projectId}
             documentId={documentId}

@@ -51,3 +51,39 @@ export function versionUploadFailureMessage(error: unknown): string {
   }
   return uploadFailureMessage(error);
 }
+
+/** 버전 다운로드·미리보기 문구 (SPEC-05 §9.4). */
+export const FILE_MESSAGES = {
+  fileUnavailable: "파일을 불러올 수 없습니다. 관리자에게 문의해 주세요.",
+  previewFailed: "미리보기를 만들 수 없습니다. 원본 파일을 내려받아 확인해 주세요.",
+  previewUnavailable: "지금은 미리보기를 사용할 수 없습니다. 원본 파일을 내려받아 확인해 주세요.",
+  network: "파일을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+  versionNotFound: "버전을 찾을 수 없습니다.",
+} as const;
+
+/** 버전 다운로드·미리보기 실패 문구. 401은 화면에서 세션 만료 흐름으로 처리한다. */
+export function fileFailureMessage(error: unknown): string {
+  if (error instanceof ApiError && error.kind === "network") {
+    return FILE_MESSAGES.network;
+  }
+  if (error instanceof ApiError && error.status === 404) {
+    const code = errorCode(error);
+    if (code === "PROJECT_NOT_FOUND") {
+      return VERSION_MESSAGES.projectNotFound;
+    }
+    if (code === "DOCUMENT_VERSION_NOT_FOUND") {
+      return FILE_MESSAGES.versionNotFound;
+    }
+    return VERSION_MESSAGES.documentNotFound;
+  }
+  if (error instanceof ApiError && error.code === "DOCUMENT_FILE_UNAVAILABLE") {
+    return FILE_MESSAGES.fileUnavailable;
+  }
+  if (error instanceof ApiError && (error.status === 422 || error.code === "PREVIEW_NOT_PDF")) {
+    return FILE_MESSAGES.previewFailed;
+  }
+  if (error instanceof ApiError && error.status === 503) {
+    return FILE_MESSAGES.previewUnavailable;
+  }
+  return failureMessage(error);
+}
