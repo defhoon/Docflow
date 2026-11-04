@@ -45,6 +45,24 @@ jobs:
           distribution: temurin
           java-version: "25"
       - uses: gradle/actions/setup-gradle@v5
+      # SPEC-05 미리보기: Office → PDF 실제 변환 테스트에 LibreOffice와 한글 글꼴이 필요하다 (ADR-0006, 결정 A4).
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress fonts-noto-cjk
+          soffice --version
+      # 변환 프로세스 네트워크 격리(unshare -rn)를 쓸 수 있으면 켠다. 쓸 수 없으면 경고를 남기고 격리 없이 테스트한다.
+      - name: Enable preview network isolation
+        run: |
+          if ! unshare -rn true 2>/dev/null; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          fi
+          if unshare -rn true 2>/dev/null; then
+            echo "DOCFLOW_PREVIEW_LAUNCHER=unshare,-rn" >> "$GITHUB_ENV"
+            echo "Preview isolation launcher enabled: unshare -rn"
+          else
+            echo "::warning::unshare -rn is not available on this runner; preview conversion tests run without OS network isolation"
+          fi
       - name: Build and test
         run: ./gradlew build
       - name: Upload test reports
