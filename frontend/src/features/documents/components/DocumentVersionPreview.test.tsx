@@ -70,7 +70,7 @@ describe("DocumentVersionPreview (SPEC-05 §9, AC-VDL-18)", () => {
 
     const frame = await screen.findByTitle("v2 미리보기");
     expect(frame.tagName).toBe("IFRAME");
-    expect(frame).toHaveAttribute("src", "blob:preview-1");
+    expect(frame).toHaveAttribute("src", "blob:preview-1#navpanes=0&view=FitH");
     expect(previewMock).toHaveBeenCalledWith("7", "3", 2, expect.any(AbortSignal));
     expect((createObjectURL.mock.calls[0][0] as Blob).type).toBe("application/pdf");
     expect(screen.getByText("미리보기는 참고용이며 원본 파일이 기준입니다.")).toBeInTheDocument();
@@ -164,6 +164,6 @@ describe("DocumentVersionPreview (SPEC-05 §9, AC-VDL-18)", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-1");
     view.rerender(tree(true));
 
-    await waitFor(() => expect(screen.getByTitle("v2 미리보기")).toHaveAttribute("src", "blob:preview-2"));
+    await waitFor(() => expect(screen.getByTitle("v2 미리보기")).toHaveAttribute("src", "blob:preview-2#navpanes=0&view=FitH"));
   });
 });

@@ -82,7 +82,7 @@ describe("DocumentDetail — 버전 히스토리·미리보기 (SPEC-05 §9, AC-
     expect(history.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(await within(history).findByRole("button", { name: "v1 미리보기" }));
 
-    expect(await screen.findByTitle("v1 미리보기")).toHaveAttribute("src", "blob:detail-preview");
+    expect(await screen.findByTitle("v1 미리보기")).toHaveAttribute("src", "blob:detail-preview#navpanes=0&view=FitH");
     fireEvent.click(screen.getByRole("button", { name: "미리보기 닫기" }));
     await waitFor(() => expect(screen.queryByTitle("v1 미리보기")).not.toBeInTheDocument());
   });

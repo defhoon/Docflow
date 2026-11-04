@@ -17,6 +17,12 @@ export const PREVIEW_MAX_WAIT_MS = 90_000;
  */
 export const PREVIEW_IFRAME_SANDBOX: string | null = null;
 
+/**
+ * 내장 PDF 뷰어 표시 옵션: 썸네일 패널을 닫고 폭에 맞춘다. 문서 상세의 좁은 영역(약 620px)에서 Chromium은 패널을 열어 두면
+ * 본문 페이지를 그리지 못하는 것을 실제 브라우저 E2E로 확인했다(SPEC-05 §18). 지원하지 않는 브라우저는 무시한다.
+ */
+export const PREVIEW_VIEWER_FRAGMENT = "#navpanes=0&view=FitH";
+
 type Props = {
   projectId: string;
   documentId: string;
@@ -125,7 +131,7 @@ export function DocumentVersionPreview({ projectId, documentId, version, onClose
           <p className="text-xs text-zinc-500">미리보기는 참고용이며 원본 파일이 기준입니다.</p>
           <iframe
             title={`v${versionNumber} 미리보기`}
-            src={state.url}
+            src={`${state.url}${PREVIEW_VIEWER_FRAGMENT}`}
             {...(PREVIEW_IFRAME_SANDBOX === null ? {} : { sandbox: PREVIEW_IFRAME_SANDBOX })}
             className="h-[80vh] w-full rounded border border-zinc-200"
           />
