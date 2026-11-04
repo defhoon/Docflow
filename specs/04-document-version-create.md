@@ -7,6 +7,7 @@
 - 작성일: 2026-11-04 (기준 커밋: `main` `a140a94`)
 - 변경 이력:
   - v0.1 (2026-11-04): 설계 결정 V1~V8(사용자 승인)을 반영한 상세 명세 초안
+  - Windows 반복 기준 (2026-11-04): AC-VER-18 반복 실행을 동시성·크기 테스트 8개 × 10회로 확정(사용자 승인, SPEC-04 한정)
   - Windows 검증 기록 (2026-11-04): 사용자가 보고한 Windows 자동 테스트·빌드 결과를 §17에 기록
   - 구현 (2026-11-04): Backend·Frontend 구현, 클라우드 테스트·E2E·CI 결과를 §17에 기록. 구현 중 확인한 사항(§13.2 잠금 SQL·`updated_at`·AC-VER-10 재현, §9.2 안내 문구, §11.5 테스트 컨텍스트 정리)을 반영. V1~V8·OQ-1~10·I1~I7 변경 없음
   - 구현 결정 (2026-11-04): 사용자가 구현 결정 I1~I7을 승인(§15.4). V1~V8·OQ-1~10 변경 없음
@@ -419,10 +420,11 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 
 | 구분 | 내용 | 완료 기준 포함 |
 | --- | --- | --- |
-| Windows 자동 테스트·빌드 | 테스트 전용 DB(`docflow_test`, 전용·빈 DB)에서 `.\gradlew.bat clean build`, 동시성·크기 테스트 반복 실행, Frontend `npm run lint`·`test`·`build` | **포함 (필수)** |
+| Windows 자동 테스트·빌드 | 테스트 전용 DB(`docflow_test`, 전용·빈 DB)에서 `.\gradlew.bat clean build`, 동시성·크기 테스트 반복 실행(10회, 아래), Frontend `npm run lint`·`test`·`build` | **포함 (필수)** |
 | Windows 실제 브라우저 수동 E2E | 새 버전 등록 화면 흐름, Next.js 경유 대용량 업로드 등 | **불포함** — 구현 완료 시점에 별도 후속 Issue로 추적, Issue 생성은 별도 승인 후 진행 [결정 OQ-9] |
 
 - 실행 전 테스트 로그의 JDBC URL이 `docflow_test`인지 확인한다([기존] SPEC-03 §16.4 안전 조치). 개발 DB에서 실행하지 않는다.
+- **반복 실행 기준 (2026-11-04 사용자 승인, SPEC-04에만 적용):** `DocumentVersionConcurrencyIntegrationTest`(6개)와 `DocumentVersionUploadSizeIntegrationTest`(2개), 총 8개 테스트를 `docflow_test`에서 10회 반복 실행한다(`test --tests … --rerun`). 매회 실패·오류·스킵이 0건이어야 통과다. 잠금 대기 시간은 측정·기록하되 합격 기준으로 쓰지 않는다. 전체 테스트는 반복하지 않으며 기존 `clean build --rerun-tasks` 성공 기록을 유지한다.
 
 ### 11.8 검증 환경과 주체
 
@@ -457,7 +459,7 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 | **AC-VER-15** | 응답은 내부 정보를 노출하지 않고 계약이 SPEC-03과 같다 | 응답에 저장 키·경로·SHA-256·Content Type·이메일 없음, `DocumentResponse` 필드 구성이 SPEC-03과 동일(업로더 표시 이름 미추가 [OQ-1]), 새 엔드포인트는 `DocumentVersionController`가 처리 [OQ-5] | 통합 | 응답 필드 단언이 있는 통합 테스트 통과 |
 | **AC-VER-16** | Frontend 등록 영역이 검증·중복 제출 방지·성공 갱신·상태별 비활성화·오류 표시를 한다 | §11.4: 문서 상세 화면 배치 [OQ-6], 허용되지 않은 상태에서 비활성화·안내 [OQ-7], 네트워크 오류 시 확정 문구 표시와 자동 재시도 없음 [OQ-8] | Vitest | Vitest 통과 |
 | **AC-VER-17** | 클라우드 실제 경로에서 새 버전 등록이 동작한다 | §11.6 항목: Next.js 경유 Chromium 등록·상세·목록 반영, 19·20MiB 크기·SHA-256 일치, 상태별 비활성화·409, 404 화면, 네트워크 오류 문구 | 클라우드 E2E (Chromium 자동화) | §11.6 전 항목 실행, §17에 명령·환경·결과 기록 |
-| **AC-VER-18** | Windows에서 자동 테스트와 빌드가 통과한다 | `docflow_test`에서 `.\gradlew.bat clean build` 성공, 동시성·크기 테스트 반복 통과, Frontend lint·test·build 성공 | Windows 자동 (사용자) | 사용자 실행 결과(명령·환경·결과) 기록. **미실행이면 SPEC-04 Done 아님** |
+| **AC-VER-18** | Windows에서 자동 테스트와 빌드가 통과한다 | `docflow_test`에서 `.\gradlew.bat clean build` 성공, 동시성·크기 테스트 8개 10회 반복 통과(§11.7), Frontend lint·test·build 성공 | Windows 자동 (사용자) | 사용자 실행 결과(명령·환경·결과) 기록. **미실행이면 SPEC-04 Done 아님** |
 | **AC-VER-19** | 기존 기능이 회귀하지 않고 CI가 통과한다 | SPEC-AUTH·01·02·03 Backend·Frontend 테스트 전체 통과(SPEC-03 테스트 수정 없음), `SecurityConfig` 변경 없음, CI 성공 | 회귀 + CI | 최신 커밋 CI 성공 + 클라우드 전체 실행 결과 |
 
 - **판정 환경 공통 규칙:** 검증 유형이 단위·통합·동시성·Vitest인 AC(AC-VER-01~16)의 "통과"는 Claude Code 클라우드 실행과 최신 커밋 GitHub Actions CI 결과로 판정한다. 같은 테스트의 Windows 실행은 AC-VER-18로 따로 판정하며, AC-VER-18을 실행하지 않았으면 SPEC-04는 Done이 아니다. 각 결과는 §17에 명령·환경·결과로 기록한다.
@@ -663,7 +665,7 @@ V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸�
 | Frontend 타입 검사 | `npx tsc --noEmit` | 성공 |
 | Frontend 테스트 | `npx vitest run` | 198/198 통과 |
 | Frontend 빌드 | `npm run build` | 성공 |
-| 동시성·크기 테스트 반복 실행 (§11.7) | — | 보고 없음 |
+| 동시성·크기 테스트 반복 실행 (§11.7, 8개 × 10회) | — | 기준 승인(2026-11-04), 결과 대기 |
 | 테스트 DB 이름(`docflow_test`) 확인 | — | 보고 없음 |
 | 잠금 대기 측정값 (OQ-4) | — | 보고 없음 |
 
