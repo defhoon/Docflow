@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.util.FileSystemUtils;
 
 import com.docflow.document.validation.DocumentFileType;
 
@@ -190,8 +189,9 @@ public class LibreOfficePreviewConverter implements DocumentPreviewConverter {
 				throw new PreviewConversionException(PreviewConversionException.Kind.TIMEOUT,
 						"timed out after " + timeout.toMillis() + "ms");
 			}
-			// 종료 후에도 남은 하위 프로세스가 있으면 정리한다.
-			process.descendants().forEach(ProcessHandle::destroyForcibly);
+			// 종료 후에도 남은 하위 프로세스가 있으면 정리하고, 끝날 때까지 기다린다. Windows는 열린 파일이 있으면
+			// 작업 디렉터리를 지울 수 없으므로 하위 프로세스가 파일 핸들을 놓은 뒤에 반환한다.
+			awaitExit(process.descendants().toList(), true);
 			return process.exitValue();
 		}
 		catch (InterruptedException ex) {
@@ -215,7 +215,31 @@ public class LibreOfficePreviewConverter implements DocumentPreviewConverter {
 		catch (InterruptedException ex) {
 			Thread.currentThread().interrupt();
 		}
-		descendants.forEach(ProcessHandle::destroyForcibly);
+		awaitExit(descendants, true);
+	}
+
+	/** 주어진 프로세스들을 (필요하면 강제 종료하고) 최대 5초 동안 종료를 기다린다. 이 변환 작업의 프로세스만 다룬다. */
+	private static void awaitExit(List<ProcessHandle> handles, boolean destroy) {
+		if (destroy) {
+			handles.forEach(ProcessHandle::destroyForcibly);
+		}
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		for (ProcessHandle handle : handles) {
+			long remaining = deadline - System.nanoTime();
+			if (remaining <= 0) {
+				break;
+			}
+			try {
+				handle.onExit().get(remaining, TimeUnit.NANOSECONDS);
+			}
+			catch (InterruptedException ex) {
+				Thread.currentThread().interrupt();
+				return;
+			}
+			catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException ex) {
+				log.warn("Preview engine process did not exit in time: pid={}", handle.pid());
+			}
+		}
 	}
 
 	private EngineStatus check() {
@@ -254,7 +278,7 @@ public class LibreOfficePreviewConverter implements DocumentPreviewConverter {
 		finally {
 			if (checkDir != null) {
 				try {
-					FileSystemUtils.deleteRecursively(checkDir);
+					PreviewWorkspace.deleteRecursively(checkDir, checkDir);
 				}
 				catch (IOException ex) {
 					log.warn("Failed to delete preview check directory", ex);

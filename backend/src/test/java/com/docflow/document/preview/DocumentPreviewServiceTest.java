@@ -98,6 +98,37 @@ class DocumentPreviewServiceTest {
 		assertThat(workDirs()).isEmpty();
 	}
 
+	// SPEC-05 §18.7: 결과(캐시·실패)는 작업 디렉터리를 지운 뒤에 공개된다. 결과를 본 즉시 작업 루트가 비어 있어야 한다.
+	@Test
+	void resultIsVisibleOnlyAfterWorkDirectoryIsRemoved() throws Exception {
+		this.service = service(properties(1, 10));
+		info(1, DocumentFileType.DOCX);
+		info(2, DocumentFileType.DOCX);
+		this.converter.release.countDown();
+
+		this.service.preview(1L, 1L, 1, 1L);
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+		while (!(this.service.preview(1L, 1L, 1, 1L) instanceof DocumentPreviewService.Ready)) {
+			assertThat(System.nanoTime()).isLessThan(deadline);
+			Thread.onSpinWait();
+		}
+		assertThat(workDirs()).isEmpty();
+
+		this.converter.failure = new PreviewConversionException(PreviewConversionException.Kind.FAILED, "no output");
+		this.service.preview(1L, 1L, 2, 1L);
+		while (true) {
+			try {
+				this.service.preview(1L, 1L, 2, 1L);
+				assertThat(System.nanoTime()).isLessThan(deadline);
+				Thread.onSpinWait();
+			}
+			catch (BusinessException ex) {
+				break;
+			}
+		}
+		assertThat(workDirs()).isEmpty();
+	}
+
 	@Test
 	void concurrentRequestsForSameVersionShareOneConversion() throws Exception {
 		this.service = service(properties(1, 10));
@@ -301,6 +332,9 @@ class DocumentPreviewServiceTest {
 				if (this.failure != null) {
 					throw this.failure;
 				}
+				// Windows의 LibreOffice처럼 작업 디렉터리 안에 읽기 전용 알려진 폴더를 남긴다.
+				Path documents = Files.createDirectories(workDir.resolve("Documents"));
+				PreviewWorkspaceTest.markReadOnly(documents);
 				Path out = Files.createDirectories(workDir.resolve("out")).resolve("input.pdf");
 				Files.write(out, this.output);
 				return out;

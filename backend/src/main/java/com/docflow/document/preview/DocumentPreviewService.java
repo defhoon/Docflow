@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.FileSystemUtils;
 
 import com.docflow.document.service.DocumentVersionQueryService;
 import com.docflow.document.service.VersionFile;
@@ -91,8 +90,8 @@ public class DocumentPreviewService {
 		this.workRoot = previews.resolve("work");
 		this.cache = new PreviewCache(previews.resolve("cache"), properties.cache().maxBytes().toBytes(), clock);
 		// 재시작 복구: 이전 실행에서 남은 작업 디렉터리를 지우고 캐시 색인을 다시 만든다.
-		FileSystemUtils.deleteRecursively(this.workRoot);
 		Files.createDirectories(this.workRoot);
+		PreviewWorkspace.deleteContents(this.workRoot);
 		this.cache.rebuild();
 		this.executor = new ThreadPoolExecutor(properties.concurrency(), properties.concurrency(), 0L,
 				TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(Math.max(1, properties.queueCapacity())),
@@ -193,17 +192,25 @@ public class DocumentPreviewService {
 			Thread.currentThread().interrupt();
 		}
 		try {
-			FileSystemUtils.deleteRecursively(this.workRoot);
+			PreviewWorkspace.deleteContents(this.workRoot);
 		}
 		catch (IOException ex) {
 			log.warn("Failed to delete preview work directory on shutdown", ex);
 		}
 	}
 
+	/**
+	 * 변환 작업. 결과(캐시 등록 또는 실패 기록)는 작업 디렉터리를 지운 뒤에 공개한다. 요청 측이 결과를 확인한 시점에는 이 작업의
+	 * 임시 파일과 엔진 프로세스가 남아 있지 않다(Windows에서는 열린 파일·읽기 전용 디렉터리가 삭제를 막는다, SPEC-05 §18.7).
+	 */
 	private void convert(VersionFileInfo info) {
 		String key = info.storageKey();
-		Path workDir = this.workRoot.resolve(UUID.randomUUID().toString());
+		String jobId = UUID.randomUUID().toString();
+		Path workDir = this.workRoot.resolve(jobId);
+		// 결과 PDF는 작업 디렉터리 밖(작업 루트)에 잠시 두었다가 캐시로 옮긴다.
+		Path staged = this.workRoot.resolve(jobId + ".pdf");
 		long started = System.nanoTime();
+		Failure failure = null;
 		try {
 			Files.createDirectories(workDir.resolve("in"));
 			Path input = workDir.resolve("in").resolve("input." + info.fileType().extension());
@@ -213,30 +220,49 @@ public class DocumentPreviewService {
 			this.conversions.incrementAndGet();
 			Path pdf = this.converter.convertToPdf(input, info.fileType(), workDir, this.properties.timeout());
 			validate(pdf);
-			this.cache.put(key, pdf);
-			this.failures.remove(key);
-			log.info("Preview converted: projectId={}, documentId={}, versionNumber={}, storageKey={}, elapsedMs={}",
-					info.projectId(), info.documentId(), info.versionNumber(), key, elapsedMillis(started));
+			Files.move(pdf, staged, StandardCopyOption.REPLACE_EXISTING);
 		}
 		catch (PreviewConversionException ex) {
-			this.failures.put(key, new Failure(ex.kind(), this.clock.instant()));
+			failure = new Failure(ex.kind(), this.clock.instant());
 			log.warn("Preview conversion failed: projectId={}, documentId={}, versionNumber={}, storageKey={}, kind={}, "
 					+ "reason={}, elapsedMs={}", info.projectId(), info.documentId(), info.versionNumber(), key,
 					ex.kind(), ex.getMessage(), elapsedMillis(started));
 		}
 		catch (IOException | RuntimeException ex) {
-			this.failures.put(key, new Failure(PreviewConversionException.Kind.ENGINE, this.clock.instant()));
+			failure = new Failure(PreviewConversionException.Kind.ENGINE, this.clock.instant());
 			log.error("Preview conversion error: projectId={}, documentId={}, versionNumber={}, storageKey={}",
 					info.projectId(), info.documentId(), info.versionNumber(), key, ex);
 		}
+		try {
+			deleteWorkDirectory(workDir);
+			if (failure == null) {
+				this.cache.put(key, staged);
+				this.failures.remove(key);
+				log.info("Preview converted: projectId={}, documentId={}, versionNumber={}, storageKey={}, elapsedMs={}",
+						info.projectId(), info.documentId(), info.versionNumber(), key, elapsedMillis(started));
+			}
+			else {
+				this.failures.put(key, failure);
+			}
+		}
+		catch (IOException | RuntimeException ex) {
+			this.failures.put(key, new Failure(PreviewConversionException.Kind.ENGINE, this.clock.instant()));
+			log.error("Preview cache registration failed: projectId={}, documentId={}, versionNumber={}, storageKey={}",
+					info.projectId(), info.documentId(), info.versionNumber(), key, ex);
+			deleteWorkDirectory(staged);
+		}
 		finally {
-			try {
-				FileSystemUtils.deleteRecursively(workDir);
-			}
-			catch (IOException ex) {
-				log.warn("Failed to delete preview work directory: {}", workDir.getFileName(), ex);
-			}
 			this.jobs.remove(key);
+		}
+	}
+
+	/** 작업 디렉터리 삭제. 실패는 원인과 함께 WARN으로 남기고(다음 시작 때 다시 정리), 결과 공개는 계속한다. */
+	private void deleteWorkDirectory(Path path) {
+		try {
+			PreviewWorkspace.deleteRecursively(this.workRoot, path);
+		}
+		catch (IOException | RuntimeException ex) {
+			log.warn("Failed to delete preview work directory: {}", path.getFileName(), ex);
 		}
 	}
 

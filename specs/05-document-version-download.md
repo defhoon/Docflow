@@ -597,3 +597,21 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
    기대: `BUILD SUCCESSFUL`, 실패·오류 0.
 4. Frontend: `npm ci`, `npm run lint`, `npx tsc --noEmit`, `npx vitest run`(228개 통과), `npm run build`.
 5. 권장 수동 확인(브라우저): Backend·Frontend 실행 후 Chrome 또는 Edge에서 문서 상세 → 각 형식 "미리보기" → 본문 글자가 보이는지, "다운로드" 시 한글 파일명으로 저장되는지.
+
+### 18.7 Windows 미리보기 테스트 실패 분석과 수정 (2026-11-04)
+
+**보고된 현상 (사용자, Windows):** LibreOffice 26.8.2.2, `DOCFLOW_PREVIEW_SOFFICE_PATH=...\program\soffice.com`으로 503은 해소. `DocumentPreviewIntegrationTest` 4개가 `DocumentTestSupport.cleanStorage()`의 `AccessDeniedException`으로 실패. 테스트 후 soffice 프로세스 없음. 남은 경로는 `previews/work/{uuid}/Documents`(일반 디렉터리, `ReadOnly, Directory`).
+
+**코드로 확인한 원인 (복합):**
+
+1. 결과 공개와 정리 순서: 변환 작업이 결과(캐시 등록 또는 실패 기록)를 먼저 공개하고 그 다음에 작업 디렉터리를 지웠다. 테스트는 `200`/`422`를 받은 즉시 끝나고 `cleanUp`이 저장 루트를 지우므로, 서비스 스레드의 정리와 경쟁한다. Linux에서는 삭제가 빠르고 열린 파일·속성이 삭제를 막지 않아 드러나지 않았다.
+2. 작업 디렉터리 안의 `Documents`: 변환 프로세스의 `USERPROFILE`을 작업 디렉터리로 바꾸므로(ADR-0006 최소 환경), Windows의 LibreOffice가 사용자 알려진 폴더(`Documents`)를 작업 디렉터리 안에 만든다. Windows는 알려진 폴더에 읽기 전용 속성을 붙이고, Java `Files.delete`(`RemoveDirectory`)는 읽기 전용 디렉터리 삭제를 거부한다. 서비스의 정리(`FileSystemUtils.deleteRecursively`)도 같은 이유로 실패해 디렉터리가 남았고, 이어서 테스트의 `cleanStorage()`가 실패했다. Linux에는 이 폴더가 생기지 않고 속성도 삭제를 막지 않는다.
+3. 프로세스 종료 대기: 엔진 종료 후 남은 하위 프로세스를 강제 종료만 하고 끝날 때까지 기다리지 않았다. Windows는 열린 파일이 있는 디렉터리를 지울 수 없으므로, 하위 프로세스가 파일 핸들을 놓기 전에 정리하면 실패할 수 있다(이번 보고에서는 테스트 후 프로세스가 없어 2가 직접 원인으로 보이나, 같은 경로의 잠재 원인).
+
+**최소 수정 (`fix/#21`):**
+
+- 작업 결과는 작업 디렉터리를 지운 뒤에 공개한다(결과 PDF를 작업 디렉터리 밖으로 옮긴 후 정리 → 캐시 등록/실패 기록 → 작업 해제).
+- 작업 디렉터리 삭제(`PreviewWorkspace`): 작업 루트 안에서만, 심볼릭 링크를 따라가지 않고 삭제하며, 접근 거부가 나면 그 항목의 읽기 전용 속성만 해제하고 한 번 더 시도한다. 그래도 실패하면 예외를 던지고 서비스는 원인과 함께 WARN 로그를 남긴다. 시작·종료 시 정리와 엔진 점검 디렉터리 정리도 같은 방식을 쓴다.
+- 엔진 종료 후 남은 하위 프로세스는 종료까지 최대 5초 기다린다(이 변환 작업의 프로세스만).
+- 테스트: 읽기 전용 알려진 폴더를 만드는 가짜 엔진으로 "결과가 보이는 시점에 작업 루트가 비어 있음"을 검증하고, `PreviewWorkspace` 단위 테스트를 추가했다. 실제 변환 테스트·보안 검증은 그대로다. 클라우드 Backend 365개 통과.
+- 남은 확인: Windows 재실행(§18.6 명령).
