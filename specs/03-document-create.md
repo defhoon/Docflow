@@ -1,6 +1,6 @@
 # SPEC-03: 문서 등록
 
-- 상태: **Done (2026-11-03, 변경된 완료 기준 충족) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증, Windows 자동 테스트(`clean build`) 완료. AC-DOC-08·09·29는 2026-11-03 사용자 승인으로 완료 기준을 조정했고, Windows 실환경 수동 E2E(Next.js 경유 업로드 등)는 후속 Issue [#17](https://github.com/defhoon/Docflow/issues/17)로 이관(미실행). D4는 미해결 알려진 제한사항이며 개선은 [#18](https://github.com/defhoon/Docflow/issues/18)**
+- 상태: **Done (2026-11-03, 변경된 완료 기준 충족) — Backend·Frontend 구현, 클라우드·CI·Next.js 경유 검증, Windows 자동 테스트(`clean build`) 완료. AC-DOC-08·09·29는 2026-11-03 사용자 승인으로 완료 기준을 조정했고, Windows 실환경 수동 E2E(Next.js 경유 업로드 등)는 후속 Issue [#17](https://github.com/defhoon/Docflow/issues/17)로 이관(미실행). D4는 미해결 알려진 제한사항이며 개선은 [#18](https://github.com/defhoon/Docflow/issues/18). main 병합 완료(PR #16, 2026-11-03, Issue #15 종료)**
 - Issue: [#15](https://github.com/defhoon/Docflow/issues/15)
 - 브랜치: `feat/15/document-create`
 - 관련 문서: [`spec.md`](../spec.md) §4.1, §5, §7.1, §9, §12, §13, §16 / [`specs/01-project-create.md`](./01-project-create.md) §5.5, §7.4, §7.7, §7.8 / [`specs/02-project-members.md`](./02-project-members.md) §5.1, §7.2, §7.3 / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §3, §4
@@ -24,6 +24,7 @@
   - Frontend 구현·Next.js 경유 검증 (2026-10-28): Backend 조건부 승인 후 Frontend 구현 승인. `proxyClientMaxBodySize: '25mb'` 적용, 실제 Next.js rewrite·Chromium 경로 검증 결과와 D4 원인 분석 기록 (§16). 정책 변경 없음
   - D4 처리 결정 기록·Windows E2E 체크리스트 (2026-10-28): 사용자 결정으로 현행 설정 유지, 21MiB 초과 요청의 413 전달 미보장을 알려진 제한사항으로 잠정 수용(§5.6, §12 R6, §14 D4-1). AC-DOC-09는 미충족으로 유지하고 AC 문구 변경은 별도 승인 대상으로 남김. Windows E2E 체크리스트 추가(§16.2). 수용 기준 변경 없음
   - AC-DOC-09 변경 (2026-10-28, 사용자 승인): "21MiB 업로드에 413 도달" 요구를 "크기 제한으로 거부된 업로드는 저장되지 않고 사용자가 실패를 인지할 수 있다"로 변경하고 검증 방법 5개·완료 조건을 정의. D4는 해결된 것이 아니며 알려진 제한사항(D4-1)·후속 개선 대상으로 유지(§16.3). 다른 AC, 크기 제한, API 계약, 보안 정책 변경 없음
+  - 병합 기록 정리 (2026-11-04): PR #16이 2026-11-03 `main`에 병합(merge commit `a140a94`)되고 Issue #15가 종료된 사실을 상태 줄과 §15에 반영. 내용·AC 변경 없음
   - 완료 기준 조정·후속 이관·Windows 자동 재검증 (2026-11-03, 사용자 승인): 일정과 자동 테스트·CI 검증 수준을 고려해 Windows 실환경 수동 E2E를 후속 Issue #17로 이관하고, AC-DOC-08·09의 검증 방법·완료 조건과 AC-DOC-29의 확인 방법을 변경(이전 문구는 각 AC에 병기). 이는 검증 시점·환경을 나눈 것이며 이관 항목을 통과로 기록하지 않는다. Windows `clean build` 성공·소켓 테스트 10회 반복 결과 반영(§16.4). D4 개선 Issue #18 생성·연결(§16.3). 변경된 기준으로 Done 판정(§16.5). 다른 AC, 크기 제한, API 계약, 보안 정책 변경 없음
   - Windows 재검증 결과 반영 (2026-11-03, 사용자 승인): Windows 자동 테스트 1차 실패(9건)의 원인·수정(`63c44e8`, 테스트 코드만)과 재검증(`test --rerun-tasks` 성공), Linux 반복 결과, 테스트 DB 격리 주의를 §16.4에 기록. §16.2 #2·#4·#10·#11 결과, R20, AC 결과표 갱신. 수동 E2E TC-01~06 보고 반영. AC·정책 변경 없음, D4 미해결 유지
   - AC-DOC-09 ⑤ 문구 보완 (2026-10-28, 사용자 승인): Frontend 네트워크 오류 안내에 등록 결과(문서 목록) 재확인 안내 추가(`features/documents/errors.ts`, 테스트 1곳). 오류 처리 로직·API 호출 변경 없음. ③ 요청별 검증(고유 제목) 결과와 Windows 체크리스트 보강 반영
@@ -834,7 +835,7 @@ MS Office·Google Docs·macOS 미리보기로 만든 표본은 클라우드에 �
 10-3. [x] D4 후속 GitHub Issue 생성 — #18 (2026-11-03, 사용자 승인)
 10-4. [x] AC-DOC-08·09·29 완료 기준 조정, Windows 실환경 수동 E2E 후속 Issue #17 생성 (2026-11-03, 사용자 승인)
 10-5. [x] 변경된 완료 기준으로 Done 판정 (§16.5)
-11. [ ] PR #16 (`Closes #15`) — Draft 생성(2026-11-03). 병합은 사용자
+11. [x] PR #16 (`Closes #15`) — 2026-11-03 Draft 생성 → Ready for review 전환 → 사용자가 `main`에 병합(merge commit `a140a94`), Issue #15 종료(completed)
 
 ## 16. 검증 결과
 
