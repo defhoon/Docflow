@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api-client";
 import { fetchDocument } from "../api";
 import { formatFileSize, statusLabel } from "../format";
 import type { DocumentDetail as DocumentDetailData } from "../types";
+import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
 
 type DetailResult =
   | { kind: "project-not-found" }
@@ -23,7 +24,9 @@ type DetailState = { kind: "loading" } | DetailResult;
 
 const ID_PATTERN = /^[0-9]+$/;
 
-/** 문서 상세: 메타데이터만 표시한다. 다운로드·미리보기·버전 목록은 SPEC-05 범위다. */
+/**
+ * 문서 상세: 메타데이터와 새 버전 등록 영역(SPEC-04 §9.1)을 표시한다. 다운로드·미리보기·버전 목록은 SPEC-05 범위다.
+ */
 export function DocumentDetail() {
   const { projectId, documentId } = useParams<{ projectId: string; documentId: string }>();
   const { refresh } = useAuth();
@@ -74,6 +77,23 @@ export function DocumentDetail() {
   }, [projectId, documentId, requestKey, validIds, refresh]);
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
+
+  // 새 버전 등록 성공: 응답(갱신된 상세)으로 바로 바꾼다. 로딩 화면을 거치지 않는다.
+  const handleVersionUploaded = useCallback(
+    (document: DocumentDetailData) => setResult({ key: requestKey, value: { kind: "success", document } }),
+    [requestKey],
+  );
+
+  // 409(상태 충돌): 등록 영역의 오류 문구를 유지하도록 로딩 화면 없이 다시 조회한다 (결정 I6). 실패하면 현재 화면을 유지한다.
+  const reloadInBackground = useCallback(() => {
+    fetchDocument(projectId, documentId).then(
+      (document) =>
+        setResult((current) =>
+          current?.key === requestKey ? { key: requestKey, value: { kind: "success", document } } : current,
+        ),
+      () => undefined,
+    );
+  }, [projectId, documentId, requestKey]);
 
   switch (state.kind) {
     case "loading":
@@ -149,6 +169,13 @@ export function DocumentDetail() {
               <p className="text-zinc-500">설명이 없습니다.</p>
             )}
           </section>
+          <DocumentVersionUploadForm
+            projectId={projectId}
+            documentId={documentId}
+            status={document.status}
+            onUploaded={handleVersionUploaded}
+            onConflict={reloadInBackground}
+          />
           <ProjectLink projectId={projectId} />
         </article>
       );

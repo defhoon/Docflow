@@ -4,6 +4,8 @@
  */
 import { isAllowedDescription, isAllowedName, trimEdges, trimEdgesToNull } from "@/features/projects/validation";
 
+import type { DocumentStatus } from "./types";
+
 export const TITLE_MAX_LENGTH = 200;
 export const DESCRIPTION_MAX_LENGTH = 1000;
 /** 20MiB = 20,971,520바이트 (SPEC-03 §5.6) */
@@ -25,6 +27,13 @@ export const MESSAGES = {
   fileTooLarge: "파일은 20MB 이하만 업로드할 수 있습니다.",
   fileNameTooLong: "파일 이름은 255자 이하여야 합니다.",
 } as const;
+
+/**
+ * 새 버전을 등록할 수 있는 문서 상태 (SPEC-04 §7.2, 결정 V4). 화면 사용성 보조이며 최종 판정은 Backend가 한다.
+ */
+export function canUploadNewVersion(status: DocumentStatus): boolean {
+  return status === "DRAFT" || status === "CHANGES_REQUESTED";
+}
 
 export type DocumentFieldErrors = Partial<Record<"title" | "description" | "file", string>>;
 
