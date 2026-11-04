@@ -42,6 +42,15 @@ class ProjectPermissionServiceTest {
 			.doesNotThrowAnyException();
 	}
 
+	// SPEC-04 §7.1 (결정 V3): 새 버전 등록은 OWNER·MEMBER 모두 허용 (문서 작성자 여부와 무관)
+	@Test
+	void ownerAndMemberCanUploadVersions() {
+		assertThatCode(() -> this.permissionService.requireVersionUploader(this.project, 1L))
+			.doesNotThrowAnyException();
+		assertThatCode(() -> this.permissionService.requireVersionUploader(this.project, 2L))
+			.doesNotThrowAnyException();
+	}
+
 	private static User user(Long id) {
 		User user = User.create(id + "@test.local", "hash", "User " + id);
 		ReflectionTestUtils.setField(user, "id", id);
