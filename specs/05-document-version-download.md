@@ -1,11 +1,12 @@
 # SPEC-05: 문서 버전 조회·다운로드·미리보기
 
-- 상태: **Draft v0.3 (2026-11-04) — 설계 확정(Q1~Q5, P1~P7, A1~A4 사용자 결정 반영). Issue #21·브랜치 생성. 구현 미착수**
+- 상태: **구현·클라우드·CI 검증 완료 (2026-11-04). Windows 검증(AC-VDL-22) 대기. 설계 확정 v0.3(Q1~Q5, P1~P7, A1~A4) 기준. PR 미생성**
 - Issue: [#21](https://github.com/defhoon/Docflow/issues/21)
 - 브랜치: `feat/21/document-version-download`
 - 관련 문서: [`spec.md`](../spec.md) §3, §4.1, §8 US-05, §9, §11, §12, §14, §16.2 / [`specs/03-document-create.md`](./03-document-create.md) §5.4~§5.7, §5.6(D4·프록시 타임아웃), §13 R8 / [`specs/04-document-version-create.md`](./04-document-version-create.md) §5, §6.3(OQ-1), §14 / [`specs/02-project-members.md`](./02-project-members.md) §7.2(D5) / [ADR-0006](../docs/adr/0006-document-preview-conversion.md)(미리보기 변환 엔진), [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §2~§6
 - 작성일: 2026-11-04 (기준 커밋: `main` `bb43b70`, PR #20 병합)
 - 변경 이력:
+  - 구현 (2026-11-04): Phase 1~4 구현·검증, 결과를 §18에 기록. 구현 중 확인한 사항 반영: §7.4 iframe `sandbox` 미사용 근거와 PDF 뷰어 표시 옵션(`#navpanes=0&view=FitH`), §9.1 히스토리 목록 조회 실패는 `role="status"`, §16.2 기술 확인 결과. 정책(Q·P·A) 변경 없음
   - v0.3 (2026-11-04): A1(LibreOffice 프로세스 직접 실행, `DocumentPreviewConverter` 인터페이스)·A2(최초 요청 시 비동기 변환, `202` + 폴링)·A3(버전별 캐시 + 전체 용량 상한 + 미사용 캐시 정리, 원본 삭제 금지, 사용 중 캐시 보호)·A4(CI·Windows 실제 변환 테스트 필수) 결정 반영. 변환 실행 규칙(작업별 디렉터리·프로필, 인수 배열, 최소 권한, 네트워크 제한, 정리), PDF 유효성 검증 방식, AC·테스트 계획 확정. ADR-0006 작성. Issue #21·브랜치 생성
   - v0.2 (2026-11-04): 미리보기를 이 SPEC에 포함(Q1 추천안 미채택). Q2~Q5 결정 반영. 변환 엔진 실측과 대안 비교
   - v0.1 (2026-11-04): 실제 코드 분석을 바탕으로 한 설계 초안(미리보기 제외 추천)
@@ -171,7 +172,8 @@ SPEC-03·04로 문서와 버전 파일을 등록할 수 있지만 사용자는 �
 
 - 미리보기 PDF는 `fetch`로 받아 `type`을 코드에서 `application/pdf`로 고정한 Blob을 만들고, Blob URL을 같은 화면의 `<iframe>`에 넣어 브라우저 내장 PDF 뷰어로 표시한다. 응답 `Content-Type`이 `application/pdf`가 아니면 표시하지 않는다.
 - `X-Frame-Options`는 HTTP 응답 헤더라 Blob URL 문서에 적용되지 않으므로 [기존] `X-Frame-Options: DENY`·`SecurityConfig`를 바꾸지 않는다.
-- `<iframe sandbox>`는 Chromium 내장 PDF 뷰어를 차단할 수 있어 E2E로 확인한다. 뷰어가 동작하는 가장 제한적인 설정을 채택하고, 결과를 §18에 기록한다 [검증 필요].
+- `<iframe sandbox>`: **사용하지 않는다** [확인 2026-11-04]. 실제 브라우저 E2E에서 `sandbox` 값(빈 값, `allow-scripts`, `allow-same-origin`, `allow-scripts allow-same-origin`)을 주면 모두 Chromium 내장 PDF 뷰어가 렌더링되지 않았고, 속성이 없을 때만 렌더링되었다(§18.4). 보호는 Blob 형식 고정(`application/pdf`), 비 PDF 응답 거부, 서버 응답의 `attachment`·`CSP sandbox`·`nosniff`, 브라우저 PDF 뷰어 격리에 의존한다.
+- PDF 뷰어 표시 옵션: Blob URL에 `#navpanes=0&view=FitH`(썸네일 패널 닫기, 폭 맞춤)를 붙인다. 문서 상세의 좁은 영역(약 620px)에서 패널이 열려 있으면 Chromium이 본문 페이지를 그리지 않는 것을 확인했다(§18.4). 지원하지 않는 브라우저는 무시한다.
 - Blob URL은 미리보기를 닫거나 다른 버전으로 바꿀 때, 화면이 숨겨지거나 언마운트될 때 해제한다.
 - 브라우저 내장 뷰어가 E2E에서 동작하지 않으면 PDF.js(`pdfjs-dist`) 도입을 별도 승인 요청한다(R7).
 
@@ -262,6 +264,7 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 - 히스토리 행: `v{N}`(최신 표시), 원본 파일명, 업로더, 업로드 시각, 크기, "미리보기"·"다운로드" 버튼.
 - 미리보기 영역: 선택 안 함 → 불러오는 중 / 변환 중("미리보기를 준비하는 중입니다. 파일에 따라 최대 1분 정도 걸릴 수 있습니다.") → 표시(`<iframe title="v{N} 미리보기">`, 높이 약 80vh, "닫기", "미리보기는 참고용이며 원본 파일이 기준입니다" 안내) → 실패(문구 + 해당 버전 다운로드 버튼).
 - 미리보기는 자동으로 열지 않고 사용자가 누른 버전만 연다.
+- 히스토리 목록 조회 실패는 영역 안에 "목록 다시 불러오기"와 함께 `role="status"`(정중한 알림)로 표시한다. 사용자 동작의 결과가 아닌 배경 조회 실패이기 때문이다. 다운로드·미리보기 실패는 `role="alert"`.
 
 ### 9.2 SPEC-04 연동
 
@@ -470,21 +473,127 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 
 - 정책 미결정 없음.
 - 구현 착수 시 승인 필요: Apache PDFBox `testImplementation` 추가(§12.3, ADR-0006 결정 5).
-- 구현 중 확인할 기술 사항: §6.4 `Accept` 동작, §7.3 LibreOffice 매크로·링크 설정 키, §7.4 `sandbox`와 PDF 뷰어, §10.3 CI 비특권 namespace, §12.3 테스트용 최소 OOXML 변환 가능 여부, §12.5 headless PDF 뷰어. 결과가 이 SPEC과 다르면 보고 후 SPEC을 먼저 갱신한다.
+- 구현 중 확인한 기술 사항 (2026-11-04):
+  - §6.4 `Accept`: 미리 지정한 `Content-Type`으로 응답하므로 `Accept: application/json`·`*/*`·브라우저 기본값·없음 모두 파일을 반환하고, 오류는 JSON이다(통합 테스트). `Accept: text/html`만 보내는 요청의 오류 응답은 [기존] 전역 동작대로 본문을 만들지 못한다(SPEC-05 범위 밖, 브라우저 기본 `Accept`에는 `*/*`가 포함됨).
+  - §7.3 LibreOffice 설정 키: `org.openoffice.Office.Common/Security/Scripting`의 `MacroSecurityLevel`=3·`DisableMacrosExecution`=true·`BlockUntrustedRefererLinks`=true, `org.openoffice.Office.Writer/Content/Update/Link`=2(갱신 안 함), `org.openoffice.Office.Calc/Content/Update/Link`=1(갱신 안 함). LibreOffice 24.2 스키마에서 확인했고, 변환 후 프로필에 값이 유지됨을 확인했다.
+  - §7.4: iframe `sandbox` 미사용, 뷰어 옵션 `#navpanes=0&view=FitH` (위).
+  - §10.3 CI 비특권 namespace: `ubuntu-latest`에서 `kernel.apparmor_restrict_unprivileged_userns=0` 설정 후 `unshare -rn` 사용 가능, CI 미리보기 테스트는 `DOCFLOW_PREVIEW_LAUNCHER=unshare,-rn`으로 실행된다(§18.2).
+  - §12.3 테스트 픽스처: 최소 OOXML 대신 python-docx·openpyxl·python-pptx로 만든 작은 실제 파일(`backend/src/test/resources/preview/`, 형식별 표식 텍스트)을 쓴다. 손상 DOCX는 LibreOffice가 종료 코드 0으로 끝나지만 결과 파일이 없어 `FAILED`로 판정한다.
+  - §12.5 headless PDF 뷰어: Blob iframe 안에 Chromium 내장 PDF 뷰어(`embed type=application/pdf`)가 생성되는 것은 매번 확인되지만, 문서 상세 안 iframe의 화면 캡처는 헤드리스 합성 한계로 일부만 그려지거나 실행마다 다르다(§18.4).
 
 ## 17. 구현 계획 및 체크리스트
 
 1. [x] 설계 결정 Q1~Q5·P1~P7·A1~A4 확정, Draft v0.3·ADR-0006 작성 (2026-11-04)
 2. [x] GitHub Issue #21, 브랜치 `feat/21/document-version-download` 생성 (2026-11-04)
-3. [ ] 구현 착수 승인, PDFBox 테스트 의존성 승인
-4. [ ] Backend 1: `FileStorage` 읽기, 목록·다운로드 API + 단위·통합·실제 HTTP 테스트
-5. [ ] Backend 2: 변환기·캐시·미리보기 서비스·API + 단위·실제 변환 통합 테스트
-6. [ ] CI: LibreOffice·한글 글꼴 설치 단계, 실제 변환 테스트 통과 확인
-7. [ ] Frontend: 히스토리·다운로드·미리보기 + Vitest
-8. [ ] 클라우드 회귀·실제 브라우저 E2E → §18
-9. [ ] Windows 검증(사용자) → §18
-10. [ ] 문서(README 설치 안내·`docs/architecture.md`), PR (`Closes #21`), 병합은 사용자
+3. [x] 구현 착수 승인, PDFBox 테스트 의존성 승인 (2026-11-04)
+4. [x] Backend 1: `FileStorage` 읽기, 목록·다운로드 API + 단위·통합·실제 HTTP 테스트
+5. [x] Backend 2: 변환기·캐시·미리보기 서비스·API + 단위·실제 변환 통합 테스트
+6. [x] CI: LibreOffice·한글 글꼴 설치, 네트워크 격리 래퍼, 실제 변환 테스트 통과
+7. [x] Frontend: 히스토리·다운로드·미리보기 + Vitest
+8. [x] 클라우드 회귀·실제 브라우저 E2E → §18
+9. [ ] Windows 검증(사용자, §18.6) → §18
+10. [x] 문서(README 설치 안내·`docs/architecture.md`·ADR-0006 구현 결과)
+11. [ ] PR (`Closes #21`), 병합은 사용자
 
 ## 18. 검증 결과
 
-**미실행.** 설계 단계이다. §10.2·§10.3의 [실측] 값은 설계 근거로 클라우드에서 측정한 것이며 구현 검증이 아니다.
+실행한 결과만 기록한다.
+
+### 18.1 요약
+
+| 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
+| --- | --- | --- | --- |
+| Backend build·test | 성공, 360개 통과(기존 299 + 신규 61), 실제 LibreOffice 변환 포함 | 성공 (§18.2) | 미실행 |
+| Frontend lint·`tsc`·test·build | 성공, Vitest 228개(기존 198 + 신규 30) | 성공 (§18.2) | 미실행 |
+| 실제 브라우저 E2E (§12.5) | 19/19 통과 (§18.4, 시각 확인 한계 있음) | — | — |
+
+### 18.2 실행 환경
+
+- 클라우드: Linux, OpenJDK 21(toolchain 21, CI는 JDK 25), PostgreSQL 16.15, LibreOffice 24.2.7, 한글 글꼴(WenQuanYi), Node 22, Chromium(Playwright, 전체 Chromium new headless), 변환 격리 `unshare -rn` 사용 가능.
+- CI(`ubuntu-latest`): LibreOffice Writer·Calc·Impress + `fonts-noto-cjk` 설치 단계(약 18초), `unshare -rn` 사용 가능하도록 AppArmor 사용자 namespace 제한 해제 후 `DOCFLOW_PREVIEW_LAUNCHER=unshare,-rn` 설정(로그에서 확인). 실제 변환 테스트는 격리 래퍼 안에서 실행되었다.
+- Backend 테스트 수 증가: 단위(파일명 헤더, 저장소 읽기, 캐시, 미리보기 서비스, 변환기), 통합(조회·다운로드, 실제 HTTP, 미리보기 실제 변환, 엔진 없음).
+
+### 18.3 AC별 결과
+
+| AC | 근거 | 결과 |
+| --- | --- | --- |
+| AC-VDL-01 | `DocumentVersionQueryIntegrationTest.listsVersionsNewestFirstWithUploaderAndNoInternals`, E2E 1·8 | 통과 |
+| AC-VDL-02 | 목록·다운로드·미리보기 통합 테스트의 내부 정보 단언, 엔진 없음 테스트(엔진 경로 미노출) | 통과 |
+| AC-VDL-03 | `downloadsOriginalBytesWithSafeHeaders`(4개 형식), `downloadsPreviousVersion`, E2E 2 | 통과 |
+| AC-VDL-04 | `DocumentFileResponseTest`(한글·`"`·`;`·`%`·이모지), 통합 헤더 단언 | 통과 |
+| AC-VDL-05 | `accessAndOwnershipAreCheckedForListAndDownload`, `previewChecksAccessEvenWhenCached`, E2E 9 | 통과 |
+| AC-VDL-06 | `everyStatusAllowsListAndDownload`(5개 상태) | 통과 |
+| AC-VDL-07 | `DocumentVersionDownloadHttpIntegrationTest.streams20MiBDownloadWithMatchingHash`, E2E 7(20MiB UI·19MiB Next.js 경유) | 통과 |
+| AC-VDL-08 | `missingOrResizedStoredFileIsUnavailable`(JSON, 원인 로그) | 통과 |
+| AC-VDL-09 | `clientAbortDuringDownloadIsNotLoggedAsError`(예외 처리를 빼면 실패함을 확인) | 통과 |
+| AC-VDL-10 | `previewsAllFourFormatsAsValidPdfWithoutTouchingOriginals`(PDF 원본 바이트 일치), 서비스 단위 테스트 | 통과 |
+| AC-VDL-11 | 같은 테스트: DOCX·XLSX·PPTX `202` 후 `200`, PDFBox로 1페이지 이상·형식별 표식 텍스트 확인, 두 번째 요청 캐시, 변환 3회. `LibreOfficePreviewConverterTest` 실제 변환 3종 | 통과 |
+| AC-VDL-12 | 같은 테스트: 원본 SHA-256·DB 행 불변, 결과는 `previews/cache`에만 | 통과 |
+| AC-VDL-13 | `unconvertibleDocumentFailsButOriginalDownloadStillWorks`(422 후 다운로드), `DocumentPreviewEngineUnavailableIntegrationTest`(503, PDF 미리보기·다운로드 정상), 서비스 단위(결과 무효·크기 초과·시간 초과 재시도), 변환기(실제 시간 초과 후 프로세스 없음, 가짜 엔진 하위 프로세스 종료) | 통과 |
+| AC-VDL-14 | `concurrentPreviewRequestsTriggerOneConversion`(실제 엔진, 변환 1회), 서비스 단위(동시 1개·대기열 초과 503) | 통과 |
+| AC-VDL-15 | `PreviewCacheTest`(LRU 90%, 미사용 정리, 사용 중·방금 등록 보호, 원본 보호, 재시작 색인) | 통과 |
+| AC-VDL-16 | 변환기 단위(인수 배열·프로필·최소 환경), 격리 래퍼 실제 변환(클라우드·CI), 래퍼 실패 시 사용 불가(대체 실행 없음), 서비스 시작 시 작업 디렉터리 정리 | 통과 |
+| AC-VDL-17 | 통합(헤더 유지) + E2E 3·4: 4개 형식 모두 Blob iframe에 Chromium 내장 PDF 뷰어 생성, 응답 `X-Frame-Options: DENY`·`nosniff`·`CSP sandbox` 유지, `SecurityConfig` 변경 없음. iframe `sandbox`는 사용하지 않음(§7.4) | 통과 (시각 확인 한계 §18.4) |
+| AC-VDL-18 | Vitest: `DocumentVersionHistory`·`DocumentVersionPreview`·`DocumentDetailVersionHistory`·`version-files` 테스트 | 통과 |
+| AC-VDL-19 | Vitest(등록 후 목록 재조회), E2E 8 | 통과 |
+| AC-VDL-20 | E2E 19/19 (§18.4) | 통과 (시각 확인 한계 §18.4) |
+| AC-VDL-21 | CI(LibreOffice 설치·격리 래퍼·실제 변환 테스트 포함) | 통과 |
+| AC-VDL-22 | Windows | **미실행 (사용자, §18.6)** |
+| AC-VDL-23 | 기존 Backend 299개·Frontend 198개 수정 없이 통과(기존 파일 변경 없음) | 통과 |
+
+### 18.4 클라우드 실제 브라우저 E2E (2026-11-04)
+
+경로: Chromium(Playwright, 전체 Chromium new headless, UTF-8 로케일) → Next.js `next start` → Spring Boot jar(`unshare -rn` 격리, LibreOffice) → PostgreSQL. 결과 19/19:
+
+1. 히스토리 표시(v1·최신·파일명·업로더)
+2. 한글 파일명 다운로드: `suggestedFilename` = "요구사항 명세서.pdf", SHA-256 일치
+3. PDF·DOCX·XLSX·PPTX 미리보기: Office는 "준비하는 중" 문구 후 표시(약 2초), 4개 형식 모두 Blob iframe에 Chromium 내장 PDF 뷰어(`embed type=application/pdf`) 생성, 다시 열면 캐시로 0.1초 이내 표시
+4. 미리보기 응답 `X-Frame-Options: DENY`·`nosniff`·`CSP: default-src 'none'; sandbox`·`application/pdf`, 변환 중 `202` 관찰
+5. iframe `sandbox` 비교: 속성 없음만 렌더링, 빈 값·`allow-scripts`·`allow-same-origin`·`allow-scripts allow-same-origin`은 렌더링되지 않음
+6. 변환 실패 문서: 실패 안내 + 원본 다운로드(파일명·내용 일치)
+7. 20MiB UI 다운로드 SHA-256 일치, 19MiB Next.js 경유 다운로드 SHA-256 일치
+8. 새 버전 등록 후 히스토리 v2 최신 반영
+9. 비구성원 화면 "프로젝트를 찾을 수 없습니다." + 캐시가 있는 버전의 미리보기 API `404`
+10. Office 캐시는 `previews/cache`에만, 작업 디렉터리 없음, 원본 파일 존재
+
+**시각 확인 한계와 발견 사항:**
+
+- 헤드리스 Chromium은 문서 상세 안의 PDF 뷰어 iframe을 화면 캡처에 일부만 그리며 결과가 실행마다 달랐다. 그래서 E2E 판정은 매번 같은 신호(Blob iframe + 내장 PDF 뷰어 생성)로 하고 픽셀 통계는 기록만 했다. 같은 Blob을 같은 폭(624px)의 단독 iframe(`#navpanes=0&view=FitH`)과 최상위 열기로 표시했을 때는 변환 문서의 한글 텍스트까지 완전히 렌더링되는 것을 화면으로 확인했다. **문서 상세 안에서 본문 글자까지 보이는지는 실제 데스크톱 브라우저(Windows Chrome·Edge)에서 확인이 필요하다(§18.6).**
+- 클라우드 컨테이너에 로케일이 없으면 Chromium이 비 ASCII 다운로드 파일명을 "download"로 바꿨다. UTF-8 로케일에서는 원본 파일명이 유지된다. 앱 문제가 아닌 실행 환경 특성이다.
+- 좁은 영역에서 썸네일 패널이 열려 있으면 Chromium이 본문 페이지를 그리지 않아 뷰어 옵션을 추가했다(§7.4, 커밋 `29d02e0`).
+
+### 18.5 미실행·남은 항목
+
+- AC-VDL-22 Windows 검증(사용자): §18.6.
+- 실제 데스크톱 브라우저에서 문서 상세 안 미리보기 본문 표시 확인(§18.4 한계). Windows 수동 확인 권장 항목으로 §18.6에 포함한다.
+- Firefox·Safari·모바일 브라우저 미확인(R7).
+
+### 18.6 Windows 검증 명령과 기대 결과 (사용자)
+
+1. LibreOffice 설치와 확인 (PowerShell):
+
+   ```powershell
+   winget install --id TheDocumentFoundation.LibreOffice -e   # 또는 공식 설치 파일
+   & "C:\Program Files\LibreOffice\program\soffice.exe" --version   # LibreOffice 버전 출력
+   ```
+
+   기본 경로가 아니면 `$env:DOCFLOW_PREVIEW_SOFFICE_PATH = "<soffice.exe 경로>"`.
+2. Backend 전체 빌드 (전용 테스트 DB):
+
+   ```powershell
+   cd backend
+   $env:DB_URL = "jdbc:postgresql://localhost:5432/docflow_test"; $env:DB_USERNAME = "docflow"; $env:DB_PASSWORD = "<비밀번호>"
+   .\gradlew.bat clean build --rerun-tasks --console=plain
+   ```
+
+   기대: `BUILD SUCCESSFUL`. 테스트 결과(`build\test-results\test\*.xml`) 합계 360개, 실패·오류 0. Windows에서는 Linux 전용 테스트 3개(`LibreOfficePreviewConverterTest`의 가짜 엔진 하위 프로세스 종료, 격리 래퍼 실패, `unshare` 격리)가 `skipped`로 집계된다(실제 LibreOffice 변환·시간 초과 테스트는 실행됨).
+3. 미리보기 테스트만 다시 실행해 결과 확인:
+
+   ```powershell
+   .\gradlew.bat test --tests "com.docflow.document.preview.*" --tests "com.docflow.document.DocumentPreviewIntegrationTest" --tests "com.docflow.document.DocumentPreviewEngineUnavailableIntegrationTest" --rerun --console=plain
+   Get-Process soffice* -ErrorAction SilentlyContinue   # 출력 없음 (남은 LibreOffice 프로세스 없음)
+   ```
+
+   기대: `BUILD SUCCESSFUL`, 실패·오류 0.
+4. Frontend: `npm ci`, `npm run lint`, `npx tsc --noEmit`, `npx vitest run`(228개 통과), `npm run build`.
+5. 권장 수동 확인(브라우저): Backend·Frontend 실행 후 Chrome 또는 Edge에서 문서 상세 → 각 형식 "미리보기" → 본문 글자가 보이는지, "다운로드" 시 한글 파일명으로 저장되는지.

@@ -63,3 +63,11 @@ SPEC-05는 PDF·DOCX·XLSX·PPTX 네 형식 모두의 브라우저 미리보기�
 - 단점: LibreOffice 설치가 개발·CI·배포의 전제 조건이 된다. CI Backend Job 시간이 늘어난다. 변환 품질은 글꼴과 문서 복잡도에 따라 달라지며, 미리보기는 참고용이고 원본 다운로드가 기준이다.
 - 위험: §결정 3의 잔여 위험. 단일 인스턴스 가정(작업·실패 상태는 메모리). 대용량 문서 변환 실패.
 - 재검토 조건: 배포 환경 결정, 다중 인스턴스 운영, 변환 실패율·시간이 사용성에 문제가 될 때, LibreOffice 보안 공지.
+
+## 구현 결과 (2026-11-04, Issue #21)
+
+- 구현: `LibreOfficePreviewConverter`(인수 배열, 작업별 디렉터리·프로필, 매크로·링크 갱신 비활성화 프로필 설정, 최소 환경 변수, 래퍼 앞붙임, 시간 초과 시 프로세스 트리 종료), `DocumentPreviewService`(single-flight, 동시 1·대기열 10, 결과 검증, 실패 기록, 시작 시 작업 디렉터리 정리), `PreviewCache`(용량 상한 LRU·미사용 정리·사용 중 보호).
+- 격리 래퍼 동작: `docflow.preview.launcher`가 비어 있으면 격리 없이 실행하고 WARN 로그를 남긴다. 지정했는데 자체 점검(`--version`)이 실패하면 ERROR 로그를 남기고 Office 미리보기를 끈다(503). 격리 없이 대체 실행하지 않는다.
+- CI: `ubuntu-latest`는 AppArmor가 비특권 사용자 namespace를 막는다. 워크플로에서 `kernel.apparmor_restrict_unprivileged_userns=0`으로 바꾼 뒤 `unshare -rn`을 확인하고 `DOCFLOW_PREVIEW_LAUNCHER=unshare,-rn`으로 실제 변환 테스트를 실행한다. 사용할 수 없으면 워크플로 경고를 남긴다.
+- 테스트 의존성: Apache PDFBox 3.0.5 `testImplementation`(승인 2026-11-04). 운영 의존성에는 없다.
+- 검증 결과와 한계는 SPEC-05 §18.
