@@ -1,6 +1,6 @@
 # DocFlow 아키텍처 개요
 
-> 기준: 6주차 프로젝트 초기화 (2026-10-14), SPEC-03 문서 등록 반영 (2026-10-28). 요구사항과 범위는 [`spec.md`](../spec.md) Draft v0.2를 따른다.
+> 기준: 6주차 프로젝트 초기화 (2026-10-14), SPEC-03 문서 등록 반영 (2026-10-28), SPEC-04 문서 버전 등록 반영 (2026-11-04). 요구사항과 범위는 [`spec.md`](../spec.md) Draft v0.2를 따른다.
 > 결정 근거는 [`docs/adr/`](./adr)를 참고한다.
 
 ## 1. 시스템 구성
@@ -41,12 +41,12 @@ docflow/
 │       └── features/
 │           ├── auth/          # AuthProvider, api, LoginForm, RequireAuth, LogoutButton
 │           ├── projects/      # api, types, validation(§5.5 입력 규칙), ProjectList, ProjectCreateForm, ProjectDetail, ProjectMembers, AddMemberForm
-│           ├── documents/     # api(FormData 등록), types, validation(제목·설명·파일 사전 검사), DocumentList, DocumentCreateForm, DocumentDetail
+│           ├── documents/     # api(FormData 등록·새 버전), types, validation(제목·설명·파일 사전 검사), errors, DocumentList, DocumentCreateForm, DocumentDetail, DocumentVersionUploadForm
 │           └── backend-health/
 ├── docs/
 │   ├── architecture.md
 │   └── adr/0001~0005
-├── specs/                     # README.md, 00-auth.md (SPEC-AUTH), 01-project-create.md (SPEC-01), 02-project-members.md (SPEC-02), 03-document-create.md (SPEC-03)
+├── specs/                     # README.md, 00-auth.md (SPEC-AUTH), 01-project-create.md (SPEC-01), 02-project-members.md (SPEC-02), 03-document-create.md (SPEC-03), 04-document-version-create.md (SPEC-04)
 ├── docker-compose.yml         # PostgreSQL 16
 ├── .env.example               # 환경변수 예시 (.env는 Git 제외)
 ├── spec.md
@@ -87,7 +87,7 @@ docflow/
 - `projects.owner_id`는 `users.id` FK(`ON DELETE RESTRICT`)이며, 목록 조회용 인덱스 `(owner_id, created_at DESC, id DESC)`와 공백 이름 방지 `CHECK`가 있다.
 - `project_members`(SPEC-02)는 MEMBER만 저장한다(Owner는 `projects.owner_id`). `project_id` FK(`ON DELETE CASCADE`), `user_id` FK(`ON DELETE RESTRICT`), `UNIQUE (project_id, user_id)`(`uk_project_members_project_user`), `user_id` 인덱스가 있다. 구성원 제거는 행을 물리 삭제한다.
 - `documents`(SPEC-03): `project_id`·`created_by` FK(`RESTRICT`), 상태 `CHECK`(5개 값, 기본 `DRAFT`), 제목 공백 금지 `CHECK`, 목록 인덱스 `(project_id, created_at DESC, id DESC)`.
-- `document_versions`(SPEC-03): `document_id`·`uploaded_by` FK(`RESTRICT`), `UNIQUE (document_id, version_number)`, `UNIQUE (storage_key)`, 버전 ≥ 1·크기 > 0·SHA-256 소문자 hex 64자·파일명 공백 금지 `CHECK`. SPEC-03은 v1만 만든다. 최신 버전은 `MAX(version_number)`로 계산하며 포인터 컬럼이 없다.
+- `document_versions`(SPEC-03): `document_id`·`uploaded_by` FK(`RESTRICT`), `UNIQUE (document_id, version_number)`, `UNIQUE (storage_key)`, 버전 ≥ 1·크기 > 0·SHA-256 소문자 hex 64자·파일명 공백 금지 `CHECK`. SPEC-03은 v1을, SPEC-04는 v2 이상을 만든다. 최신 버전은 `MAX(version_number)`로 계산하며 포인터 컬럼이 없다.
 - Entity ID는 `BIGINT GENERATED ALWAYS AS IDENTITY`로 확정했다(ADR-0005).
 
 ### 문서 파일 저장과 업로드 흐름 (SPEC-03)
@@ -108,7 +108,25 @@ Browser ─ FormData(title, description, file) ─▶ Next.js rewrite (본문 �
 - 저장소 인터페이스는 `FileStorage`, 구현은 로컬 파일시스템 `LocalFileStorage`다(ADR-0001 Q2). 저장 루트는 `DOCFLOW_STORAGE_DIR`(기본 `./storage`, `backend/`에서 실행 시 `backend/storage`, Git 제외)이다.
 - 저장 키는 서버가 만든 `documents/<UUID>`이며 원본 파일명을 경로에 쓰지 않는다. 저장 키와 서버 경로, SHA-256, Content Type은 API 응답에 넣지 않는다.
 - DB 트랜잭션은 파일이 최종 위치에 놓인 뒤에만 시작하므로 "DB 행은 있는데 파일이 없는" 상태는 생기지 않는다. 반대로 프로세스 강제 종료나 보상 삭제 실패 시 고아 파일이 남을 수 있으며 자동 정리는 없다(MVP 잔여 위험).
+- 파일 수신·검증·배치는 `DocumentFileIntake`, 보상 등록 후 트랜잭션 실행은 `StoredFileTransaction`이 담당하며 문서 등록과 새 버전 등록이 함께 쓴다(Spring Bean이 아닌 일반 객체, SPEC-04 결정 I1).
 - **알려진 제한사항(SPEC-03 결정 D4-1, 미해결):** Tomcat은 요청 상한(21MB)을 넘는 요청을 본문 수신 전에 `413`으로 응답하고 연결을 닫는다. 이때 Next.js rewrite 프록시가 업로드 중인 클라이언트 요청을 끊어, 브라우저는 `413` 대신 연결 오류(`Failed to fetch`)를 받을 수 있다. 정상 화면은 20MB 초과 파일을 전송 전에 막고, 연결 오류 시 파일 크기 확인 안내를 표시한다. 모든 초과 요청에서 `413` 전달을 보장하지 않는다.
+
+### 새 버전 등록 흐름 (SPEC-04)
+
+```text
+DocumentVersionController ─▶ DocumentVersionService
+  1. 프로젝트 접근 확인(404) → 새 버전 등록 권한(requireVersionUploader, OWNER·MEMBER)
+  2. 문서 조회(projectId + documentId, 404) → 상태 사전 확인(DRAFT·CHANGES_REQUESTED 외 409)
+  3. 파일 수신·검증·CREATE_NEW 배치 (DocumentFileIntake, 문서 등록과 동일)
+  4. DB 트랜잭션(StoredFileTransaction, 보상 등록)
+     4-1. 문서 행 잠금: SELECT … FROM documents WHERE id=? AND project_id=? FOR NO KEY UPDATE (join 없음, users 행 미잠금)
+     4-2. 상태 재검증(409 → 롤백 → 보상 삭제)
+     4-3. MAX(version_number) + 1 → DocumentVersion INSERT
+     4-4. documents.updated_at 갱신(flush) → 커밋 → 201 + 갱신된 DocumentResponse
+```
+
+- 같은 문서의 동시 등록은 문서 행 잠금으로 직렬화되어 번호가 중복·누락 없이 할당된다. 잠금은 파일 배치가 끝난 뒤의 짧은 DB 작업 동안만 잡으며 잠금 대기 상한은 두지 않는다(OQ-4). 잠금을 기다리는 요청은 커넥션을 하나씩 점유한다.
+- 문서 상태는 바꾸지 않는다. 예상하지 못한 `uk_document_versions_document_version` 위반은 원인 로그(`projectId`·`documentId`·`versionNumber`·제약 이름·`storageKey`)를 남기고 `500`으로 응답한다.
 
 ## 6. 보안 관련 현재 상태
 
@@ -129,11 +147,11 @@ Browser ─ FormData(title, description, file) ─▶ Next.js rewrite (본문 �
   - OWNER·MEMBER 모두 허용하고, 비구성원은 `404 PROJECT_NOT_FOUND`다. 문서는 항상 경로의 `projectId`와 `documentId`를 함께 조건으로 조회해 다른 프로젝트 문서 ID는 `404 DOCUMENT_NOT_FOUND`로 응답한다(IDOR 방어).
   - 형식·파일명·빈 파일 오류는 `400 VALIDATION_FAILED` + `fieldErrors[file]`, 크기 초과는 `413 FILE_TOO_LARGE`, 저장·DB 오류는 내부 경로 없는 `500 INTERNAL_ERROR`다.
   - CSRF 헤더 없이 크기를 초과한 요청은 CSRF 판단 전에 multipart 해석이 일어나 Spring Boot 기본 오류 형식의 `413`을 받는다(정상 SPA 요청은 해당 없음).
+- 새 버전 API(SPEC-04 §6): `POST /api/projects/{projectId}/documents/{documentId}/versions`(multipart `file`만, 구성원, `201` + `Location`은 문서 상세). 허용되지 않은 상태는 `409 DOCUMENT_STATUS_CONFLICT`(본문에 상태 값 없음), 그 밖의 오류 계약은 문서 등록과 같다.
 - MVP 한계: `/me` 이외의 보호 API는 요청마다 계정 활성 여부를 다시 확인하지 않는다. 로그인 실패 횟수 제한이 없다.
 
 ## 7. 다음 단계에서 추가될 요소 (미생성)
 
 | 시점 | 추가 요소 |
 | --- | --- |
-| SPEC-04 Version 등록 | 다음 버전 번호 할당과 동시 등록 처리 (`FileStorage`·형식 검증·보상 규칙은 SPEC-03 구현 재사용) |
 | SPEC-05 Version 조회 | 버전 목록, 파일 다운로드 |

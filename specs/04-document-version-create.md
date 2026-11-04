@@ -1,12 +1,13 @@
 # SPEC-04: 문서 버전 등록
 
-- 상태: **Draft v0.2 (2026-11-04) — 설계 결정 V1~V8 승인, 미결정 OQ-1~10 결정 반영. 사용자 검토 승인(2026-11-04). Issue #19·브랜치 생성. 구현 결정 I1~I7 승인(2026-11-04), 구현 진행 중**
+- 상태: **Draft v0.2 (2026-11-04) — 설계 결정 V1~V8 승인, 미결정 OQ-1~10 결정 반영. 사용자 검토 승인(2026-11-04). Issue #19·브랜치 생성. 구현 결정 I1~I7 승인(2026-11-04). 구현·클라우드·CI 검증 완료, Windows 자동 검증(AC-VER-18) 대기**
 - Issue: [#19](https://github.com/defhoon/Docflow/issues/19)
 - 브랜치: `feat/19/document-version-create`
 - 관련 문서: [`spec.md`](../spec.md) §3, §6.1, §7.1, §8 US-05, §9, §12, §13, §14, §16.2 / [`specs/03-document-create.md`](./03-document-create.md) §5.1~§5.7, §6, §7, §8, §12, §13, §16 / [`specs/02-project-members.md`](./02-project-members.md) §7.2(D5), §10(잠금 대기 기법) / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §2~§6
 - 작성일: 2026-11-04 (기준 커밋: `main` `a140a94`)
 - 변경 이력:
   - v0.1 (2026-11-04): 설계 결정 V1~V8(사용자 승인)을 반영한 상세 명세 초안
+  - 구현 (2026-11-04): Backend·Frontend 구현, 클라우드 테스트·E2E·CI 결과를 §17에 기록. 구현 중 확인한 사항(§13.2 잠금 SQL·`updated_at`·AC-VER-10 재현, §9.2 안내 문구, §11.5 테스트 컨텍스트 정리)을 반영. V1~V8·OQ-1~10·I1~I7 변경 없음
   - 구현 결정 (2026-11-04): 사용자가 구현 결정 I1~I7을 승인(§15.4). V1~V8·OQ-1~10 변경 없음
   - v0.2 승인 (2026-11-04): 사용자가 Draft v0.2 검토를 승인(V1~V8·OQ-1~10, AC 판정 규칙: AC-VER-01~16 클라우드·CI, AC-VER-17 클라우드 실제 브라우저 E2E, AC-VER-18 Windows 자동 테스트·빌드 필수, AC-VER-19 회귀·CI 필수). Issue #19, 브랜치 `feat/19/document-version-create` 생성
   - v0.2 (2026-11-04): OQ-1~10 결정(사용자 승인)을 반영. 응답 계약 유지(OQ-1), 409 본문에 상태 값 미포함(OQ-2), 잠금 후 구성원 재확인 없음(OQ-3), 잠금 대기 상한 없음·대기 시간 측정 기록(OQ-4), `DocumentVersionController` 신설(OQ-5), 문서 상세 화면 배치(OQ-6), 허용되지 않은 상태에서 UI 비활성화+안내(OQ-7), 네트워크 오류 안내 문구 확정·자동 재시도 없음(OQ-8), Windows 실제 브라우저 수동 E2E는 후속 Issue로 추적(OQ-9), `spec.md` §16.2에 APPROVED 잠정 거부 명시(OQ-10). 관련 API·Frontend·AC·테스트 갱신. V1~V8 변경 없음
@@ -312,7 +313,7 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 - 전송: `FormData`에 `file`만 넣는다. [기존] `api-client` 사용.
 - 제출 중 버튼·입력 비활성화, 연속 제출 차단([기존] SPEC-03 패턴) [결정 V7].
 - 성공: 응답 `DocumentResponse`로 상세 화면의 최신 버전 정보를 갱신하고, 파일 입력을 비우고(`key` 재마운트), 성공 문구(예: "새 버전 v2를 등록했습니다.")를 표시한다. 다른 경로로 이동하지 않는다.
-- 상태 표시: 문서 상태가 `DRAFT`·`CHANGES_REQUESTED`가 아니면 등록 영역(파일 입력·버튼)을 **비활성화하고 안내 문구**(예: "현재 문서 상태에서는 새 버전을 등록할 수 없습니다.")를 표시한다 [결정 OQ-7]. 이는 사용성 보조이며 **Backend가 상태를 최종 검증한다**(§7.2). 화면 표시 후 상태가 바뀌어 제출이 `409`가 되면 §9.3대로 표시한다.
+- 상태 표시: 문서 상태가 `DRAFT`·`CHANGES_REQUESTED`가 아니면 등록 영역(파일 입력·버튼)을 **비활성화하고 안내 문구**(예: "현재 문서 상태에서는 새 버전을 등록할 수 없습니다.")를 표시한다 [결정 OQ-7]. 구현 문구: "초안 또는 수정 요청 상태의 문서에만 새 버전을 등록할 수 있습니다."(`409` 문구와 같은 문장이 한 화면에 두 번 나오지 않도록 예시 문구 대신 사용). 이는 사용성 보조이며 **Backend가 상태를 최종 검증한다**(§7.2). 화면 표시 후 상태가 바뀌어 제출이 `409`가 되면 §9.3대로 표시한다.
 - 자동 재시도: 네트워크 오류 시 요청을 자동으로 다시 보내지 않는다 [결정 OQ-8]. [기존] `api-client`의 `403 CSRF_INVALID` 1회 재시도는 서버가 요청을 거부해 아무것도 저장하지 않은 경우에만 동작하므로 이 원칙과 충돌하지 않는다.
 - `<Activity>` 재진입: 상세 화면을 떠났다가 다시 들어오면 파일 입력과 제출 상태가 초기화되어야 한다([기존] SPEC-03 교훈).
 
@@ -405,6 +406,7 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 
 - Backend: SPEC-AUTH·01·02·03 기존 테스트 전체(기준: `main` `a140a94`에서 254개). 공통 컴포넌트 추출 후에도 SPEC-03 테스트가 **수정 없이** 통과해야 한다(테스트 수정이 필요하면 사유를 보고하고 승인 후 진행).
 - Frontend: 기존 169개 전체, lint, typecheck, `next build`.
+- [구현 확인] 테스트 컨텍스트마다 Hikari 풀(기본 10개)이 열리므로, 신규 SPEC-04 통합 테스트 4개 클래스를 기존 컨텍스트 7개에 더하면 PostgreSQL 기본 `max_connections`(100, CI 서비스 컨테이너 동일)를 넘어 컨텍스트 로딩이 실패했다. 설정을 바꾸지 않고 신규 클래스에 `@DirtiesContext`를 붙여 클래스 종료 시 컨텍스트를 닫는다. 기존 테스트는 수정하지 않았다.
 
 ### 11.6 클라우드 실제 경로 E2E (필수)
 
@@ -474,10 +476,13 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 ### 13.2 구현 제약 [검증 필요]
 
 - **잠금 쿼리 형태**: [기존] `DocumentRepository.findByIdAndProjectId`는 `join fetch d.createdBy`를 쓴다. 여기에 비관적 잠금을 붙이면 PostgreSQL이 `users` 행까지 잠글 수 있으므로 join 없는 별도 잠금 조회를 둔다. Hibernate가 만드는 잠금 SQL(`FOR UPDATE` 또는 `FOR NO KEY UPDATE`)과 두 등록 트랜잭션의 실제 직렬화를 구현 시 로그·테스트로 확인한다.
+  - **[확인 2026-11-04, I3]** Hibernate 7.4.5 실제 SQL: `select … from documents d1_0 where d1_0.id=? and d1_0.project_id=? for no key update of d1_0` (join 없음). 잠금 보유 중 다른 연결에서 작성자 `users` 행 `FOR NO KEY UPDATE NOWAIT` 성공, `documents` 행은 `55P03`. `DocumentVersionConcurrencyIntegrationTest.lockQueryLocksOnlyTheDocumentRow`가 SQL 형태와 잠금 범위를 회귀 검증한다.
 - **`updated_at` 갱신**: `@LastModifiedDate`는 엔티티가 변경될 때만 동작한다. 도메인 메서드로 명시적 변경(예: 갱신 시각 필드를 바꾸는 메서드) 또는 JPQL 벌크 UPDATE 중 하나를 구현 시 선택하고, 응답 `updatedAt`과 DB 값이 일치함을 확인한다. 벌크 UPDATE는 영속성 컨텍스트 동기화에 주의한다.
+  - **[확인, I2]** `BaseTimeEntity.markModified()`로 변경 상태를 만들고 트랜잭션 안에서 flush한다. 응답 `updatedAt`과 DB 값이 마이크로초 정밀도에서 일치함을 통합 테스트로 확인했다.
 - **TOCTOU**: 접근 확인은 트랜잭션 밖(readOnly)에서 일어나므로 상태 판정은 잠금 트랜잭션 안에서 다시 한다(§7.2).
 - **리팩터링 회귀**: 공통 컴포넌트 추출은 SPEC-03 경로(보상, 시나리오 A·B, 크기 경계, Windows 소켓 테스트)를 건드린다. SPEC-03 테스트가 수정 없이 통과해야 한다.
 - **예상하지 못한 UNIQUE 위반 재현**: 정상 경로에서는 잠금 때문에 발생하지 않으므로 재현 방법(테스트 대역 등)을 구현 시 정한다(AC-VER-10).
+  - **[확인, I3]** Mock 없이 재현했다: 별도 연결이 문서 잠금 없이 `(document_id, 2)` 행을 미커밋 INSERT → 요청은 잠금 획득(FK의 `FOR KEY SHARE`와 충돌 없음)·MAX=1 계산 후 INSERT에서 대기 → 별도 연결 커밋 → 실제 `23505 uk_document_versions_document_version` → `500`, 롤백, 보상 삭제, ERROR 원인 로그.
 - **테스트 DB 격리**: 버전 행이 늘어나므로 정리 순서 유지, 전용·빈 테스트 DB 원칙 유지([기존] R20).
 
 ### 13.3 잔여 위험
@@ -565,23 +570,82 @@ V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸�
 2. [x] OQ-1~10 결정 반영 (Draft v0.2, 2026-11-04)
 2-1. [x] Draft v0.2 최종 검토 승인 (사용자, 2026-11-04)
 3. [x] GitHub Issue #19 생성, 브랜치 `feat/19/document-version-create` 생성 (2026-11-04, 사용자 승인)
-4. [ ] Backend: 공통 컴포넌트 추출(SPEC-03 회귀 확인) → `DocumentVersionService`·잠금 조회·권한 메서드·오류 코드·Controller + 단위·통합·동시성 테스트
-5. [ ] Frontend: 문서 상세 새 버전 등록 영역 + Vitest
-6. [ ] 클라우드 전체 테스트·빌드, 클라우드 실제 경로 E2E (§11.6) → §17 기록
-7. [ ] CI 확인
+4. [x] Backend: 공통 컴포넌트 추출(SPEC-03 회귀 확인) → `DocumentVersionService`·잠금 조회·권한 메서드·오류 코드·Controller + 단위·통합·동시성 테스트 (2026-11-04)
+5. [x] Frontend: 문서 상세 새 버전 등록 영역 + Vitest (2026-11-04)
+6. [x] 클라우드 전체 테스트·빌드, 클라우드 실제 경로 E2E (§11.6) → §17 기록 (2026-11-04)
+7. [x] CI 확인 (`e8c5bd0` 성공, 이후 문서 커밋은 PR에서 재확인)
 8. [ ] Windows 자동 테스트·빌드 (사용자, §11.7) → §17 기록
-9. [ ] 문서: README, `docs/architecture.md`, 이 SPEC §17
+9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §17
 10. [ ] PR (`Closes #19`), 병합은 사용자
 11. [ ] Windows 실제 브라우저 수동 E2E 후속 Issue 생성 (구현 완료 시점, 별도 승인 후) [결정 OQ-9]
 
 ## 17. 검증 결과
 
-**미실행.** 설계 문서 단계이며 구현과 테스트를 시작하지 않았다.
+실행한 결과만 기록한다. 실행하지 않은 검증은 "미실행"으로 둔다.
+
+### 17.1 요약
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 미실행 | 미실행 | 미실행 |
-| Frontend lint·test·build | 미실행 | 미실행 | 미실행 |
-| 클라우드 실제 경로 E2E (§11.6) | 미실행 | — | — |
+| Backend build·test | 성공, 299개 통과(기존 254 + 신규 45) | 성공 (`e8c5bd0`, run 67) | 미실행 |
+| Frontend lint·test·build | 성공, Vitest 198개(기존 169 + 신규 29), `tsc`, `next build` | 성공 (`e8c5bd0`, run 67) | 미실행 |
+| 클라우드 실제 경로 E2E (§11.6) | 19/19 통과 | — | — |
 | Windows 실제 브라우저 수동 E2E | — | — | 후속 Issue로 추적 예정 (AC 미포함, OQ-9) |
-| 잠금 대기 시간 측정 (OQ-4) | 미실행 | 미실행 | 미실행 |
+| 잠금 대기 시간 측정 (OQ-4) | §17.3 | 미기록 (CI는 테스트 표준 출력을 남기지 않음) | 미실행 |
+
+### 17.2 실행 환경과 명령
+
+- 클라우드: Linux, OpenJDK 21.0.12(Gradle init script로 toolchain 21 지정, CI는 JDK 25), PostgreSQL 16.15(임시 인스턴스, 기본 `max_connections` 100), Node 22.22, Chromium(Playwright).
+- Backend: `./gradlew clean build` (DB `docflow`, 전용 테스트 DB). 기준선은 구현 전 `clean test --rerun-tasks` 254개 통과.
+- Frontend: `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`.
+- E2E: Spring Boot jar(`local` 프로필, 전용 DB `docflow_e2e`, 전용 저장 루트) + `next start`(rewrite 경유) + Chromium. 스크립트는 저장소 밖(클라우드 scratchpad)에 두었다.
+
+### 17.3 AC별 결과
+
+| AC | 근거 (클라우드·CI) | 결과 |
+| --- | --- | --- |
+| AC-VER-01 | `DocumentVersionApiIntegrationTest.memberWhoIsNotAuthorUploadsVersionTwoWithoutChangingExistingData`, `consecutiveUploads…` | 통과 |
+| AC-VER-02 | 같은 테스트(v1 행 전 컬럼·파일 SHA-256, documents 컬럼 비교, `updated_at` 증가·응답 값 일치) | 통과 |
+| AC-VER-03 | `consecutiveUploadsAreReflectedInDetailAndListWithoutReordering` | 통과 |
+| AC-VER-04 | `DocumentVersionConcurrencyIntegrationTest.requestsWaitForDocumentLockAndReceiveDistinctNumbers`, `parallelUploadsGetContiguousNumbersWithoutLoss`(N=8), `lockOnOneDocumentDoesNotBlock…`, `lockQueryLocksOnlyTheDocumentRow` | 통과. 측정값 아래 |
+| AC-VER-05 | `DocumentStatusTest`(5개 상태), `reviewAndApprovedStatusesRejectNewVersion`(409 본문 키 `code`·`message`만), `changesRequestedAcceptsNewVersionAndKeepsStatus`, `DocumentVersionServiceTransactionTest.statusRejectedBeforeUploadStoresNothing` | 통과 |
+| AC-VER-06 | `statusChangedWhileWaitingForLockIsRejectedAndFileIsCompensated`, 단위 `statusRejectedAfterLockRollsBackAndDeletesFile` | 통과 |
+| AC-VER-07 | `invalidFilesAreRejectedLikeDocumentCreation`, `DocumentVersionUploadSizeIntegrationTest`(실제 HTTP 20,971,520 → 201·SHA-256 일치, +1 → 413) | 통과 |
+| AC-VER-08 | `DocumentVersionStorageIntegrationTest.scenarioB_…`, `storageFailureLeavesNoRowsAndNoTempFiles`, `storageIoErrorLeavesNoRows` | 통과 |
+| AC-VER-09 | `scenarioA_databaseFailureRollsBackAndDeletesOnlyThisRequestsFile`, 단위 `insertFailureRollsBackAndDeletesFile` | 통과 |
+| AC-VER-10 | `unexpectedVersionNumberUniqueViolationIsServerErrorWithCauseLog`(실제 PostgreSQL 위반, §13.2), 단위 `versionNumberConflictLogsCauseAndRethrows` | 통과 |
+| AC-VER-11 | 단위 `commitOutcomeUnknownKeepsFile`, `rollbackFailureKeepsFile`, `transactionBeginFailureDeletesFile`, `compensationFailure…` 2개 + 통합 `compensationFailureKeepsOriginalErrorAndLeavesOrphan` | 통과 |
+| AC-VER-12 | `outsidersAndForeignDocumentsCannotBeDistinguished` | 통과 |
+| AC-VER-13 | `sameFileAgainCreatesNewVersionWithDifferentStorageKey` | 통과 |
+| AC-VER-14 | `securityAndRequestFormatErrorsFollowExistingContract` | 통과 |
+| AC-VER-15 | 응답 필드 수·내부 정보 단언, `handler().handlerType(DocumentVersionController)`·기존 조회는 `DocumentController` | 통과 |
+| AC-VER-16 | `DocumentVersionUploadForm.test.tsx`(22), `DocumentDetailVersionUpload.test.tsx`(5), `version-api.test.ts`(2) | 통과 |
+| AC-VER-17 | 클라우드 E2E 19/19 (아래) | 통과 |
+| AC-VER-18 | Windows 자동 테스트·빌드 | **미실행 (사용자 실행 필요, 미실행이면 Done 아님)** |
+| AC-VER-19 | SPEC-03 포함 기존 254개·Frontend 169개 수정 없이 통과(기존 테스트 파일 중 `ProjectPermissionServiceTest`에는 케이스 1개만 추가), `SecurityConfig` 변경 없음, CI 성공 | 통과 (최종 커밋 CI는 PR에서 재확인) |
+
+**잠금 대기 측정 (클라우드, OQ-4·I4, 판정 기준 없음)** — `clean build` 실행 기준:
+
+- 결정적 직렬화: 첫 요청 v2 54ms, 둘째 v3 39ms(요청 시작~응답, 차단 연결 보유 시간 포함), 잠금 해제 후 두 요청 완료까지 17ms.
+- 병렬 N=8: 전체 114ms, 요청별 최소 42ms·중앙값 71ms·최대 114ms, 동시 잠금 대기 최대 5개(표본 조사). 같은 테스트 단독 실행 때는 전체 154ms, 최대 대기 7개.
+
+**클라우드 E2E (Chromium → Next.js `next start` → Spring Boot jar → PostgreSQL)** — 19개 확인 모두 통과:
+
+1. OWNER 새 버전 → 상세 v2 갱신·성공 문구, 요청에 `X-XSRF-TOKEN`·multipart, 목록 `v2` 반영
+2. 작성자가 아닌 MEMBER 새 버전 v3, `uploaded_by` = MEMBER, `created_by` 불변
+3. 19MiB·20MiB 새 버전 크기·SHA-256(DB·저장 파일) 일치 (각 약 1초)
+4. 20MiB+1 화면 사전 차단, 요청 없음
+5. 비구성원 화면 "프로젝트를 찾을 수 없습니다." + API `404 PROJECT_NOT_FOUND`, 저장 없음
+6. `IN_REVIEW`·`RE_REVIEW`·`APPROVED`(DB 설정): 파일 입력·버튼 비활성화와 안내 문구, 브라우저 직접 호출 `409`(본문 키 `code`·`message`, 상태 값 없음)
+7. 화면 표시 후 DB에서 `IN_REVIEW`로 변경 → 제출 `409` → 문구 유지, 로딩 없이 상태 "검토 중" 반영·비활성화 (I6)
+8. 연결 리셋(`ERR_CONNECTION_RESET`)·브라우저 오프라인(`ERR_INTERNET_DISCONNECTED`) → OQ-8 문구, 요청 각 1회(자동 재시도 없음), 새 버전 없음
+9. 같은 파일 재등록 → v4, SHA-256 같고 저장 키 다름
+10. Next.js 경유 동시 8개 → 모두 `201`, v2~v9, CSRF 헤더 없는 요청 `403 CSRF_INVALID`
+11. 종료 후 DB 저장 키 34개 = 저장소 파일 34개, 임시 파일 없음
+
+### 17.4 미실행·남은 항목
+
+- AC-VER-18 Windows 자동 테스트·빌드: 미실행(사용자). 실행 전 테스트 로그의 JDBC URL이 `docflow_test`인지 확인한다(§11.7).
+- Windows 실제 브라우저 수동 E2E: AC 미포함, 후속 Issue 생성은 별도 승인(OQ-9).
+- CI에서의 잠금 대기 측정값: CI가 테스트 표준 출력을 남기지 않아 기록하지 못했다.
+- D4(21MiB 초과 요청의 Next.js 경유 연결 리셋, #18)는 새 버전 업로드에도 같고 이번 범위에서 다루지 않았다.
