@@ -44,6 +44,21 @@ public enum DocumentFileType {
 		return Optional.empty();
 	}
 
+	/** 저장된 Content Type으로 형식을 찾는다 (SPEC-05 미리보기). 서버가 저장한 값만 넘긴다. */
+	public static Optional<DocumentFileType> fromContentType(String contentType) {
+		for (DocumentFileType type : values()) {
+			if (type.contentType.equals(contentType)) {
+				return Optional.of(type);
+			}
+		}
+		return Optional.empty();
+	}
+
+	/** 소문자 확장자 (점 없음). */
+	public String extension() {
+		return this.extension;
+	}
+
 	public boolean isOoxml() {
 		return this.mainPartName != null;
 	}

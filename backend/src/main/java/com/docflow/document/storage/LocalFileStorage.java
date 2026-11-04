@@ -1,6 +1,7 @@
 package com.docflow.document.storage;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -84,6 +85,16 @@ public class LocalFileStorage implements FileStorage {
 	@Override
 	public void delete(String storageKey) throws IOException {
 		Files.deleteIfExists(resolve(storageKey));
+	}
+
+	@Override
+	public InputStream openForRead(String storageKey) throws IOException {
+		return Files.newInputStream(resolve(storageKey), StandardOpenOption.READ);
+	}
+
+	@Override
+	public long size(String storageKey) throws IOException {
+		return Files.size(resolve(storageKey));
 	}
 
 	@Override
