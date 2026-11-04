@@ -1,12 +1,13 @@
 # SPEC-04: 문서 버전 등록
 
-- 상태: **Draft v0.2 (2026-11-04) — 설계 결정 V1~V8 승인, 미결정 OQ-1~10 결정 반영. 사용자 검토 승인(2026-11-04). Issue #19·브랜치 생성, 구현 미착수**
+- 상태: **Draft v0.2 (2026-11-04) — 설계 결정 V1~V8 승인, 미결정 OQ-1~10 결정 반영. 사용자 검토 승인(2026-11-04). Issue #19·브랜치 생성. 구현 결정 I1~I7 승인(2026-11-04), 구현 진행 중**
 - Issue: [#19](https://github.com/defhoon/Docflow/issues/19)
 - 브랜치: `feat/19/document-version-create`
 - 관련 문서: [`spec.md`](../spec.md) §3, §6.1, §7.1, §8 US-05, §9, §12, §13, §14, §16.2 / [`specs/03-document-create.md`](./03-document-create.md) §5.1~§5.7, §6, §7, §8, §12, §13, §16 / [`specs/02-project-members.md`](./02-project-members.md) §7.2(D5), §10(잠금 대기 기법) / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §2~§6
 - 작성일: 2026-11-04 (기준 커밋: `main` `a140a94`)
 - 변경 이력:
   - v0.1 (2026-11-04): 설계 결정 V1~V8(사용자 승인)을 반영한 상세 명세 초안
+  - 구현 결정 (2026-11-04): 사용자가 구현 결정 I1~I7을 승인(§15.4). V1~V8·OQ-1~10 변경 없음
   - v0.2 승인 (2026-11-04): 사용자가 Draft v0.2 검토를 승인(V1~V8·OQ-1~10, AC 판정 규칙: AC-VER-01~16 클라우드·CI, AC-VER-17 클라우드 실제 브라우저 E2E, AC-VER-18 Windows 자동 테스트·빌드 필수, AC-VER-19 회귀·CI 필수). Issue #19, 브랜치 `feat/19/document-version-create` 생성
   - v0.2 (2026-11-04): OQ-1~10 결정(사용자 승인)을 반영. 응답 계약 유지(OQ-1), 409 본문에 상태 값 미포함(OQ-2), 잠금 후 구성원 재확인 없음(OQ-3), 잠금 대기 상한 없음·대기 시간 측정 기록(OQ-4), `DocumentVersionController` 신설(OQ-5), 문서 상세 화면 배치(OQ-6), 허용되지 않은 상태에서 UI 비활성화+안내(OQ-7), 네트워크 오류 안내 문구 확정·자동 재시도 없음(OQ-8), Windows 실제 브라우저 수동 E2E는 후속 Issue로 추적(OQ-9), `spec.md` §16.2에 APPROVED 잠정 거부 명시(OQ-10). 관련 API·Frontend·AC·테스트 갱신. V1~V8 변경 없음
 
@@ -542,6 +543,20 @@ Security(CSRF·인증) → multipart 해석(크기 상한 → 413) → 경로 �
 ### 15.3 남은 미결정 사항
 
 정책 미결정 없음. §13.2의 구현 제약(잠금 SQL 형태, `updated_at` 갱신 방식, 예상하지 못한 UNIQUE 위반 재현 방법)은 구현 단계에서 확인할 기술 사항이다. 결과가 이 SPEC과 다르면 보고 후 SPEC을 먼저 갱신한다.
+
+### 15.4 구현 결정 (2026-11-04, 사용자 승인)
+
+V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸지 않는다.
+
+| ID | 결정 | 반영 위치 |
+| --- | --- | --- |
+| I1 | 공통 컴포넌트 `DocumentFileIntake`(임시 복사·크기·SHA-256·형식 검증·`CREATE_NEW` 배치)와 `StoredFileTransaction`(보상 등록 후 트랜잭션 실행, 시작 전 실패 시 직접 삭제)은 Spring Bean이 아닌 package-private 일반 객체로 만들고 각 Service 생성자에서 생성한다. `DocumentService` 생성자 시그니처를 유지해 SPEC-03 테스트를 수정하지 않는다 | §8, §11.5 |
+| I2 | `documents.updated_at` 갱신은 `BaseTimeEntity`에 `protected markModified()`를 추가해 엔티티를 변경 상태로 만들고, 트랜잭션 안에서 flush해 JPA Auditing이 기록한 값을 응답에 쓴다. JPQL 벌크 UPDATE는 쓰지 않는다 | §5.3, §13.2 |
+| I3 | 잠금 조회는 join 없는 JPQL + `PESSIMISTIC_WRITE`로 하고, 실제 Hibernate 잠금 SQL을 확인한 뒤 진행한다. AC-VER-10은 Mock 없이 실제 PostgreSQL UNIQUE 위반으로 재현한다: 별도 연결이 문서 잠금 없이 같은 번호의 버전 행을 미커밋 INSERT한 상태에서 요청을 보내고, 요청 INSERT가 대기하는 것을 확인한 뒤 커밋한다(잠금 SQL이 `FOR NO KEY UPDATE`일 때 성립). 성립하지 않으면 운영 코드를 바꾸지 않고 대안을 보고한다 | §7.4, §11.2, §13.2, AC-VER-10 |
+| I4 | 잠금 대기 시간은 테스트에서만 측정한다(운영 코드에 측정 로그를 추가하지 않음) | §11.3, AC-VER-04 |
+| I5 | 병렬 부하 검증은 N=8, 기존 Hikari 설정(기본 풀 크기, `connection-timeout: 5000`) 유지 | §11.3, R3 |
+| I6 | Frontend는 `409` 시 오류 문구를 유지하면서 로딩 화면 없이 문서 상세를 백그라운드로 다시 조회한다 | §9.3 |
+| I7 | 구현은 ① SPEC-03 파일 처리 리팩터링 ② Backend API ③ PostgreSQL 통합·동시성 테스트 ④ Frontend ⑤ E2E·회귀·문서 순서로, 각 단계 테스트 후 의미 있는 단위로 커밋한다 | §16 |
 
 ## 16. 구현 계획 및 단계별 체크리스트 (구현 승인 후)
 
