@@ -28,6 +28,22 @@ docflow:
   storage:
     # 문서 파일 저장 루트 (SPEC-03 §5.4). 기본값은 backend/에서 실행할 때 backend/storage이며 Git에서 제외한다.
     dir: ${DOCFLOW_STORAGE_DIR:./storage}
+  # 버전 미리보기 (SPEC-05 §8.3, ADR-0006). Office 문서는 LibreOffice로 PDF 변환한다.
+  preview:
+    # LibreOffice 실행 파일. 비어 있으면 PATH의 soffice, Windows는 기본 설치 경로에서 찾는다.
+    soffice-path: ${DOCFLOW_PREVIEW_SOFFICE_PATH:}
+    # OS 격리 래퍼 인수(쉼표 구분, 예: unshare,-rn). 비어 있으면 OS 격리 없이 실행하고 시작 시 WARN 로그를 남긴다.
+    # 지정했는데 점검에 실패하면 격리 없이 실행하지 않고 Office 미리보기를 끈다(503).
+    launcher: ${DOCFLOW_PREVIEW_LAUNCHER:}
+    timeout: 60s
+    concurrency: 1
+    queue-capacity: 10
+    max-output-bytes: 100MB
+    retry-after-failure: 10m
+    cache:
+      max-bytes: ${DOCFLOW_PREVIEW_CACHE_MAX_BYTES:2GB}
+      max-idle: 30d
+      cleanup-interval: 1h
 
 management:
   endpoints:

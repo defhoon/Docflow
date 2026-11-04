@@ -74,7 +74,7 @@ public class DocumentVersionQueryService {
 	}
 
 	/** 접근·문서·버전을 확인하고 파일 메타데이터를 돌려준다. 트랜잭션은 반환 전에 끝난다. */
-	VersionFileInfo resolve(Long projectId, Long documentId, int versionNumber, Long sessionUserId) {
+	public VersionFileInfo resolve(Long projectId, Long documentId, int versionNumber, Long sessionUserId) {
 		return this.readOnlyTransaction.execute((status) -> {
 			requireDocument(projectId, documentId, sessionUserId);
 			DocumentVersion version = this.documentVersionRepository
@@ -91,7 +91,7 @@ public class DocumentVersionQueryService {
 	/**
 	 * 저장된 원본을 연다. 응답 헤더를 보내기 전에 호출되므로 누락·크기 불일치는 JSON 오류로 응답된다 (SPEC-05 §7.3).
 	 */
-	InputStream openStored(VersionFileInfo info) {
+	public InputStream openStored(VersionFileInfo info) {
 		long actual;
 		try {
 			actual = this.fileStorage.size(info.storageKey());
