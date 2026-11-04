@@ -4,7 +4,7 @@ Document Review Workflow Management System
 
 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 시스템이다. 요구사항과 MVP 범위는 [`spec.md`](./spec.md)를 따른다.
 
-> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현·검증을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10)으로 `main`에 병합되었다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). SPEC-02(프로젝트 구성원 관리)는 PR [#14](https://github.com/defhoon/Docflow/pull/14)로 `main`에 병합되었다([Issue #13](https://github.com/defhoon/Docflow/issues/13), [`specs/02-project-members.md`](./specs/02-project-members.md)). SPEC-03(문서 등록·목록·상세)은 `feat/15/document-create` 브랜치에서 구현과 자동·클라우드 검증을 마쳤고 Windows E2E를 남겨 두고 있다([Issue #15](https://github.com/defhoon/Docflow/issues/15), [`specs/03-document-create.md`](./specs/03-document-create.md)). 버전 추가·다운로드·검토·피드백 기능은 아직 구현되지 않았다.
+> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현·검증을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10)으로 `main`에 병합되었다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). SPEC-02(프로젝트 구성원 관리)는 PR [#14](https://github.com/defhoon/Docflow/pull/14)로 `main`에 병합되었다([Issue #13](https://github.com/defhoon/Docflow/issues/13), [`specs/02-project-members.md`](./specs/02-project-members.md)). SPEC-03(문서 등록·목록·상세)은 PR [#16](https://github.com/defhoon/Docflow/pull/16)으로 `main`에 병합되었다([Issue #15](https://github.com/defhoon/Docflow/issues/15), [`specs/03-document-create.md`](./specs/03-document-create.md)). Windows 실환경 수동 E2E는 [#17](https://github.com/defhoon/Docflow/issues/17), D4 제한사항 개선은 [#18](https://github.com/defhoon/Docflow/issues/18)에서 후속으로 다룬다. SPEC-04(문서 버전 등록)는 [Issue #19](https://github.com/defhoon/Docflow/issues/19) 브랜치에서 구현과 클라우드·CI·Windows 자동 검증을 마쳐 Done으로 판정되었고 PR 생성을 앞두고 있다([`specs/04-document-version-create.md`](./specs/04-document-version-create.md)). 버전 목록·다운로드·검토·피드백 기능은 아직 구현되지 않았다.
 
 ## 기술 스택
 
@@ -115,11 +115,18 @@ npm run dev              # http://localhost:3000
 
 - 프로젝트 Owner와 Member 모두 문서를 등록·조회할 수 있다. 구성원이 아닌 사용자는 "프로젝트를 찾을 수 없습니다."를 본다.
 - 허용 형식은 PDF·DOCX·XLSX·PPTX이며 크기는 1바이트~20MB(20,971,520바이트)다. Backend가 확장자와 함께 파일 내용(PDF 최소 구조, OOXML `[Content_Types].xml`)을 검증한다. 형식 검증은 안전성을 보증하지 않으며 악성코드 검사는 하지 않는다.
-- 등록한 문서의 상태는 "초안"(`DRAFT`)이며, 이 단계에는 상태 변경·새 버전·삭제 기능이 없다.
+- 등록한 문서의 상태는 "초안"(`DRAFT`)이며, 상태 변경·삭제 기능은 없다.
 - 업로드 파일은 `DOCFLOW_STORAGE_DIR`(기본 `backend/storage`) 아래 `documents/<UUID>`로 저장된다. 원본 파일명은 저장 경로에 쓰지 않는다.
 - **알려진 제한사항:** 20MB를 넘는 파일은 등록 화면이 전송 전에 막는다. 화면을 거치지 않은 요청 중 요청 전체가 21MiB를 넘는 경우에는 Next.js 경유 응답이 `413` 대신 연결 리셋으로 끝날 수 있다(SPEC-03 §5.6, 결정 D4-1, 미해결). 업로드 중 연결이 끊기면 화면은 파일 크기와 네트워크 상태를 확인하라는 안내를 표시한다.
 
 Windows 수동 확인 절차는 [`specs/03-document-create.md`](./specs/03-document-create.md) §16.2를 참고한다.
+
+#### 새 버전 등록 (SPEC-04)
+
+- 문서 상세 화면 아래 "새 버전 등록" 영역에서 파일을 선택해 등록한다. 프로젝트 Owner와 Member 모두 등록할 수 있으며 문서 작성자가 아니어도 된다. 별도 화면은 없다.
+- 버전 번호는 서버가 정한다(최신 버전 + 1). 등록 후 상세와 목록의 최신 버전이 바뀌고, 이전 버전 정보와 파일은 그대로 남는다. 같은 파일을 다시 올려도 새 버전이 된다.
+- 문서 상태가 "초안"·"수정 요청"일 때만 등록할 수 있다. 그 밖의 상태에서는 등록 영역이 비활성화되고 안내 문구가 보이며, 서버도 `409`로 거부한다.
+- 파일 형식·크기 규칙은 문서 등록과 같다. 업로드 중 연결이 끊기면 결과를 확인할 수 없다는 안내가 표시되고 자동으로 다시 보내지 않는다. 상세 화면을 새로고침해 최신 버전을 확인한 뒤 다시 시도한다.
 
 브라우저는 `localhost:3000`만 호출한다. `/api/*` 요청은 Next.js rewrite로 Backend에 전달되므로 세션 쿠키(`JSESSIONID`)와 CSRF 쿠키(`XSRF-TOKEN`)는 `localhost:3000`에 저장된다.
 

@@ -37,4 +37,15 @@ public class ProjectPermissionService {
 		}
 	}
 
+	/**
+	 * 새 버전 등록 권한 (SPEC-04 §7.1, 결정 V3). 현재 OWNER·MEMBER 모두 허용하며, 문서 작성자가 아니어도 된다. Author·Reviewer
+	 * 역할 모델이 정해지면(SPEC-06) 이 메서드만 바꾼다. 접근 확인을 통과한 프로젝트에만 사용한다.
+	 */
+	public void requireVersionUploader(Project accessibleProject, Long userId) {
+		ProjectRole role = resolveRole(accessibleProject, userId);
+		if (role != ProjectRole.OWNER && role != ProjectRole.MEMBER) {
+			throw new BusinessException(ErrorCode.ACCESS_DENIED);
+		}
+	}
+
 }

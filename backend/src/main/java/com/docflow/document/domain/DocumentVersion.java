@@ -86,6 +86,15 @@ public class DocumentVersion {
 		return new DocumentVersion(document, FIRST_VERSION, file, uploadedBy);
 	}
 
+	/** 기존 문서에 추가하는 새 버전 (SPEC-04 §5.4). 번호는 호출 측이 문서 행 잠금 후 계산한다. */
+	public static DocumentVersion next(Document document, int versionNumber, StoredDocumentFile file,
+			User uploadedBy) {
+		if (versionNumber <= FIRST_VERSION) {
+			throw new IllegalArgumentException("New version number must be greater than " + FIRST_VERSION);
+		}
+		return new DocumentVersion(document, versionNumber, file, uploadedBy);
+	}
+
 	public Long getId() {
 		return this.id;
 	}
@@ -116,6 +125,10 @@ public class DocumentVersion {
 
 	public String getSha256() {
 		return this.sha256;
+	}
+
+	public User getUploadedBy() {
+		return this.uploadedBy;
 	}
 
 	public Instant getCreatedAt() {

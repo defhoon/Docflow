@@ -62,6 +62,14 @@ public class Document extends BaseTimeEntity {
 		return new Document(project, title, description, createdBy);
 	}
 
+	/**
+	 * 새 버전이 추가되었음을 기록한다. {@code updated_at}만 갱신하고 제목·설명·상태·작성자는 바꾸지 않는다 (SPEC-04 §5.3,
+	 * 결정 V2).
+	 */
+	public void markNewVersionAdded() {
+		markModified();
+	}
+
 	public Long getId() {
 		return this.id;
 	}

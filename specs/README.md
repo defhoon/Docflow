@@ -33,7 +33,8 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-AUTH 사용자 인증 | `00-auth.md` | #4 | 구현·병합 완료 |
 | SPEC-01 프로젝트 생성·조회 및 소유권 | `01-project-create.md` | #6 | 구현·검증 완료, main 병합 완료 (PR #10) |
 | SPEC-02 프로젝트 구성원 관리 | `02-project-members.md` | #13 | 구현·검증 완료, main 병합 완료 (PR #14) |
-| SPEC-03 문서 등록 | `03-document-create.md` | #15 | Done(2026-11-03, 변경된 완료 기준 기준), PR #16 Draft·병합 전. Windows 실환경 수동 E2E는 #17로 이관(미실행), D4 미해결(#18) |
+| SPEC-03 문서 등록 | `03-document-create.md` | #15 | Done(2026-11-03, 변경된 완료 기준 기준), main 병합 완료 (PR #16, 2026-11-03). 후속: Windows 실환경 수동 E2E #17(미실행), D4 미해결 #18 |
+| SPEC-04 문서 버전 등록 | `04-document-version-create.md` | #19 | Done (2026-11-04, AC-VER-01~19 충족, 브랜치 `feat/19/document-version-create`). PR 미생성. 후속: Windows 실제 브라우저 수동 E2E(OQ-9, Issue 생성 별도 승인) |
 
 ## 작성 원칙
 

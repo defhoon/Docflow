@@ -666,7 +666,7 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 - Feedback을 APPLIED로 변경하려면 반드시 새로운 DocumentVersion이 존재해야 하는가?
 - Feedback이 어떤 DocumentVersion에 반영되었는지를 저장할 것인가?
 - Feedback을 문서 전체 단위로 작성할 것인가, 특정 페이지/위치와 연결할 것인가?
-- 승인된 Document에 새로운 Version을 추가할 수 있는가?
+- 승인된 Document에 새로운 Version을 추가할 수 있는가? → **잠정 결정 (2026-11-04, SPEC-04 Draft v0.2):** `APPROVED` 문서의 새 버전 등록은 SPEC-04에서 잠정 거부(`409 DOCUMENT_STATUS_CONFLICT`)하며, SPEC-12(승인)에서 재검토한다.
 - 동일 Version에 중복 Review 요청을 허용할 것인가?
 - Document 파일 형식은 어디까지 지원할 것인가?
 - AuditLog의 기록 범위를 어디까지 설정할 것인가?
