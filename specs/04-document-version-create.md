@@ -1,12 +1,13 @@
 # SPEC-04: 문서 버전 등록
 
-- 상태: **Draft v0.2 (2026-11-04) — 설계 결정 V1~V8 승인, 미결정 OQ-1~10 결정 반영. 사용자 검토 승인(2026-11-04). Issue #19·브랜치 생성. 구현 결정 I1~I7 승인(2026-11-04). 구현·클라우드·CI 검증 완료, Windows 자동 테스트·빌드 성공(2026-11-04, 사용자). AC-VER-18의 동시성·크기 테스트 반복 실행은 미보고**
+- 상태: **Done (2026-11-04) — AC-VER-01~19 충족(§17.6). 설계 결정 V1~V8·OQ-1~10, 구현 결정 I1~I7 승인. 구현·클라우드·CI·Windows 자동 검증 완료. PR 미생성**
 - Issue: [#19](https://github.com/defhoon/Docflow/issues/19)
 - 브랜치: `feat/19/document-version-create`
 - 관련 문서: [`spec.md`](../spec.md) §3, §6.1, §7.1, §8 US-05, §9, §12, §13, §14, §16.2 / [`specs/03-document-create.md`](./03-document-create.md) §5.1~§5.7, §6, §7, §8, §12, §13, §16 / [`specs/02-project-members.md`](./02-project-members.md) §7.2(D5), §10(잠금 대기 기법) / [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0002](../docs/adr/0002-package-structure.md), [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §2~§6
 - 작성일: 2026-11-04 (기준 커밋: `main` `a140a94`)
 - 변경 이력:
   - v0.1 (2026-11-04): 설계 결정 V1~V8(사용자 승인)을 반영한 상세 명세 초안
+  - Done 판정 (2026-11-04): Windows 반복 검증(8개 × 10회, 80/80) 결과를 §17.5에 기록하고 AC-VER-18 충족, SPEC-04 Done 판정(§17.6)
   - Windows 반복 기준 (2026-11-04): AC-VER-18 반복 실행을 동시성·크기 테스트 8개 × 10회로 확정(사용자 승인, SPEC-04 한정)
   - Windows 검증 기록 (2026-11-04): 사용자가 보고한 Windows 자동 테스트·빌드 결과를 §17에 기록
   - 구현 (2026-11-04): Backend·Frontend 구현, 클라우드 테스트·E2E·CI 결과를 §17에 기록. 구현 중 확인한 사항(§13.2 잠금 SQL·`updated_at`·AC-VER-10 재현, §9.2 안내 문구, §11.5 테스트 컨텍스트 정리)을 반영. V1~V8·OQ-1~10·I1~I7 변경 없음
@@ -577,7 +578,7 @@ V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸�
 5. [x] Frontend: 문서 상세 새 버전 등록 영역 + Vitest (2026-11-04)
 6. [x] 클라우드 전체 테스트·빌드, 클라우드 실제 경로 E2E (§11.6) → §17 기록 (2026-11-04)
 7. [x] CI 확인 (`e8c5bd0` 성공, 이후 문서 커밋은 PR에서 재확인)
-8. [x] Windows 자동 테스트·빌드 (사용자, §11.7) → §17 기록 (2026-11-04). 동시성·크기 테스트 반복 실행 결과는 미보고
+8. [x] Windows 자동 테스트·빌드 (사용자, §11.7) → §17 기록 (2026-11-04). 동시성·크기 테스트 8개 × 10회 반복 80/80 통과
 9. [x] 문서: README, `docs/architecture.md`, 이 SPEC §17
 10. [ ] PR (`Closes #19`), 병합은 사용자
 11. [ ] Windows 실제 브라우저 수동 E2E 후속 Issue 생성 (구현 완료 시점, 별도 승인 후) [결정 OQ-9]
@@ -624,7 +625,7 @@ V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸�
 | AC-VER-15 | 응답 필드 수·내부 정보 단언, `handler().handlerType(DocumentVersionController)`·기존 조회는 `DocumentController` | 통과 |
 | AC-VER-16 | `DocumentVersionUploadForm.test.tsx`(22), `DocumentDetailVersionUpload.test.tsx`(5), `version-api.test.ts`(2) | 통과 |
 | AC-VER-17 | 클라우드 E2E 19/19 (아래) | 통과 |
-| AC-VER-18 | Windows 자동 테스트·빌드 (§17.5) | `clean build --rerun-tasks`(동시성·크기 테스트 포함 1회)와 Frontend lint·`tsc`·Vitest·build 성공. **동시성·크기 테스트 반복 실행과 테스트 DB 이름(`docflow_test`) 확인은 보고에 없어 미기록** |
+| AC-VER-18 | Windows 자동 테스트·빌드 (§17.5) | `clean build --rerun-tasks` 성공, `docflow_test`에서 동시성·크기 테스트 8개 × 10회 80/80 통과(실패·오류·스킵 0), Frontend lint·`tsc`·Vitest 198/198·build 성공 | **충족** |
 | AC-VER-19 | SPEC-03 포함 기존 254개·Frontend 169개 수정 없이 통과(기존 테스트 파일 중 `ProjectPermissionServiceTest`에는 케이스 1개만 추가), `SecurityConfig` 변경 없음, CI 성공 | 통과 (최종 커밋 CI는 PR에서 재확인) |
 
 **잠금 대기 측정 (클라우드, OQ-4·I4, 판정 기준 없음)** — `clean build` 실행 기준:
@@ -648,7 +649,6 @@ V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸�
 
 ### 17.4 미실행·남은 항목
 
-- AC-VER-18 중 동시성·크기 테스트 반복 실행과 테스트 DB 이름 확인: 보고되지 않아 기록하지 않았다(§17.5).
 - Windows 실제 브라우저 수동 E2E: AC 미포함, 후속 Issue 생성은 별도 승인(OQ-9).
 - CI에서의 잠금 대기 측정값: CI가 테스트 표준 출력을 남기지 않아 기록하지 못했다.
 - D4(21MiB 초과 요청의 Next.js 경유 연결 리셋, #18)는 새 버전 업로드에도 같고 이번 범위에서 다루지 않았다.
@@ -665,8 +665,18 @@ V1~V8·OQ-1~10을 구현하는 방식에 대한 결정이다. 정책을 바꾸�
 | Frontend 타입 검사 | `npx tsc --noEmit` | 성공 |
 | Frontend 테스트 | `npx vitest run` | 198/198 통과 |
 | Frontend 빌드 | `npm run build` | 성공 |
-| 동시성·크기 테스트 반복 실행 (§11.7, 8개 × 10회) | — | 기준 승인(2026-11-04), 결과 대기 |
-| 테스트 DB 이름(`docflow_test`) 확인 | — | 보고 없음 |
-| 잠금 대기 측정값 (OQ-4) | — | 보고 없음 |
+| 동시성·크기 테스트 반복 실행 (§11.7, 8개 × 10회) | `.\gradlew.bat test --tests "com.docflow.document.DocumentVersionConcurrencyIntegrationTest" --tests "com.docflow.document.DocumentVersionUploadSizeIntegrationTest" --rerun-tasks --console=plain` (10회) | 10회 모두 BUILD SUCCESSFUL. 매회 동시성 6/6, 크기 2/2 통과, 누적 80/80, failures·errors·skipped 0. 회당 약 1분 5초~1분 25초 |
+| 테스트 DB | — | `docflow_test` (PostgreSQL 16, Docker Compose) |
+| 잠금 대기 측정값 (OQ-4) | — | 보고 없음 (합격 기준 아님) |
 
-- 검증 커밋은 보고에 명시되지 않았다. 보고 시점 원격 브랜치 HEAD는 `1026afc`이며 제품·테스트 코드는 `e8c5bd0`과 같다.
+- 환경: Windows PowerShell, PostgreSQL 16(Docker Compose), 전용 테스트 DB `docflow_test`.
+- 반복 실행은 `--rerun` 대신 `--rerun-tasks`를 사용해 컴파일 작업도 매회 다시 실행했다. 대상 테스트와 판정 기준은 §11.7과 같다.
+- 검증 커밋 해시는 보고에 명시되지 않았다. 반복 실행 시점 원격 브랜치의 제품·테스트 코드는 `e8c5bd0`과 같다(이후 커밋은 문서만 변경).
+
+### 17.6 Done 판정 (2026-11-04)
+
+- AC-VER-01~17·19: 클라우드 테스트·E2E와 CI로 충족(§17.3).
+- AC-VER-18: Windows 전체 빌드와 Frontend 검증 성공, 반복 기준(8개 × 10회, 80/80) 충족(§17.5).
+- `spec.md` §14 DoD: In Scope 구현, 정상·실패 흐름 테스트, 권한·상태 검증, Frontend 상태, Backend–Frontend 실제 연동(클라우드 E2E), 자동 테스트 통과, SPEC과 구현 일치.
+- 수동 검증: 이 SPEC의 필수 수동·실제 경로 검증은 클라우드 E2E(AC-VER-17)다. Windows 실제 브라우저 수동 E2E는 결정 OQ-9에 따라 완료 기준에서 제외되며 후속 Issue로 추적한다(생성은 별도 승인).
+- **판정: SPEC-04 Done.** 남은 위험은 §13.3, 미실행 항목은 §17.4를 따른다.
