@@ -37,13 +37,23 @@ public final class DocumentTestSupport {
 				UsernamePasswordAuthenticationToken.authenticated(AuthenticatedUser.from(user), null, List.of()));
 	}
 
-	/** FK 순서: audit_logs → document_versions → documents → projects(구성원 CASCADE) → users. */
+	/** FK 순서: (audit_logs, document_versions, documents) → projects(구성원 CASCADE) → users. */
 	public static void cleanDatabase(JdbcTemplate jdbcTemplate) {
-		jdbcTemplate.update("DELETE FROM audit_logs");
-		jdbcTemplate.update("DELETE FROM document_versions");
-		jdbcTemplate.update("DELETE FROM documents");
+		// documents.final_version_id ↔ document_versions.document_id가 서로 참조하므로(SPEC-07) 한 문장으로 비운다.
+		jdbcTemplate.execute("TRUNCATE audit_logs, document_versions, documents");
 		jdbcTemplate.update("DELETE FROM projects");
 		jdbcTemplate.update("DELETE FROM users");
+	}
+
+	/**
+	 * 테스트용으로 문서를 v1 기준 FINALIZED로 직접 만든다 (SPEC-07 V7 CHECK 제약을 만족하는 값).
+	 */
+	public static void finalizeDirectly(JdbcTemplate jdbcTemplate, Long documentId) {
+		jdbcTemplate.update("""
+				UPDATE documents SET status = 'FINALIZED',
+				    final_version_id = (SELECT id FROM document_versions WHERE document_id = ? AND version_number = 1),
+				    finalized_by = created_by, finalized_at = now()
+				WHERE id = ?""", documentId, documentId);
 	}
 
 	public static void cleanStorage() {

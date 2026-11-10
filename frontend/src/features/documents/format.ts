@@ -1,11 +1,8 @@
 import type { DocumentStatus } from "./types";
 
 const STATUS_LABELS: Record<DocumentStatus, string> = {
-  DRAFT: "초안",
-  IN_REVIEW: "검토 중",
-  CHANGES_REQUESTED: "수정 요청",
-  RE_REVIEW: "재검토 중",
-  APPROVED: "승인",
+  ACTIVE: "협업 중",
+  FINALIZED: "최종 확정",
 };
 
 export function statusLabel(status: DocumentStatus): string {

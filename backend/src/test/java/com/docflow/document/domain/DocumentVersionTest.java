@@ -53,7 +53,7 @@ class DocumentVersionTest {
 		assertThat(this.document.getUpdatedAt()).isNotNull();
 		assertThat(this.document.getTitle()).isEqualTo("문서");
 		assertThat(this.document.getDescription()).isEqualTo("설명");
-		assertThat(this.document.getStatus()).isEqualTo(DocumentStatus.DRAFT);
+		assertThat(this.document.getStatus()).isEqualTo(DocumentStatus.ACTIVE);
 		assertThat(this.document.getCreatedBy()).isSameAs(this.author);
 	}
 

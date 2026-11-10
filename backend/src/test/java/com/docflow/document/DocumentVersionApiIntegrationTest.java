@@ -119,7 +119,7 @@ class DocumentVersionApiIntegrationTest {
 			.andExpect(header().string("Location", "/api/projects/" + this.projectId + "/documents/" + documentId))
 			.andExpect(jsonPath("$.id").value(documentId))
 			.andExpect(jsonPath("$.title").value("요구사항"))
-			.andExpect(jsonPath("$.status").value("DRAFT"))
+			.andExpect(jsonPath("$.status").value("ACTIVE"))
 			.andExpect(jsonPath("$.createdBy.id").value(this.owner.getId()))
 			.andExpect(jsonPath("$.createdBy.*", hasSize(2)))
 			.andExpect(jsonPath("$.latestVersion.versionNumber").value(2))
@@ -127,7 +127,7 @@ class DocumentVersionApiIntegrationTest {
 			.andExpect(jsonPath("$.latestVersion.sizeBytes").value(v2Content.length))
 			.andExpect(jsonPath("$.latestVersion.uploadedAt").exists())
 			.andExpect(jsonPath("$.latestVersion.*", hasSize(4)))
-			.andExpect(jsonPath("$.*", hasSize(8)))
+			.andExpect(jsonPath("$.*", hasSize(9))) // SPEC-07: finalization 추가
 			.andReturn()
 			.getResponse()
 			.getContentAsString();
@@ -200,24 +200,24 @@ class DocumentVersionApiIntegrationTest {
 		assertThat(versionNumbers(newer)).containsExactly(1);
 	}
 
-	// AC-VER-05: CHANGES_REQUESTED는 허용되고 상태가 유지된다
+	// AC-VER-05 (SPEC-07 갱신): ACTIVE는 반복 업로드를 허용하고 상태가 유지된다
 	@Test
-	void changesRequestedAcceptsNewVersionAndKeepsStatus() throws Exception {
-		Long documentId = createDocument(this.owner, "수정 요청됨", DocumentTestFiles.pdf());
-		setStatus(documentId, "CHANGES_REQUESTED");
+	void activeAcceptsRepeatedNewVersionsAndKeepsStatus() throws Exception {
+		Long documentId = createDocument(this.owner, "협업 중", DocumentTestFiles.pdf());
 
+		uploadVersion(this.member, documentId, pdfFile()).andExpect(status().isCreated());
 		uploadVersion(this.member, documentId, pdfFile()).andExpect(status().isCreated())
-			.andExpect(jsonPath("$.status").value("CHANGES_REQUESTED"))
-			.andExpect(jsonPath("$.latestVersion.versionNumber").value(2));
-		assertThat(documentRow(documentId).get("status")).isEqualTo("CHANGES_REQUESTED");
+			.andExpect(jsonPath("$.status").value("ACTIVE"))
+			.andExpect(jsonPath("$.latestVersion.versionNumber").value(3));
+		assertThat(documentRow(documentId).get("status")).isEqualTo("ACTIVE");
 	}
 
-	// AC-VER-05: IN_REVIEW·RE_REVIEW·APPROVED는 409, 본문에 상태 값 없음(OQ-2), 행·파일 변화 없음
+	// AC-VER-05 (SPEC-07 갱신, AC-FIN-07): FINALIZED는 409, 본문에 상태 값 없음(OQ-2), 행·파일 변화 없음
 	@ParameterizedTest
-	@ValueSource(strings = { "IN_REVIEW", "RE_REVIEW", "APPROVED" })
-	void reviewAndApprovedStatusesRejectNewVersion(String documentStatus) throws Exception {
-		Long documentId = createDocument(this.owner, "검토 중", DocumentTestFiles.pdf());
-		setStatus(documentId, documentStatus);
+	@ValueSource(strings = { "FINALIZED" })
+	void finalizedStatusRejectsNewVersion(String documentStatus) throws Exception {
+		Long documentId = createDocument(this.owner, "확정됨", DocumentTestFiles.pdf());
+		DocumentTestSupport.finalizeDirectly(this.jdbcTemplate, documentId);
 		Map<String, Object> documentBefore = documentRow(documentId);
 		List<String> filesBefore = DocumentTestSupport.storedFiles();
 
@@ -352,7 +352,7 @@ class DocumentVersionApiIntegrationTest {
 		this.mockMvc.perform(forged.with(as(this.member)).with(csrf()))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.latestVersion.versionNumber").value(2))
-			.andExpect(jsonPath("$.status").value("DRAFT"))
+			.andExpect(jsonPath("$.status").value("ACTIVE"))
 			.andExpect(jsonPath("$.title").value("문서"));
 		assertThat(versionRow(documentId, 2).get("uploaded_by")).isEqualTo(this.member.getId());
 	}
@@ -401,10 +401,6 @@ class DocumentVersionApiIntegrationTest {
 	private void addMember(Long project, User user) {
 		this.jdbcTemplate.update("INSERT INTO project_members (project_id, user_id) VALUES (?, ?)", project,
 				user.getId());
-	}
-
-	private void setStatus(Long documentId, String documentStatus) {
-		this.jdbcTemplate.update("UPDATE documents SET status = ? WHERE id = ?", documentStatus, documentId);
 	}
 
 	private Map<String, Object> documentRow(Long documentId) {

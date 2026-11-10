@@ -219,10 +219,14 @@ class DocumentVersionQueryIntegrationTest {
 
 	// AC-VDL-06: 문서 상태와 관계없이 조회·다운로드
 	@ParameterizedTest
-	@ValueSource(strings = { "DRAFT", "IN_REVIEW", "CHANGES_REQUESTED", "RE_REVIEW", "APPROVED" })
+	@ValueSource(strings = { "ACTIVE", "FINALIZED" })
 	void everyStatusAllowsListAndDownload(String documentStatus) throws Exception {
 		Long documentId = createDocument(this.owner, file("a.pdf", DocumentTestFiles.pdf()));
-		this.jdbcTemplate.update("UPDATE documents SET status = ? WHERE id = ?", documentStatus, documentId);
+		if ("FINALIZED".equals(documentStatus)) {
+			DocumentTestSupport.finalizeDirectly(this.jdbcTemplate, documentId);
+		}
+		assertThat(this.jdbcTemplate.queryForObject("SELECT status FROM documents WHERE id = ?", String.class,
+				documentId)).isEqualTo(documentStatus);
 
 		this.mockMvc.perform(get(versionsUrl(documentId)).with(as(this.member))).andExpect(status().isOk());
 		download(this.member, documentId, 1).andExpect(status().isOk());

@@ -53,7 +53,7 @@ class DocumentSchemaIntegrationTest {
 	void documentDefaultsAndChecks() {
 		Long id = insertDocument("제목");
 		assertThat(this.jdbcTemplate.queryForObject("SELECT status FROM documents WHERE id = ?", String.class, id))
-			.isEqualTo("DRAFT");
+			.isEqualTo("ACTIVE");
 
 		assertViolation(() -> insertDocument("   "), "ck_documents_title_not_blank");
 		assertViolation(() -> this.jdbcTemplate.update(

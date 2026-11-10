@@ -235,7 +235,7 @@ class DocumentVersionConcurrencyIntegrationTest {
 				sampler.maxWaiting);
 	}
 
-	// AC-VER-06: 사전 확인을 통과하고 파일을 배치한 요청이 잠금을 기다리는 동안 상태가 IN_REVIEW로 바뀌면 409, 롤백, 보상 삭제
+	// AC-VER-06: 사전 확인을 통과하고 파일을 배치한 요청이 잠금을 기다리는 동안 문서가 FINALIZED로 확정되면 409(SPEC-07 FR-5, AC-FIN-10), 롤백, 보상 삭제
 	@Test
 	void statusChangedWhileWaitingForLockIsRejectedAndFileIsCompensated() throws Exception {
 		Long documentId = createDocument();
@@ -243,9 +243,13 @@ class DocumentVersionConcurrencyIntegrationTest {
 		Future<Timed> request;
 		try (Connection blocker = this.dataSource.getConnection()) {
 			blocker.setAutoCommit(false);
-			try (PreparedStatement update = blocker
-				.prepareStatement("UPDATE documents SET status = 'IN_REVIEW' WHERE id = ?")) {
+			try (PreparedStatement update = blocker.prepareStatement("""
+					UPDATE documents SET status = 'FINALIZED',
+					    final_version_id = (SELECT id FROM document_versions WHERE document_id = ? AND version_number = 1),
+					    finalized_by = created_by, finalized_at = now()
+					WHERE id = ?""")) {
 				update.setLong(1, documentId);
+				update.setLong(2, documentId);
 				update.executeUpdate();
 			}
 			request = submit(this.member, documentId);

@@ -36,10 +36,11 @@ function detail(versionNumber: number): DocumentDetailData {
     id: 3,
     title: "요구사항 명세서",
     description: null,
-    status: "DRAFT",
+    status: "ACTIVE",
     createdBy: { id: 1, displayName: "Author" },
     createdAt: "2026-10-27T09:00:00Z",
     updatedAt: "2026-10-27T09:00:00Z",
+    finalization: null,
     latestVersion: { versionNumber, originalFilename: `v${versionNumber}.pdf`, sizeBytes: 10, uploadedAt: "2026-10-27T09:00:00Z" },
   };
 }

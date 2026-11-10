@@ -90,9 +90,9 @@ class DocumentVersionServiceTransactionTest {
 		UserAccountService userAccountService = mock(UserAccountService.class);
 		given(userAccountService.getReference(USER_ID)).willReturn(this.user);
 		given(this.documentRepository.findByIdAndProjectId(DOCUMENT_ID, PROJECT_ID))
-			.willReturn(Optional.of(document(DocumentStatus.DRAFT)));
+			.willReturn(Optional.of(document(DocumentStatus.ACTIVE)));
 		given(this.documentRepository.findByIdAndProjectIdForUpdate(DOCUMENT_ID, PROJECT_ID))
-			.willReturn(Optional.of(document(DocumentStatus.DRAFT)));
+			.willReturn(Optional.of(document(DocumentStatus.ACTIVE)));
 		given(this.versionRepository.findMaxVersionNumber(DOCUMENT_ID)).willReturn(1);
 		given(this.versionRepository.save(any(DocumentVersion.class))).willAnswer((invocation) -> invocation.getArgument(0));
 		this.fileStorage = spy(new LocalFileStorage(this.root.toString(), () -> "documents/fixed"));
@@ -107,7 +107,7 @@ class DocumentVersionServiceTransactionTest {
 
 		assertThat(response.id()).isEqualTo(DOCUMENT_ID);
 		assertThat(response.latestVersion().versionNumber()).isEqualTo(2);
-		assertThat(response.status()).isEqualTo(DocumentStatus.DRAFT);
+		assertThat(response.status()).isEqualTo(DocumentStatus.ACTIVE);
 		assertThat(storedFiles()).containsExactly("fixed");
 		assertThat(tempFiles()).isEmpty();
 		verify(this.documentRepository).flush();
@@ -117,7 +117,7 @@ class DocumentVersionServiceTransactionTest {
 	@Test
 	void statusRejectedBeforeUploadStoresNothing() throws IOException {
 		given(this.documentRepository.findByIdAndProjectId(DOCUMENT_ID, PROJECT_ID))
-			.willReturn(Optional.of(document(DocumentStatus.IN_REVIEW)));
+			.willReturn(Optional.of(document(DocumentStatus.FINALIZED)));
 
 		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
 			.isInstanceOfSatisfying(BusinessException.class,
@@ -131,7 +131,7 @@ class DocumentVersionServiceTransactionTest {
 	@Test
 	void statusRejectedAfterLockRollsBackAndDeletesFile() throws IOException {
 		given(this.documentRepository.findByIdAndProjectIdForUpdate(DOCUMENT_ID, PROJECT_ID))
-			.willReturn(Optional.of(document(DocumentStatus.APPROVED)));
+			.willReturn(Optional.of(document(DocumentStatus.FINALIZED)));
 
 		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
 			.isInstanceOfSatisfying(BusinessException.class,

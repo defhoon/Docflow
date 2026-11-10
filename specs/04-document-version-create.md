@@ -1,5 +1,7 @@
 # SPEC-04: 문서 버전 등록
 
+> 2026-11-10 SPEC-07(#24) 갱신: 업로드 허용 상태는 `DRAFT·CHANGES_REQUESTED`에서 `ACTIVE`로, 거부 상태는 `FINALIZED`(409 `DOCUMENT_STATUS_CONFLICT`)로 바뀌었다. 상태 관련 AC-VER-05·06은 이 기준으로 검증한다.
+
 - 상태: **Done (2026-11-04) — AC-VER-01~19 충족(§17.6). 설계 결정 V1~V8·OQ-1~10, 구현 결정 I1~I7 승인. 구현·클라우드·CI·Windows 자동 검증 완료. PR 미생성**
 - Issue: [#19](https://github.com/defhoon/Docflow/issues/19)
 - 브랜치: `feat/19/document-version-create`

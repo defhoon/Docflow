@@ -31,10 +31,11 @@ function detail(overrides: Partial<DocumentDetailData> = {}, versionNumber = 1):
     id: 3,
     title: "요구사항 명세서",
     description: null,
-    status: "DRAFT",
+    status: "ACTIVE",
     createdBy: { id: 1, displayName: "Author" },
     createdAt: "2026-10-27T09:00:00Z",
     updatedAt: "2026-10-27T09:00:00Z",
+    finalization: null,
     latestVersion: {
       versionNumber,
       originalFilename: `v${versionNumber}.pdf`,
@@ -85,7 +86,7 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
   });
 
   it("허용되지 않은 상태의 문서는 등록 영역이 비활성화되고 안내 문구가 보인다 (OQ-7)", async () => {
-    fetchDocumentMock.mockResolvedValue(detail({ status: "APPROVED" }));
+    fetchDocumentMock.mockResolvedValue(detail({ status: "FINALIZED" }));
     render(<DocumentDetail />);
 
     expect(await screen.findByText("초안 또는 수정 요청 상태의 문서에만 새 버전을 등록할 수 있습니다.")).toBeInTheDocument();
@@ -94,15 +95,15 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
   });
 
   it("409이면 오류 문구를 유지한 채 로딩 화면 없이 다시 조회해 상태를 반영한다 (I6)", async () => {
-    fetchDocumentMock.mockResolvedValueOnce(detail()).mockResolvedValueOnce(detail({ status: "IN_REVIEW" }));
+    fetchDocumentMock.mockResolvedValueOnce(detail()).mockResolvedValueOnce(detail({ status: "FINALIZED" }));
     createDocumentVersionMock.mockRejectedValue(new ApiError("http", 409, "DOCUMENT_STATUS_CONFLICT", "x"));
     render(<DocumentDetail />);
-    await screen.findByText("초안");
+    await screen.findByText("협업 중");
 
     choosePdf();
     fireEvent.click(screen.getByRole("button", { name: "새 버전 등록" }));
 
-    expect(await screen.findByText("검토 중")).toBeInTheDocument();
+    expect(await screen.findByText("최종 확정")).toBeInTheDocument();
     expect(fetchDocumentMock).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("alert")).toHaveTextContent("현재 문서 상태에서는 새 버전을 등록할 수 없습니다.");
     expect(screen.getByRole("button", { name: "새 버전 등록" })).toBeDisabled();
@@ -115,7 +116,7 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
       .mockRejectedValueOnce(new ApiError("network", null, null, "x"));
     createDocumentVersionMock.mockRejectedValue(new ApiError("http", 409, "DOCUMENT_STATUS_CONFLICT", "x"));
     render(<DocumentDetail />);
-    await screen.findByText("초안");
+    await screen.findByText("협업 중");
 
     choosePdf();
     fireEvent.click(screen.getByRole("button", { name: "새 버전 등록" }));
