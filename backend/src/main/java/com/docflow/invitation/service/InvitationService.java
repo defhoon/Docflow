@@ -70,17 +70,40 @@ public class InvitationService {
 	}
 
 	/**
-	 * 최초 운영 관리자용 코드 (#26 §최초 관리자). 사용자가 한 명도 없을 때만 호출한다. 이전에 발급된 미사용 관리자 코드는
-	 * 폐기한다(원문을 다시 알 수 없으므로).
+	 * 최초 운영 관리자용 초대 (#37). 운영자가 비밀 변수로 준 코드의 해시만 저장한다(원문은 저장·기록하지 않음).
+	 * 같은 코드의 초대가 이미 사용 가능하면 그대로 두고(재시작), 다른 미사용 관리자 초대는 폐기한다.
+	 *
+	 * @return 사용 가능한 초대의 만료 시각. 같은 코드가 이미 만료·폐기되었으면 비어 있다(새 코드 필요)
 	 */
 	@Transactional
-	public String issueBootstrapAdminCode(Duration validity) {
+	public java.util.Optional<Instant> prepareBootstrapAdminInvitation(String code, Duration validity) {
 		Instant now = Instant.now();
-		this.invitationRepository.findUnusedAdminInvitations().forEach((invitation) -> invitation.revoke(now));
-		String code = InvitationCodes.generate();
-		this.invitationRepository
-			.save(Invitation.issue(InvitationCodes.hash(code), true, null, "최초 운영 관리자", now.plus(validity)));
-		return code;
+		String hash = InvitationCodes.hash(code);
+		this.invitationRepository.findUnusedAdminInvitations()
+			.stream()
+			.filter((invitation) -> !invitation.hasCodeHash(hash))
+			.forEach((invitation) -> invitation.revoke(now));
+		java.util.Optional<Invitation> existing = this.invitationRepository.findByCodeHash(hash);
+		if (existing.isPresent()) {
+			return existing.filter((invitation) -> invitation.isGrantsAdmin() && invitation.isUsable(now))
+				.map(Invitation::getExpiresAt);
+		}
+		Invitation invitation = this.invitationRepository
+			.save(Invitation.issue(hash, true, null, "최초 운영 관리자", now.plus(validity)));
+		return java.util.Optional.of(invitation.getExpiresAt());
+	}
+
+	/** 관리자가 생긴 뒤 남은 미사용 관리자 초대를 폐기한다 (#37). @return 폐기한 수 */
+	@Transactional
+	public int revokeUnusedAdminInvitations() {
+		Instant now = Instant.now();
+		int count = 0;
+		for (Invitation invitation : this.invitationRepository.findUnusedAdminInvitations()) {
+			if (invitation.revoke(now)) {
+				count++;
+			}
+		}
+		return count;
 	}
 
 	private User requireAdmin(Long sessionUserId) {

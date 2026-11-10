@@ -18,8 +18,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +64,12 @@ class SignupIntegrationTest {
 
 	@Autowired
 	private AdminBootstrap adminBootstrap;
+
+	@Autowired
+	private com.docflow.user.repository.UserRepository userRepository;
+
+	@Autowired
+	private com.docflow.invitation.service.InvitationService invitationService;
 
 	private User admin;
 
@@ -229,27 +233,70 @@ class SignupIntegrationTest {
 		}
 	}
 
-	// AC-INV-09: 사용자가 없으면 최초 관리자 코드를 로그로 1회 발급, 그 코드로 가입하면 ADMIN
+	// AC-INV-09 (#37): 사용자 0명 + 운영자 코드 → 해시만 저장, 로그에 코드 없음, 가입 시 ADMIN, 재시작해도 중복 없음, 이후 재사용 불가
 	@Test
-	void bootstrapIssuesAdminCodeOnlyWhenNoUsersExist(CapturedOutput output) throws Exception {
-		// 컨텍스트 시작 시점의 로그는 제외하고 이 테스트에서 출력된 부분만 본다.
-		int start = output.toString().length();
-		this.adminBootstrap.run(new DefaultApplicationArguments());
-		assertThat(output.toString().substring(start)).doesNotContain("One-time administrator invitation code");
-
+	void bootstrapUsesOperatorCodeWithoutLoggingIt(CapturedOutput output) throws Exception {
+		String code = "Bootstrap-Code-For-Tests-0123456789";
+		AdminBootstrap bootstrap = bootstrap(code);
 		this.jdbcTemplate.update("DELETE FROM users");
-		this.adminBootstrap.run(new DefaultApplicationArguments());
-		Matcher matcher = Pattern.compile("One-time administrator invitation code \\(valid [^)]+\\): (\\S+)")
-			.matcher(output.toString().substring(start));
-		assertThat(matcher.find()).isTrue();
-		String code = matcher.group(1);
+		int start = output.toString().length();
 
-		String body = signup(code, "root@test.local", "Strong-Passw0rd", "운영자").andExpect(status().isCreated())
-			.andExpect(jsonPath("$.admin").value(true))
-			.andReturn().getResponse().getContentAsString();
-		JsonNode created = this.jsonMapper.readTree(body);
-		assertThat(this.jdbcTemplate.queryForObject("SELECT system_role FROM users WHERE id = ?", String.class,
-				created.get("id").asLong())).isEqualTo("ADMIN");
+		bootstrap.run(new DefaultApplicationArguments());
+		bootstrap.run(new DefaultApplicationArguments()); // 재시작: 같은 코드의 초대를 그대로 둔다
+		String logs = output.toString().substring(start);
+		assertThat(logs).contains("Administrator bootstrap invitation is ready").doesNotContain(code);
+		assertThat(this.jdbcTemplate.queryForObject(
+				"SELECT count(*) FROM invitations WHERE grants_admin AND used_at IS NULL AND revoked_at IS NULL", Long.class))
+			.isEqualTo(1);
+		assertThat(this.jdbcTemplate.queryForList("SELECT code_hash FROM invitations", String.class)).doesNotContain(code);
+
+		signup(code, "root@test.local", "Strong-Passw0rd", "운영자").andExpect(status().isCreated())
+			.andExpect(jsonPath("$.admin").value(true));
+		signup(code, "second@test.local", "Strong-Passw0rd", "두번째").andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVITATION_INVALID"));
+
+		// 관리자가 생긴 뒤 다시 시작해도 관리자 초대를 만들지 않는다
+		bootstrap.run(new DefaultApplicationArguments());
+		assertThat(this.jdbcTemplate.queryForObject("SELECT count(*) FROM invitations WHERE grants_admin", Long.class))
+			.isEqualTo(1);
+		assertThat(output.toString().substring(start)).contains("DOCFLOW_BOOTSTRAP_ADMIN_CODE is still set");
+	}
+
+	// AC-INV-12 (#37): 코드가 없거나 짧으면 발급하지 않는다. 사용자는 있지만 관리자가 없으면 발급하지 않는다
+	@Test
+	void bootstrapRefusesMissingOrWeakCodesAndExistingUsers(CapturedOutput output) {
+		this.jdbcTemplate.update("DELETE FROM users");
+		bootstrap("").run(new DefaultApplicationArguments());
+		bootstrap("too-short").run(new DefaultApplicationArguments());
+		assertThat(this.jdbcTemplate.queryForObject("SELECT count(*) FROM invitations", Long.class)).isZero();
+		assertThat(output).contains("Set DOCFLOW_BOOTSTRAP_ADMIN_CODE").contains("must be 24..64 characters");
+
+		this.userAccountService.createUser("plain@test.local", PASSWORD, "Plain");
+		bootstrap("Bootstrap-Code-For-Tests-0123456789").run(new DefaultApplicationArguments());
+		assertThat(this.jdbcTemplate.queryForObject("SELECT count(*) FROM invitations", Long.class)).isZero();
+		assertThat(output).contains("Users exist but no administrator");
+	}
+
+	// AC-INV-13 (#37): 관리자가 이미 있으면 남아 있는 관리자 초대로 가입할 수 없다
+	@Test
+	void adminInvitationCannotBeUsedOnceAnAdminExists() throws Exception {
+		String code = "Leftover-Admin-Code-0123456789AB";
+		this.jdbcTemplate.update(
+				"INSERT INTO invitations (code_hash, grants_admin, expires_at) VALUES (?, TRUE, now() + interval '1 hour')",
+				com.docflow.invitation.domain.InvitationCodes.hash(code));
+
+		signup(code, "late@test.local", "Strong-Passw0rd", "늦은").andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVITATION_INVALID"));
+		assertThat(this.jdbcTemplate.queryForObject("SELECT count(*) FROM users WHERE system_role = 'ADMIN'", Long.class))
+			.isEqualTo(1);
+
+		this.adminBootstrap.run(new DefaultApplicationArguments());
+		assertThat(this.jdbcTemplate.queryForObject("SELECT revoked_at FROM invitations WHERE grants_admin", Object.class))
+			.isNotNull();
+	}
+
+	private AdminBootstrap bootstrap(String code) {
+		return new AdminBootstrap(this.userRepository, this.invitationService, code, false, java.time.Duration.ofHours(24));
 	}
 
 	// AC-INV-10: 로그인 실패 5회 후 올바른 비밀번호도 429, 다른 계정은 영향 없음, 성공 시 초기화

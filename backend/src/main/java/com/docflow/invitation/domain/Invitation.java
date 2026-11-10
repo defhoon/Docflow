@@ -76,6 +76,10 @@ public class Invitation {
 		return new Invitation(codeHash, grantsAdmin, createdBy, note, expiresAt);
 	}
 
+	public boolean hasCodeHash(String hash) {
+		return this.codeHash.equals(hash);
+	}
+
 	public boolean isUsable(Instant now) {
 		return this.usedAt == null && this.revokedAt == null && now.isBefore(this.expiresAt);
 	}

@@ -2,6 +2,7 @@ package com.docflow.auth.service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +49,11 @@ public class SignupService {
 		this.transactionTemplate = new TransactionTemplate(transactionManager);
 	}
 
-	public AuthUserResponse signup(SignupRequest request) {
+	public AuthUserResponse signup(SignupRequest request, Optional<String> clientIp) {
 		if (request.password().getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED);
 		}
-		this.attemptGuard.checkSignup(request.email());
+		this.attemptGuard.checkSignup(request.email(), clientIp);
 		try {
 			AuthUserResponse created = this.transactionTemplate.execute((status) -> createWithInvitation(request));
 			log.info("User signed up: userId={}", created.id());
@@ -60,14 +61,14 @@ public class SignupService {
 		}
 		catch (BusinessException ex) {
 			if (ex.errorCode() == ErrorCode.INVITATION_INVALID || ex.errorCode() == ErrorCode.EMAIL_ALREADY_REGISTERED) {
-				this.attemptGuard.signupFailed(request.email());
+				this.attemptGuard.signupFailed(request.email(), clientIp);
 				log.info("Signup rejected: reason={}", ex.errorCode());
 			}
 			throw ex;
 		}
 		catch (DataIntegrityViolationException ex) {
 			// 같은 이메일 동시 가입: uk_users_email이 최종 판정한다. 트랜잭션은 롤백되어 코드는 미사용으로 남는다.
-			this.attemptGuard.signupFailed(request.email());
+			this.attemptGuard.signupFailed(request.email(), clientIp);
 			throw new BusinessException(ErrorCode.EMAIL_ALREADY_REGISTERED);
 		}
 	}
@@ -78,6 +79,10 @@ public class SignupService {
 			.findByCodeHashForUpdate(InvitationCodes.hash(request.inviteCode()))
 			.filter((candidate) -> candidate.isUsable(now))
 			.orElseThrow(() -> new BusinessException(ErrorCode.INVITATION_INVALID));
+		// 관리자 초대는 관리자가 아직 없을 때만 사용할 수 있다 (#37). 다른 코드와 같은 응답으로 거부한다.
+		if (invitation.isGrantsAdmin() && this.userAccountService.adminExists()) {
+			throw new BusinessException(ErrorCode.INVITATION_INVALID);
+		}
 		if (this.userAccountService.existsByEmail(request.email())) {
 			throw new BusinessException(ErrorCode.EMAIL_ALREADY_REGISTERED);
 		}

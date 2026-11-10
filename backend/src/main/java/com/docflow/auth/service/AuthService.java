@@ -42,19 +42,20 @@ public class AuthService {
 	 * 이메일·비밀번호를 확인한다. 존재하지 않는 계정, 비밀번호 불일치, 비활성 계정은 모두
 	 * {@link ErrorCode#AUTH_INVALID_CREDENTIALS}로 처리하여 계정 존재 여부를 드러내지 않는다.
 	 */
-	public Authentication authenticate(String email, String password) {
+	public Authentication authenticate(String email, String password, Optional<String> clientIp) {
 		// 시도 제한 (#26): 차단 중이면 자격 증명을 확인하지 않고 429로 응답한다.
-		this.attemptGuard.checkLogin(email);
+		this.attemptGuard.checkLogin(email, clientIp);
 		try {
 			Authentication authentication = this.authenticationManager
 				.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(User.normalizeEmail(email), password));
-			this.attemptGuard.loginSucceeded(email);
+			this.attemptGuard.loginSucceeded(email, clientIp);
 			return authentication;
 		}
 		catch (AuthenticationException ex) {
 			// 이메일, 비밀번호, 실패 사유는 기록하지 않는다.
-			this.attemptGuard.loginFailed(email);
-			log.info("Login failed");
+			this.attemptGuard.loginFailed(email, clientIp);
+			// 신뢰 경계에서 얻은 IP만 기록한다(#37 운영 확인용). 이메일·비밀번호는 기록하지 않는다.
+			log.info("Login failed: clientIp={}", clientIp.orElse("unknown"));
 			throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
 		}
 	}
