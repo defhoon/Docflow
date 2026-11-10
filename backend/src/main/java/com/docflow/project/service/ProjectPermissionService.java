@@ -55,4 +55,14 @@ public class ProjectPermissionService {
 		requireOwner(accessibleProject, userId);
 	}
 
+	/**
+	 * 피드백 작성 권한 (SPEC-08 §4). OWNER·MEMBER 모두 허용한다. 접근 확인을 통과한 프로젝트에만 사용한다.
+	 */
+	public void requireFeedbackWriter(Project accessibleProject, Long userId) {
+		ProjectRole role = resolveRole(accessibleProject, userId);
+		if (role != ProjectRole.OWNER && role != ProjectRole.MEMBER) {
+			throw new BusinessException(ErrorCode.ACCESS_DENIED);
+		}
+	}
+
 }
