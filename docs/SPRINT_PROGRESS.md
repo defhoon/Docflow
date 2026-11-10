@@ -7,11 +7,11 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-10 체크포인트 1 |
-| 현재 브랜치 | `docs/22/collaboration-workflow` |
-| 마지막 검증 완료 커밋 | (이 문서 커밋) — 문서 변경만, 코드 변화 없음 |
+| 마지막 갱신 | 2026-11-10 체크포인트 6 (#27 배포 준비 완료) |
+| 현재 브랜치 | `feat/27/deployment-prep` |
+| 마지막 검증 완료 커밋 | 이 문서를 포함한 #27 커밋 (Backend 398 통과, Frontend 225·lint·tsc·build 통과) |
 | 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
-| 배포 준비 상태 | 미착수 (Issue #27). 유료 리소스·외부 공개는 별도 승인 필요 |
+| 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
 ## Issue · 브랜치 스택
 
@@ -20,37 +20,48 @@
 | 순서 | Issue | 브랜치 | 내용 | 상태 |
 | --- | --- | --- | --- | --- |
 | 0 | #21 | `feat/21/document-version-download` | SPEC-05 버전 조회·다운로드·미리보기 | 구현·CI 완료, Windows 검증 대기, PR 없음 |
-| 1 | #22 | `docs/22/collaboration-workflow` | spec.md v0.5, SPEC 재구성, 이 문서 | 진행 중 |
-| 2 | #23 | `feat/23/audit-log` | SPEC-06 활동 이력 | 예정 |
-| 3 | #24 | `feat/24/document-finalize` | SPEC-07 ACTIVE/FINALIZED, 최종 확정 | 예정 |
-| 4 | #25 | `feat/25/version-feedback` | SPEC-08 버전별 Feedback | 예정 |
-| 5 | #26 | `feat/26/invite-signup` | 초대코드 가입, 로그인 시도 제한 | 예정 |
-| 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 예정 |
+| 1 | #22 | `docs/22/collaboration-workflow` | spec.md v0.5, SPEC 재구성, 이 문서 | 완료 (`44cb4fb`) |
+| 2 | #23 | `feat/23/audit-log` | SPEC-06 활동 이력 | Backend 완료 (`de11cfc`, CI run 80 success) |
+| 3 | #24 | `feat/24/document-finalize` | SPEC-07 ACTIVE/FINALIZED, 최종 확정 | Backend 완료 (`620e0f7`, CI run 81 success) |
+| 4 | #25 | `feat/25/version-feedback` | SPEC-08 버전별 Feedback | Backend 완료 (`52ab113`) |
+| 5 | #26 | `feat/26/invite-signup` | 초대코드 가입, 로그인 시도 제한 | Backend 완료 (`0f10a10`) |
+| 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포) |
 | 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 예정 |
 
 ## 완료된 작업
 
-- 체크포인트 1: Issue #22~#28 생성, `spec.md` v0.5(새 워크플로·대응표 §9.1), `CLAUDE.md` 개요, `specs/README.md` 표
+- CP1 (#22): Issue #22~#28, `spec.md` v0.5(새 워크플로·대응표 §9.1), `CLAUDE.md` 개요, `specs/README.md`
+- CP2 (#23): `audit_logs`(V6), `AuditLogService.record`(MANDATORY 트랜잭션), 활동 조회 API 3종, 문서·버전 생성 기록
+- CP3 (#24): V7 상태 마이그레이션(ACTIVE/FINALIZED, APPROVED 존재 시 중단), 확정 API, 복합 FK·불변 트리거, 동시성 테스트
+- CP4 (#25): V8 `feedbacks`, 버전별 작성·조회 API, 확정과 직렬화
+- CP5 (#26): V9 초대코드·`system_role`, 가입 API, 관리자 초대 API, 최초 관리자 코드(로그 1회), 로그인·가입 시도 제한(429)
+- CP6 (#27): `application-prod.yml`, Office 변환 비활성화·격리 필수 설정, Dockerfile 2종, CI docker 빌드 job, ADR-0007, `docs/deployment.md`(비용·변수·절차·점검표·백업)
 
 ## 진행 중
 
-- 없음 (다음: SPEC-06 브랜치 생성 → SPEC 초안 → 구현)
+- 없음. 다음: #28 UI/UX (`feat/28/ui-overhaul`, `feat/27` 위에서 생성)
 
-## 변경 파일 (현재 브랜치)
+## 변경 파일
 
-- `spec.md`, `CLAUDE.md`, `specs/README.md`, `docs/SPRINT_PROGRESS.md`
+- 각 SPEC 문서 §검증 기록과 커밋 참고 (`git log --stat docs/22/collaboration-workflow..feat/27/deployment-prep`)
 
 ## 테스트 결과
 
 | 시점 | 환경 | 결과 |
 | --- | --- | --- |
-| 기준(`e22cad5`) | 클라우드 | Backend 365 통과, Frontend 228 Vitest·lint·tsc·build 통과, E2E 19/19 |
-| 기준(`e22cad5`) | GitHub Actions | run 79 success |
+| 기준(`e22cad5`) | 클라우드 / CI run 79 | Backend 365, Frontend 228, E2E 19/19 / success |
+| #27 | 클라우드 | Backend 398 통과, Frontend Vitest 225·lint·tsc·build 통과 |
+| #27 | 클라우드 수동 | prod 프로파일 jar + Next standalone: 최초 관리자 가입→로그인→프로젝트→업로드→DOCX 미리보기 503→다운로드 동일 바이트→피드백→확정, 재시작 후 데이터·파일 유지(세션은 재로그인), 22MiB 413 JSON |
+| #23, #24 | GitHub Actions | success (run 80, 81) |
+| #25~#27 | GitHub Actions | 확인 필요 |
 
 ## 미해결 문제
 
 - SPEC-05 Windows 재실행 결과 대기 (AC-VDL-22)
-- #18 Next.js 경유 21MiB 초과 업로드 연결 리셋 (배포 프록시 제한과 관련, #27에서 재확인)
+- Docker 이미지 빌드는 클라우드에 Docker 데몬이 없어 CI job으로만 검증 예정
+- 백업·복구 절차는 Railway 환경에서 미실행
+- 재배포 시 세션 초기화(Spring Session JDBC는 새 의존성 → 승인 필요)
+- #18: 로컬 standalone에서는 22MiB가 413 JSON으로 응답(재현 안 됨). dev 서버·Windows 재확인 필요
 - `spec.md` §16.2: 삭제 기능, 피드백 수정·삭제, 파일 형식 범위 미결정
 
 ## 다음 실행 명령 (클라우드 재개 시)
@@ -67,7 +78,6 @@ cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run 
 
 ## 다음 작업 우선순위
 
-1. SPEC-06 활동 이력: `audit_logs`, 기록 컴포넌트, 문서 생성·버전 등록 기록, 조회 API
-2. SPEC-07 최종 확정: 상태 마이그레이션, 확정 API, FINALIZED 업로드 거부
-3. SPEC-08 버전별 Feedback
-4. #26 초대 가입·로그인 제한 → #27 배포 준비 → #28 UI
+1. #28 UI: 디자인 토큰·공통 컴포넌트 → App Shell → 문서 상세 협업 작업 공간(피드백·확정·읽기 전용) → 홈(내 프로젝트·최근 활동) → 로그인·가입·관리자 초대 → 반응형 스크린샷 검증
+2. CI 결과 확인(#25~#28)
+3. 사용자 승인 후 Railway 배포·점검표·백업 복구 검증

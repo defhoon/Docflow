@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.util.unit.DataSize;
 
 /**
@@ -17,12 +18,26 @@ import org.springframework.util.unit.DataSize;
  * @param launcher 실행 명령 앞에 붙이는 OS 격리 래퍼 인수 배열 (예: {@code unshare,-rn}). 비어 있으면 OS 격리 없이 실행한다
  * @param retryAfterFailure 시간 초과·엔진 오류 후 다시 변환을 허용하는 간격 (기본 10분)
  * @param cache 캐시 설정
+ * @param officeEnabled Office(DOCX/XLSX/PPTX)→PDF 변환 사용 여부 (기본 true). false이면 LibreOffice를 실행하지 않고 503으로
+ * 응답한다. PDF 미리보기와 원본 다운로드는 영향 없음 (#27 운영 정책)
+ * @param requireIsolation true이면 격리 래퍼({@code launcher})가 없을 때 변환을 끈다 (기본 false, 운영 프로파일 true)
  */
 @ConfigurationProperties("docflow.preview")
 public record PreviewProperties(Duration timeout, Integer concurrency, Integer queueCapacity, DataSize maxOutputBytes,
-		String sofficePath, List<String> launcher, Duration retryAfterFailure, Cache cache) {
+		String sofficePath, List<String> launcher, Duration retryAfterFailure, Cache cache, Boolean officeEnabled,
+		Boolean requireIsolation) {
 
+	/** 기존 설정(SPEC-05)과 같은 기본값: 변환 사용, 격리 필수 아님. */
+	public PreviewProperties(Duration timeout, Integer concurrency, Integer queueCapacity, DataSize maxOutputBytes,
+			String sofficePath, List<String> launcher, Duration retryAfterFailure, Cache cache) {
+		this(timeout, concurrency, queueCapacity, maxOutputBytes, sofficePath, launcher, retryAfterFailure, cache, null,
+				null);
+	}
+
+	@ConstructorBinding
 	public PreviewProperties {
+		officeEnabled = (officeEnabled != null) ? officeEnabled : Boolean.TRUE;
+		requireIsolation = (requireIsolation != null) ? requireIsolation : Boolean.FALSE;
 		timeout = (timeout != null) ? timeout : Duration.ofSeconds(60);
 		concurrency = (concurrency != null) ? concurrency : 1;
 		queueCapacity = (queueCapacity != null) ? queueCapacity : 10;

@@ -89,3 +89,19 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+
+  docker:
+    name: Docker images (build only, no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build backend image
+        run: docker build -t docflow-backend:ci backend
+      - name: Build frontend image
+        run: docker build --build-arg BACKEND_URL=http://backend:8080 -t docflow-frontend:ci frontend
+      - name: Check images run as non-root and contain no .env
+        run: |
+          test "$(docker run --rm --entrypoint id docflow-frontend:ci -un)" = "node"
+          docker run --rm --entrypoint sh docflow-backend:ci -c 'id docflow && test ! -e /app/.env && command -v pg_dump'
+          docker run --rm --entrypoint sh docflow-frontend:ci -c 'test ! -e /app/.env'
+
