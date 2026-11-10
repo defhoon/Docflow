@@ -7,9 +7,9 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-10 체크포인트 7 (#28 UI 1차 완료) |
-| 현재 브랜치 | `feat/28/ui-overhaul` |
-| 마지막 검증 완료 커밋 | 이 문서를 포함한 #28 커밋 (Backend 398 통과(#27 기준, #28은 Frontend만 변경), Frontend 244·lint·tsc·build 통과, 실제 브라우저 3개 뷰포트 확인) |
+| 마지막 갱신 | 2026-11-10 체크포인트 8 (PR #29~#36 생성, #37 공개 전 보안 강화·통합 검증) |
+| 현재 브랜치 | `feat/37/pre-release-hardening` (`feat/28` 위) |
+| 마지막 검증 완료 커밋 | #37 커밋 (Backend 415 통과, 실제 브라우저 14단계 시나리오·재시작·백업 복구 통과) |
 | 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
 | 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
@@ -19,14 +19,15 @@
 
 | 순서 | Issue | 브랜치 | 내용 | 상태 |
 | --- | --- | --- | --- | --- |
-| 0 | #21 | `feat/21/document-version-download` | SPEC-05 버전 조회·다운로드·미리보기 | 구현·CI 완료, Windows 검증 대기, PR 없음 |
-| 1 | #22 | `docs/22/collaboration-workflow` | spec.md v0.5, SPEC 재구성, 이 문서 | 완료 (`44cb4fb`) |
-| 2 | #23 | `feat/23/audit-log` | SPEC-06 활동 이력 | Backend 완료 (`de11cfc`, CI run 80 success) |
-| 3 | #24 | `feat/24/document-finalize` | SPEC-07 ACTIVE/FINALIZED, 최종 확정 | Backend 완료 (`620e0f7`, CI run 81 success) |
-| 4 | #25 | `feat/25/version-feedback` | SPEC-08 버전별 Feedback | Backend 완료 (`52ab113`) |
-| 5 | #26 | `feat/26/invite-signup` | 초대코드 가입, 로그인 시도 제한 | Backend 완료 (`0f10a10`) |
-| 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포) |
-| 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 1차 완료 |
+| 0 | #21 | `feat/21/document-version-download` | SPEC-05 버전 조회·다운로드·미리보기 | 구현·CI 완료, Windows 검증 대기, PR #29 |
+| 1 | #22 | `docs/22/collaboration-workflow` | spec.md v0.5, SPEC 재구성, 이 문서 | 완료 (`44cb4fb`), PR #30 |
+| 2 | #23 | `feat/23/audit-log` | SPEC-06 활동 이력 | Backend 완료 (`de11cfc`, CI run 80 success), PR #31 |
+| 3 | #24 | `feat/24/document-finalize` | SPEC-07 ACTIVE/FINALIZED, 최종 확정 | Backend 완료 (`620e0f7`, CI run 81 success), PR #32 |
+| 4 | #25 | `feat/25/version-feedback` | SPEC-08 버전별 Feedback | Backend 완료 (`52ab113`), PR #33 |
+| 5 | #26 | `feat/26/invite-signup` | 초대코드 가입, 로그인 시도 제한 | Backend 완료 (`0f10a10`), PR #34 |
+| 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포), PR #35 |
+| 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 1차 완료, PR #36 |
+| 8 | #37 | `feat/37/pre-release-hardening` | 공개 전 보안 강화·통합 검증·Windows/배포 문서 | 완료, PR 미생성(승인 범위 밖) |
 
 ## 완료된 작업
 
@@ -38,6 +39,8 @@
 - CP6 (#27): `application-prod.yml`, Office 변환 비활성화·격리 필수 설정, Dockerfile 2종, CI docker 빌드 job, ADR-0007, `docs/deployment.md`(비용·변수·절차·점검표·백업)
 
 - CP7 (#28): 디자인 토큰(`globals.css` @theme), `components/ui`(Button, Card, Field/Input/Textarea/Select, StatusBadge, Dialog, Toast, States, PageHeader/Breadcrumb, icons), AppShell(사이드바·모바일 서랍), '내 작업' 홈(내 프로젝트·최근 활동), 프로젝트 목록(검색·정렬)·상세(문서 상태 필터·구성원·활동), 문서 협업 작업 공간(미리보기·버전 선택·버전별 피드백·새 버전·오너 확정 Dialog·FINALIZED 읽기 전용·활동), 로그인·초대 가입·초대 관리 화면
+
+- CP8 (#37): PR #29~#36 생성(스택 base), 최초 관리자 = 운영자 비밀 코드(로그 노출 제거, 관리자 존재 후 관리자 초대 무효), 신뢰 프록시 홉 기반 IP + (IP,이메일)/IP/계정 제한, 권한·불변성 회귀 테스트, 실제 브라우저 14단계 시나리오·재시작·백업 복구 실행, `docs/windows-verification.md`, `docs/deployment.md` 갱신
 
 ## 진행 중
 
@@ -82,7 +85,7 @@ cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run 
 
 ## 다음 작업 우선순위
 
-1. CI 결과 확인(#25~#28, docker job 포함)
-2. 사용자 수동 검증(데스크톱 브라우저, Windows) 후 SPEC-06~08·#26·#28 Done 판정
-3. PR 생성(사용자 요청 시, 스택 순서)
-3. 사용자 승인 후 Railway 배포·점검표·백업 복구 검증
+1. #37 PR 생성 여부(사용자 승인 필요), CI 확인
+2. 사용자 Windows 검증(`docs/windows-verification.md`) 결과 기록 → SPEC-05~08·#26 Done 판정
+3. 사용자 승인 후 Railway 배포 → §7 체크리스트, 신뢰 프록시 확인, 백업·복구 1회
+4. PR 순서대로 병합(사용자 수행). 앞 PR 병합 후 다음 PR base를 main으로 변경
