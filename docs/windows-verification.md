@@ -70,6 +70,20 @@ docker compose down -v; docker compose up -d
 
 ### 4.1 자동 테스트 (먼저 SPEC-05 Windows 재검증)
 
+**DB 접속 정보를 프로세스 환경 변수로 먼저 설정한다.** 일부 테스트(`DocumentPreviewProductionPolicyIntegrationTest` 등)는 prod 프로파일로 기동하며, prod는 의도적으로 `.env`를 읽지 않는다(#39). 이때 DB 정보가 없으면 기본값(`docflow` 사용자, 비밀번호 없음)으로 접속해 인증 오류가 난다. 아래는 루트 `.env`의 DB 값 3개만 현재 PowerShell 창에 넣으며 값을 화면에 출력하지 않는다(창을 닫으면 사라짐).
+
+```powershell
+cd <저장소 경로>\Docflow
+Get-Content .env | Where-Object { $_ -match '^\s*(DB_URL|DB_USERNAME|DB_PASSWORD)\s*=' } | ForEach-Object {
+  $name, $value = $_ -split '=', 2
+  [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim(), 'Process')
+}
+# 설정 여부만 확인(값은 출력하지 않음)
+'DB_URL','DB_USERNAME','DB_PASSWORD' | ForEach-Object { "{0}: {1}" -f $_, [bool][Environment]::GetEnvironmentVariable($_, 'Process') }
+```
+
+`.env`에 `DB_URL`·`DB_USERNAME`이 없으면 각각 `jdbc:postgresql://localhost:5432/docflow`, `docflow`로 직접 설정한다. 같은 창에서 이어서 테스트를 실행한다.
+
 ```powershell
 cd backend
 .\gradlew.bat test --tests "com.docflow.document.preview.*" --tests "com.docflow.document.DocumentPreviewIntegrationTest" --tests "com.docflow.document.DocumentPreviewEngineUnavailableIntegrationTest" --rerun --console=plain
