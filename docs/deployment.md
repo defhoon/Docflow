@@ -57,7 +57,7 @@
 | backend | `DOCFLOW_PREVIEW_OFFICE_ENABLED` | 생략(기본 false). 격리 검증 전 켜지 않음 | |
 | frontend | `BACKEND_URL` | `http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:8080` 또는 `http://backend.railway.internal:8080` | |
 
-`SESSION_COOKIE_SECURE`는 prod 기본값 true이므로 설정하지 않는다(HTTPS 전용 쿠키).
+`SESSION_COOKIE_SECURE`는 prod 기본값 true이므로 설정하지 않는다(HTTPS 전용 쿠키). false로 두면 backend가 기동을 거부한다(#39). `DOCFLOW_ALLOW_INSECURE_COOKIES`는 로컬 HTTP 확인 전용이며 Railway에 **설정하지 않는다**. prod 프로파일은 저장소의 `.env`를 읽지 않는다(이미지에도 없음).
 
 ## 4. 최초 관리자 생성
 

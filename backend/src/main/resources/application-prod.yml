@@ -1,9 +1,6 @@
 # 운영 프로파일 (#27, ADR-0007). SPRING_PROFILES_ACTIVE=prod 로 활성화한다.
 # 비밀값(DB_PASSWORD 등)은 이 파일에 쓰지 않고 배포 플랫폼의 환경 변수로만 주입한다.
-spring:
-  config:
-    # 운영에서는 저장소 루트 .env를 읽지 않는다(기본 설정의 optional import를 비운다).
-    import: ""
+# 저장소 루트 .env는 prod에서 읽지 않는다(application.yml의 "!prod" 문서, #39).
 
 docflow:
   storage:
@@ -21,6 +18,8 @@ server:
       cookie:
         # HTTPS 전용 세션 쿠키. CSRF 쿠키도 같은 값을 따른다(SecurityConfig).
         secure: ${SESSION_COOKIE_SECURE:true}
+  # 위 값이 false이면 기동을 거부한다(ProductionCookieGuard, #39). HTTPS 없는 로컬 확인에서만
+  # DOCFLOW_ALLOW_INSECURE_COOKIES=true 로 명시적으로 허용한다. 운영에는 설정하지 않는다.
   # 요청 처리 중 종료 신호를 받으면 진행 중인 요청을 마치고 종료한다(재배포 시 업로드 중단 최소화).
   shutdown: graceful
 

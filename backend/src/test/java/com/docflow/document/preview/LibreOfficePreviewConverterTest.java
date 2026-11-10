@@ -43,14 +43,31 @@ class LibreOfficePreviewConverterTest {
 		Path out = this.workDir.resolve("out");
 		Path input = this.workDir.resolve("in").resolve("input.docx");
 
-		List<String> command = converter.command(Path.of("/usr/bin/soffice"), profile, out, input);
+		// 실행 파일은 서버가 찾은 호스트 경로 그대로 쓴다. Linux 경로 리터럴을 Path로 만들면 Windows에서 역슬래시 경로가
+		// 되므로(#39) 호스트 경로로 만든다.
+		Path soffice = this.workDir.resolve("bin").resolve("soffice");
 
-		assertThat(command).startsWith("unshare", "-rn", "/usr/bin/soffice")
+		List<String> command = converter.command(soffice, profile, out, input);
+
+		assertThat(command).startsWith("unshare", "-rn", soffice.toString())
 			.contains("-env:UserInstallation=" + profile.toUri(), "--headless", "--convert-to", "pdf", "--outdir",
 					out.toString())
 			.endsWith(input.toString())
 			.doesNotContain("sh", "-c", "cmd", "/c");
 		assertThat(String.join(" ", command)).doesNotContain(";").doesNotContain("|").doesNotContain("&&");
+	}
+
+	// #39 회귀: 격리 래퍼 인수는 바꾸지 않고 앞에 둔 채, 실행 파일 인수는 호스트 Path 문자열 그대로 전달한다
+	@Test
+	void launcherStaysFirstAndExecutableIsPassedAsHostPathVerbatim() {
+		LibreOfficePreviewConverter converter = new LibreOfficePreviewConverter(properties(List.of("unshare", "-rn")), false);
+		Path soffice = this.workDir.toAbsolutePath().resolve("Libre Office").resolve("program").resolve("soffice");
+
+		List<String> command = converter.command(soffice, this.workDir.resolve("p"), this.workDir.resolve("o"),
+				this.workDir.resolve("i.docx"));
+
+		assertThat(command.subList(0, 3)).containsExactly("unshare", "-rn", soffice.toString());
+		assertThat(command).filteredOn((arg) -> arg.contains("Libre Office")).hasSize(1);
 	}
 
 	@Test

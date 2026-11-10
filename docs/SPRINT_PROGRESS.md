@@ -7,9 +7,9 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-10 체크포인트 9 (PR #38 생성, 배포 직전 준비 문서 완료, Railway 리소스 미생성) |
-| 현재 브랜치 | `feat/37/pre-release-hardening` (`feat/28` 위) |
-| 마지막 검증 완료 커밋 | `feat/37` 최신 커밋 (Backend 415·Frontend 244·lint·tsc·build 통과, CI run 95·96 success) |
+| 마지막 갱신 | 2026-11-10 체크포인트 10 (#39 Windows 테스트 실패 2건 수정) |
+| 현재 브랜치 | `fix/39/windows-test-failures` (`feat/37` 위) |
+| 마지막 검증 완료 커밋 | #39 커밋 (클라우드 Backend 419 통과: `.env`에 `SESSION_COOKIE_SECURE=false`를 넣은 Windows 재현 조건과 원래 조건 모두) |
 | 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
 | 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
@@ -28,6 +28,7 @@
 | 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포), PR #35 |
 | 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 1차 완료, PR #36 |
 | 8 | #37 | `feat/37/pre-release-hardening` | 공개 전 보안 강화·통합 검증·Windows/배포 문서 | 완료, PR #38 |
+| 9 | #39 | `fix/39/windows-test-failures` | Windows 실패 2건: prod의 `.env` 로딩 차단·비보안 쿠키 기동 거부, 명령 테스트 경로 | 완료, PR 미생성(지시에 따라) |
 
 ## 완료된 작업
 
@@ -41,6 +42,8 @@
 - CP7 (#28): 디자인 토큰(`globals.css` @theme), `components/ui`(Button, Card, Field/Input/Textarea/Select, StatusBadge, Dialog, Toast, States, PageHeader/Breadcrumb, icons), AppShell(사이드바·모바일 서랍), '내 작업' 홈(내 프로젝트·최근 활동), 프로젝트 목록(검색·정렬)·상세(문서 상태 필터·구성원·활동), 문서 협업 작업 공간(미리보기·버전 선택·버전별 피드백·새 버전·오너 확정 Dialog·FINALIZED 읽기 전용·활동), 로그인·초대 가입·초대 관리 화면
 
 - CP8 (#37): PR #29~#36 생성(스택 base), 최초 관리자 = 운영자 비밀 코드(로그 노출 제거, 관리자 존재 후 관리자 초대 무효), 신뢰 프록시 홉 기반 IP + (IP,이메일)/IP/계정 제한, 권한·불변성 회귀 테스트, 실제 브라우저 14단계 시나리오·재시작·백업 복구 실행, `docs/windows-verification.md`, `docs/deployment.md` 갱신
+
+- CP10 (#39): Windows `clean build` 2건 실패 원인 수정. (1) `application.yml`의 `.env` import가 prod에도 적용되어 로컬 `SESSION_COOKIE_SECURE=false`가 prod 기본값을 덮어씀 → `!prod` 문서로 이동, prod에서 비보안 쿠키면 기동 거부(`ProductionCookieGuard`, 로컬 확인용 `DOCFLOW_ALLOW_INSECURE_COOKIES`만 예외). (2) 명령 테스트의 Linux 경로 리터럴 → 호스트 경로. 회귀 테스트 4개 추가
 
 ## 진행 중
 
@@ -91,7 +94,7 @@ cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run 
 
 ## 다음 작업 우선순위
 
-1. 사용자 Windows 검증(`docs/windows-verification.md` §0 순서) → 결과 기록 → SPEC-05~08·#26 Done 판정
+1. 사용자 Windows 재검증(`fix/39` 브랜치, `docs/windows-verification.md` §0 순서) → 결과 기록 → SPEC-05~08·#26 Done 판정
 2. 로그인 폭주 대응 방침 결정(수용·감시 / 앞단 제한)
 3. 사용자 승인 후 Railway 리소스 생성 → `docs/deployment.md` §9 체크리스트 1~14 → 결과 기록
 4. PR 병합(위 순서, 사용자 수행)
