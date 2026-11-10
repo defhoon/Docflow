@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.docflow.audit.domain.AuditAction;
+import com.docflow.audit.domain.AuditTargetType;
+import com.docflow.audit.service.AuditLogService;
 import com.docflow.document.domain.Document;
 import com.docflow.document.domain.DocumentVersion;
 import com.docflow.document.domain.StoredDocumentFile;
@@ -51,10 +54,13 @@ public class DocumentService {
 
 	private final StoredFileTransaction storedFileTransaction;
 
+	private final AuditLogService auditLogService;
+
 	public DocumentService(ProjectService projectService, ProjectPermissionService projectPermissionService,
 			UserAccountService userAccountService, DocumentRepository documentRepository,
 			DocumentVersionRepository documentVersionRepository, FileStorage fileStorage,
-			DocumentFileValidator documentFileValidator, PlatformTransactionManager transactionManager) {
+			DocumentFileValidator documentFileValidator, PlatformTransactionManager transactionManager,
+			AuditLogService auditLogService) {
 		this.projectService = projectService;
 		this.projectPermissionService = projectPermissionService;
 		this.userAccountService = userAccountService;
@@ -62,6 +68,7 @@ public class DocumentService {
 		this.documentVersionRepository = documentVersionRepository;
 		this.fileIntake = new DocumentFileIntake(fileStorage, documentFileValidator);
 		this.storedFileTransaction = new StoredFileTransaction(transactionManager, fileStorage);
+		this.auditLogService = auditLogService;
 	}
 
 	/**
@@ -84,6 +91,9 @@ public class DocumentService {
 				.save(Document.create(project, request.title(), request.description(), user));
 			DocumentVersion version = this.documentVersionRepository
 				.save(DocumentVersion.first(document, storedFile, user));
+			// 활동 이력은 같은 트랜잭션에서 기록한다 (SPEC-06 FR-2, AC-AUD-01).
+			this.auditLogService.record(projectId, sessionUserId, AuditAction.DOCUMENT_CREATED, AuditTargetType.DOCUMENT,
+					document.getId(), document.getId(), version.getVersionNumber());
 			return DocumentResponse.from(document, version);
 		});
 		log.info("Document created: projectId={}, documentId={}, storageKey={}", projectId, response.id(),

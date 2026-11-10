@@ -81,7 +81,7 @@ class DocumentServiceTransactionTest {
 		this.fileStorage = spy(new LocalFileStorage(this.root.toString(), () -> "documents/fixed"));
 		this.service = new DocumentService(projectService, new ProjectPermissionService(), userAccountService,
 				this.documentRepository, this.versionRepository, this.fileStorage, new DocumentFileValidator(),
-				this.transactionManager);
+				this.transactionManager, mock(com.docflow.audit.service.AuditLogService.class));
 	}
 
 	@Test
