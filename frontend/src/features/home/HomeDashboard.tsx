@@ -62,7 +62,7 @@ export function HomeDashboard() {
           </ButtonLink>
         }
       />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
         <Card className="xl:col-span-3" aria-labelledby="home-projects">
           <CardHeader
             title="내 프로젝트"

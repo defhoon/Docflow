@@ -114,7 +114,7 @@ export function InvitationAdmin() {
   return (
     <>
       <PageHeader title="초대 관리" description="초대코드는 한 번만 사용할 수 있으며 발급 직후에만 원문을 볼 수 있습니다." />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
         <Card aria-labelledby="issue-heading">
           <CardHeader title="초대코드 발급" titleId="issue-heading" />
           <CardBody>

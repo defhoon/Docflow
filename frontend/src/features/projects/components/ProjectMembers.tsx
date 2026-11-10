@@ -9,7 +9,7 @@ import { errorCode, failureMessage, isUnauthenticated } from "../errors";
 import type { Member, ProjectRole } from "../types";
 import { AddMemberForm } from "./AddMemberForm";
 
-const ROLE_LABELS: Record<ProjectRole, string> = { OWNER: "Owner", MEMBER: "Member" };
+const ROLE_LABELS: Record<ProjectRole, string> = { OWNER: "오너", MEMBER: "구성원" };
 
 type MembersResult = { kind: "error"; message: string } | { kind: "success"; members: Member[] };
 

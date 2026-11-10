@@ -52,9 +52,9 @@ describe("ProjectMembers", () => {
     const list = await screen.findByRole("list", { name: "구성원 목록" });
     const rows = within(list).getAllByRole("listitem");
     expect(rows[0]).toHaveTextContent("Author");
-    expect(rows[0]).toHaveTextContent("Owner");
+    expect(rows[0]).toHaveTextContent("오너");
     expect(rows[1]).toHaveTextContent("Same Name");
-    expect(rows[1]).toHaveTextContent("Member");
+    expect(rows[1]).toHaveTextContent("구성원");
     expect(list.textContent).not.toMatch(/@|2026/);
     expect(list.querySelector("time")).toBeNull();
     expect(fetchMembersMock).toHaveBeenCalledWith("7");

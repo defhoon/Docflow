@@ -232,7 +232,7 @@ export function DocumentDetail() {
               </ButtonLink>
             </div>
           )}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
             <div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
               <Card aria-labelledby="preview-heading">
                 <CardHeader
@@ -269,7 +269,7 @@ export function DocumentDetail() {
                 </CardBody>
               </Card>
               <Card aria-labelledby="versions-card-heading">
-                <CardHeader title="버전" titleId="versions-card-heading" description="버전을 선택하면 오른쪽에 해당 버전의 피드백이 표시됩니다." />
+                <CardHeader title="버전" titleId="versions-card-heading" description="버전 번호를 누르면 그 버전의 피드백을 보고 남길 수 있습니다." />
                 <CardBody className="py-2">
                   <DocumentVersionHistory
                     projectId={projectId}

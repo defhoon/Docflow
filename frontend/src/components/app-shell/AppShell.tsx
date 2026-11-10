@@ -62,9 +62,11 @@ function ShellFrame({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh w-full">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-line bg-surface lg:flex">
-        <Sidebar pathname={pathname} />
-      </aside>
+      <div className="hidden w-60 shrink-0 border-r border-line bg-surface lg:block">
+        <aside className="sticky top-0 flex h-dvh w-60">
+          <Sidebar pathname={pathname} />
+        </aside>
+      </div>
       {menuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div aria-hidden="true" className="absolute inset-0 bg-ink/40" onClick={() => setMenuOpen(false)} />

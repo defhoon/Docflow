@@ -152,7 +152,7 @@ export function DocumentVersionHistory({
                   <span className="rounded bg-success-50 px-1.5 text-xs font-medium text-success-700">최종</span>
                 )}
               </span>
-              <span className="min-w-0 flex-1 break-all">{version.originalFilename}</span>
+              <span className="min-w-[10rem] flex-1 break-all">{version.originalFilename}</span>
               <span className="text-ink-muted">
                 {version.uploadedBy.displayName} ·{" "}
                 <time dateTime={version.uploadedAt}>{formatDateTime(version.uploadedAt)}</time> ·{" "}
