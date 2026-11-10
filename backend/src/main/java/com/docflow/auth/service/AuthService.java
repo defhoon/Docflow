@@ -11,6 +11,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 
 import com.docflow.auth.dto.AuthUserResponse;
+import com.docflow.auth.security.AuthAttemptGuard;
 import com.docflow.global.error.BusinessException;
 import com.docflow.global.error.ErrorCode;
 import com.docflow.user.domain.User;
@@ -28,9 +29,13 @@ public class AuthService {
 
 	private final UserAccountService userAccountService;
 
-	public AuthService(AuthenticationManager authenticationManager, UserAccountService userAccountService) {
+	private final AuthAttemptGuard attemptGuard;
+
+	public AuthService(AuthenticationManager authenticationManager, UserAccountService userAccountService,
+			AuthAttemptGuard attemptGuard) {
 		this.authenticationManager = authenticationManager;
 		this.userAccountService = userAccountService;
+		this.attemptGuard = attemptGuard;
 	}
 
 	/**
@@ -38,12 +43,17 @@ public class AuthService {
 	 * {@link ErrorCode#AUTH_INVALID_CREDENTIALS}로 처리하여 계정 존재 여부를 드러내지 않는다.
 	 */
 	public Authentication authenticate(String email, String password) {
+		// 시도 제한 (#26): 차단 중이면 자격 증명을 확인하지 않고 429로 응답한다.
+		this.attemptGuard.checkLogin(email);
 		try {
-			return this.authenticationManager
+			Authentication authentication = this.authenticationManager
 				.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(User.normalizeEmail(email), password));
+			this.attemptGuard.loginSucceeded(email);
+			return authentication;
 		}
 		catch (AuthenticationException ex) {
 			// 이메일, 비밀번호, 실패 사유는 기록하지 않는다.
+			this.attemptGuard.loginFailed(email);
 			log.info("Login failed");
 			throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
 		}

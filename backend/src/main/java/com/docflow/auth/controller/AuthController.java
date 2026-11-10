@@ -3,6 +3,7 @@ package com.docflow.auth.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,7 +23,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.docflow.auth.dto.AuthUserResponse;
 import com.docflow.auth.dto.LoginRequest;
 import com.docflow.auth.security.AuthenticatedUser;
+import com.docflow.auth.dto.SignupRequest;
 import com.docflow.auth.service.AuthService;
+import com.docflow.auth.service.SignupService;
 import com.docflow.global.error.BusinessException;
 import com.docflow.global.error.ErrorCode;
 
@@ -44,9 +47,12 @@ public class AuthController {
 
 	private final SecurityContextLogoutHandler logoutHandler = new SecurityContextLogoutHandler();
 
+	private final SignupService signupService;
+
 	public AuthController(AuthService authService, SessionAuthenticationStrategy sessionAuthenticationStrategy,
-			SecurityContextRepository securityContextRepository) {
+			SecurityContextRepository securityContextRepository, SignupService signupService) {
 		this.authService = authService;
+		this.signupService = signupService;
 		this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
 		this.securityContextRepository = securityContextRepository;
 	}
@@ -75,7 +81,16 @@ public class AuthController {
 		this.securityContextRepository.saveContext(context, httpRequest, httpResponse);
 
 		AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
-		return new AuthUserResponse(principal.getId(), principal.getEmail(), principal.getDisplayName());
+		return this.authService.findActiveUser(principal.getId())
+			.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+	}
+
+	/**
+	 * 초대코드 회원가입 (#26). 가입 후 자동 로그인하지 않는다(로그인 절차·시도 제한을 한 경로로 유지).
+	 */
+	@PostMapping("/signup")
+	public ResponseEntity<AuthUserResponse> signup(@Valid @RequestBody SignupRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(this.signupService.signup(request));
 	}
 
 	/**

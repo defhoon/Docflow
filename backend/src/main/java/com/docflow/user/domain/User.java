@@ -4,6 +4,8 @@ import java.util.Locale;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -34,6 +36,10 @@ public class User extends BaseTimeEntity {
 	@Column(name = "enabled", nullable = false)
 	private boolean enabled;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "system_role", nullable = false, length = 20)
+	private SystemRole systemRole = SystemRole.USER;
+
 	protected User() {
 	}
 
@@ -53,6 +59,19 @@ public class User extends BaseTimeEntity {
 	 */
 	public static String normalizeEmail(String email) {
 		return (email != null) ? email.trim().toLowerCase(Locale.ROOT) : null;
+	}
+
+	/** 초대코드가 관리자 권한을 부여할 때(최초 운영 관리자)만 사용한다 (#26). */
+	public void grantAdmin() {
+		this.systemRole = SystemRole.ADMIN;
+	}
+
+	public boolean isAdmin() {
+		return this.systemRole == SystemRole.ADMIN;
+	}
+
+	public SystemRole getSystemRole() {
+		return this.systemRole;
 	}
 
 	public void disable() {
