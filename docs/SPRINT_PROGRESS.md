@@ -7,9 +7,9 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-10 체크포인트 8 (PR #29~#36 생성, #37 공개 전 보안 강화·통합 검증) |
+| 마지막 갱신 | 2026-11-10 체크포인트 9 (PR #38 생성, 배포 직전 준비 문서 완료, Railway 리소스 미생성) |
 | 현재 브랜치 | `feat/37/pre-release-hardening` (`feat/28` 위) |
-| 마지막 검증 완료 커밋 | #37 커밋 (Backend 415 통과, 실제 브라우저 14단계 시나리오·재시작·백업 복구 통과) |
+| 마지막 검증 완료 커밋 | `feat/37` 최신 커밋 (Backend 415·Frontend 244·lint·tsc·build 통과, CI run 95·96 success) |
 | 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
 | 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
@@ -27,7 +27,7 @@
 | 5 | #26 | `feat/26/invite-signup` | 초대코드 가입, 로그인 시도 제한 | Backend 완료 (`0f10a10`), PR #34 |
 | 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포), PR #35 |
 | 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 1차 완료, PR #36 |
-| 8 | #37 | `feat/37/pre-release-hardening` | 공개 전 보안 강화·통합 검증·Windows/배포 문서 | 완료, PR 미생성(승인 범위 밖) |
+| 8 | #37 | `feat/37/pre-release-hardening` | 공개 전 보안 강화·통합 검증·Windows/배포 문서 | 완료, PR #38 |
 
 ## 완료된 작업
 
@@ -83,9 +83,15 @@ cd backend && ./gradlew test
 cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run build
 ```
 
+## 병합 순서 (사용자 수행, Merge commit만 사용)
+
+1. #29 → `main` 병합 → #30 base를 `main`으로 변경(Edit → base). 이후 #30 → #31 → … → #38 순으로 같은 방식 반복.
+2. 각 base 변경 후 CI 재실행 결과 확인 뒤 병합. Squash·Rebase 금지(다음 PR에 이전 커밋이 중복 표시·충돌 위험).
+3. 병합된 head 브랜치는 다음 PR base 변경 후 삭제(먼저 삭제해도 GitHub가 자동 재지정하지만 순서를 지키는 편이 안전).
+
 ## 다음 작업 우선순위
 
-1. #37 PR 생성 여부(사용자 승인 필요), CI 확인
-2. 사용자 Windows 검증(`docs/windows-verification.md`) 결과 기록 → SPEC-05~08·#26 Done 판정
-3. 사용자 승인 후 Railway 배포 → §7 체크리스트, 신뢰 프록시 확인, 백업·복구 1회
-4. PR 순서대로 병합(사용자 수행). 앞 PR 병합 후 다음 PR base를 main으로 변경
+1. 사용자 Windows 검증(`docs/windows-verification.md` §0 순서) → 결과 기록 → SPEC-05~08·#26 Done 판정
+2. 로그인 폭주 대응 방침 결정(수용·감시 / 앞단 제한)
+3. 사용자 승인 후 Railway 리소스 생성 → `docs/deployment.md` §9 체크리스트 1~14 → 결과 기록
+4. PR 병합(위 순서, 사용자 수행)

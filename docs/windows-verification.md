@@ -4,6 +4,16 @@
 > 검증 브랜치: `feat/37/pre-release-hardening` (#21~#28 변경을 모두 포함하는 스택의 맨 위).
 > 결과는 아래 §7 표를 채워 알려 주세요. 실행하지 않은 항목은 "미실행"으로 남겨 주세요.
 
+## 0. 우선순위 요약 (이 순서로 진행)
+
+1. 준비·DB: §1 → §2 → §3 (`docker compose up -d`)
+2. **SPEC-05 LibreOffice**: §4.1의 preview 테스트 + `Get-Process soffice*` 출력 없음
+3. **전체 Backend 테스트**: §4.1 `clean build --rerun-tasks` (실패 0, skipped 6)
+4. **전체 Frontend 테스트**: §5.1 `npm run lint`, `npm test`, `npx tsc --noEmit`, `npm run build`
+5. **새 협업 워크플로**: §4.2 실행(기본 프로파일이면 Office 미리보기까지) → §6 1~12
+6. **UI/UX 실제 화면**: §6 13 + 데스크톱 폭에서 홈·프로젝트·문서 화면 확인
+7. §7 표 작성 후 전달
+
 ## 1. 준비물
 
 | 도구 | 버전 | 확인 명령 (PowerShell) |
@@ -89,10 +99,21 @@ Office 미리보기까지 확인하려면 prod 대신 기본 프로파일로 실
 
 ## 5. Frontend
 
+### 5.1 자동 검사
+
 ```powershell
 cd ..\frontend
 npm ci
-npm run dev        # http://localhost:3000
+npm run lint          # 오류 0
+npm test              # Vitest: 32 files, 244 tests passed (클라우드 기준)
+npx tsc --noEmit      # 출력 없음
+npm run build         # Route 목록 출력, 오류 없음
+```
+
+### 5.2 실행
+
+```powershell
+npm run dev        # http://localhost:3000 (Backend가 8080에서 실행 중이어야 함)
 ```
 
 ## 6. 화면 확인 순서와 예상 결과
