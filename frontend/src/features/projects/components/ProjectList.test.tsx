@@ -67,8 +67,8 @@ describe("ProjectList (AC-PROJECT-18)", () => {
     expect(links[0]).toHaveTextContent("가장 최근");
     expect(links[0].querySelector("time")).toHaveAttribute("dateTime", "2026-01-03T00:00:00Z");
     // 내 역할 표시 (AC-MEMBER-18)
-    expect(links[0]).toHaveTextContent("Owner");
-    expect(links[1]).toHaveTextContent("Member");
+    expect(links[0]).toHaveTextContent("오너");
+    expect(links[1]).toHaveTextContent("구성원");
   });
 
   it("오류가 나면 오류와 다시 시도 버튼을 표시하고, 다시 시도하면 목록을 다시 불러온다", async () => {

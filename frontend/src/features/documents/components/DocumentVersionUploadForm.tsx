@@ -137,13 +137,13 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   }
 
   return (
-    <section aria-labelledby="document-version-heading" className="flex flex-col gap-3 border-t border-zinc-200 pt-4">
-      <h3 id="document-version-heading" className="text-sm font-semibold text-zinc-500">
+    <section aria-labelledby="document-version-heading" className="flex flex-col gap-3">
+      <h3 id="document-version-heading" className="text-sm font-semibold text-ink">
         새 버전 등록
       </h3>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3" aria-busy={submitting}>
         {!allowed && (
-          <p id="document-version-guide" className="text-sm text-zinc-600">
+          <p id="document-version-guide" className="text-sm text-ink-muted">
             {VERSION_MESSAGES.statusGuide}
           </p>
         )}
@@ -159,33 +159,33 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
             onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
             aria-invalid={Boolean(fileError)}
             aria-describedby={fileError ? "document-version-file-error" : allowed ? undefined : "document-version-guide"}
-            className="text-sm"
+            className="text-sm file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-ink hover:file:bg-subtle"
           />
           {fileError && (
-            <span id="document-version-file-error" className="text-red-700">
+            <span id="document-version-file-error" className="text-danger-700">
               {fileError}
             </span>
           )}
         </div>
         {formError && (
-          <p role="alert" className="text-sm font-medium text-red-700">
+          <p role="alert" className="text-sm font-medium text-danger-700">
             {formError}
           </p>
         )}
         {submitting && (
-          <p role="status" className="text-sm text-zinc-500">
+          <p role="status" className="text-sm text-ink-muted">
             파일을 업로드하는 중입니다. 화면을 닫지 마세요.
           </p>
         )}
         {success && (
-          <p role="status" className="text-sm text-green-700">
+          <p role="status" className="text-sm text-success-700">
             {success}
           </p>
         )}
         <button
           type="submit"
           disabled={disabled}
-          className="self-start rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="self-start inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {submitting ? "등록 중..." : "새 버전 등록"}
         </button>

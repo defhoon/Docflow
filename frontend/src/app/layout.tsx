@@ -6,13 +6,13 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "DocFlow",
-  description: "Document Review Workflow Management System",
+  description: "문서 버전·피드백·최종 확정 협업",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">
+    <html lang="ko" className="antialiased">
+      <body className="min-h-dvh">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

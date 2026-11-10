@@ -107,11 +107,12 @@ describe("프로젝트 화면 인증 연동", () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === "/api/auth/me"
         ? json(200, user)
-        : json(200, [{ id: 3, name: "DocFlow", createdAt: "2026-01-01T00:00:00Z", myRole: "OWNER" }]),
+        : json(200, [{ id: 3, name: "기획 프로젝트", createdAt: "2026-01-01T00:00:00Z", myRole: "OWNER" }]),
     );
     renderWithAuth(<ProjectsPage />);
 
-    expect((await screen.findByText("DocFlow")).closest("a")).toHaveAttribute("href", "/projects/3");
+    // 앱 셸 로고에도 "DocFlow"가 있으므로 프로젝트 이름을 구별되게 둔다 (#28).
+    expect((await screen.findByText("기획 프로젝트")).closest("a")).toHaveAttribute("href", "/projects/3");
     expect(screen.getByRole("heading", { name: "내 프로젝트" })).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });

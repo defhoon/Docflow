@@ -25,17 +25,17 @@ export function LogoutButton() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-1">
       <button
         type="button"
         onClick={() => void handleClick()}
         disabled={pending}
-        className="rounded border border-zinc-300 px-3 py-1 text-sm disabled:opacity-50"
+        className="w-full rounded-md px-2 py-1.5 text-left text-sm text-ink-muted hover:bg-subtle hover:text-ink disabled:opacity-50"
       >
         {pending ? "로그아웃 중..." : "로그아웃"}
       </button>
       {failed && (
-        <span role="alert" className="text-sm text-red-700">
+        <span role="alert" className="text-xs text-danger-700">
           로그아웃하지 못했습니다. 다시 시도해 주세요.
         </span>
       )}

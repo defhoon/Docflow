@@ -21,7 +21,7 @@ export function BackendHealthStatus() {
   switch (state.kind) {
     case "loading":
       return (
-        <p role="status" className="text-zinc-500">
+        <p role="status" className="text-ink-muted">
           Backend 상태를 확인하는 중입니다...
         </p>
       );
@@ -39,7 +39,7 @@ export function BackendHealthStatus() {
       );
     case "error":
       return (
-        <p role="alert" className="font-medium text-red-700">
+        <p role="alert" className="font-medium text-danger-700">
           연결 오류 — {state.message}
         </p>
       );

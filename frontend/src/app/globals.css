@@ -1,17 +1,54 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * DocFlow 디자인 토큰 (#28). 색은 의미 이름으로만 사용한다.
+ * brand: 주요 행동, success: 최종 확정, info: 협업 중, danger: 오류·되돌릴 수 없는 행동.
+ */
+@theme {
+  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-canvas: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-subtle: #f1f2f4;
+  --color-line: #e4e5e9;
+  --color-line-strong: #d0d2d8;
+  --color-ink: #16171d;
+  --color-ink-muted: #5c5f6a;
+  --color-ink-faint: #8a8d97;
+
+  --color-brand-50: #eef1ff;
+  --color-brand-100: #dfe5ff;
+  --color-brand-500: #4f5dea;
+  --color-brand-600: #3f4bd6;
+  --color-brand-700: #343eb3;
+
+  --color-info-50: #ecf5ff;
+  --color-info-600: #1f6fd1;
+  --color-info-700: #1a5aab;
+  --color-success-50: #ebf8f1;
+  --color-success-600: #138a52;
+  --color-success-700: #0f6f42;
+  --color-warning-50: #fff7e8;
+  --color-warning-700: #93600a;
+  --color-danger-50: #fdeeee;
+  --color-danger-600: #d23b3b;
+  --color-danger-700: #b02e2e;
+
+  --radius-card: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(16 17 22 / 0.04), 0 1px 3px rgb(16 17 22 / 0.06);
+  --shadow-overlay: 0 12px 32px rgb(16 17 22 / 0.18);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+html {
+  background: var(--color-canvas);
+  color: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
 }

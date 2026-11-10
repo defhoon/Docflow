@@ -31,6 +31,9 @@ function messageFor(error: unknown): string {
     if (error.status === 401) {
       return "이메일 또는 비밀번호가 올바르지 않습니다.";
     }
+    if (error.status === 429) {
+      return "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+    }
     if (error.code === "CSRF_INVALID") {
       return "요청을 처리할 수 없습니다. 페이지를 새로고침해 주세요.";
     }
@@ -91,11 +94,11 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       {expired && (
-        <p role="status" className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p role="status" className="rounded-lg bg-warning-50 px-3 py-2 text-sm text-warning-700">
           세션이 만료되었습니다. 다시 로그인해 주세요.
         </p>
       )}
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
         이메일
         <input
           type="email"
@@ -105,15 +108,15 @@ export function LoginForm() {
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={Boolean(fieldErrors.email)}
           aria-describedby={fieldErrors.email ? "email-error" : undefined}
-          className="rounded border border-zinc-300 px-3 py-2"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         {fieldErrors.email && (
-          <span id="email-error" className="text-red-700">
+          <span id="email-error" className="text-danger-700">
             {fieldErrors.email}
           </span>
         )}
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
         비밀번호
         <input
           type="password"
@@ -123,23 +126,23 @@ export function LoginForm() {
           onChange={(event) => setPassword(event.target.value)}
           aria-invalid={Boolean(fieldErrors.password)}
           aria-describedby={fieldErrors.password ? "password-error" : undefined}
-          className="rounded border border-zinc-300 px-3 py-2"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         {fieldErrors.password && (
-          <span id="password-error" className="text-red-700">
+          <span id="password-error" className="text-danger-700">
             {fieldErrors.password}
           </span>
         )}
       </label>
       {formError && (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-danger-700">
           {formError}
         </p>
       )}
       <button
         type="submit"
         disabled={submitting}
-        className="rounded bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-50"
+        className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
       >
         {submitting ? "로그인 중..." : "로그인"}
       </button>

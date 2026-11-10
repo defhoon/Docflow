@@ -17,6 +17,14 @@ type Props = {
   reloadKey: number;
   selectedVersion: number | null;
   onPreview: (version: DocumentVersionSummary) => void;
+  /** 버전 선택(피드백 대상, #28). 없으면 선택 버튼을 표시하지 않는다. */
+  onSelect?: (version: DocumentVersionSummary) => void;
+  /** 목록을 불러올 때마다 호출한다(선택 가능한 버전 목록 공유). */
+  onLoaded?: (versions: DocumentVersionSummary[]) => void;
+  /** 최종 확정 버전 번호 (SPEC-07). 해당 행에 '최종' 표시. */
+  finalVersionNumber?: number | null;
+  /** 제목을 숨긴다(카드 머리글이 대신할 때). */
+  hideHeading?: boolean;
 };
 
 type ListState =
@@ -25,7 +33,17 @@ type ListState =
   | { kind: "success"; versions: DocumentVersionSummary[] };
 
 /** 버전 히스토리 (SPEC-05 §9.1): 최신 먼저, 버전별 미리보기·원본 다운로드. */
-export function DocumentVersionHistory({ projectId, documentId, reloadKey, selectedVersion, onPreview }: Props) {
+export function DocumentVersionHistory({
+  projectId,
+  documentId,
+  reloadKey,
+  selectedVersion,
+  onPreview,
+  onSelect,
+  onLoaded,
+  finalVersionNumber = null,
+  hideHeading = false,
+}: Props) {
   const { refresh } = useAuth();
   const [attempt, setAttempt] = useState(0);
   const requestKey = `${projectId}/${documentId}#${reloadKey}#${attempt}`;
@@ -41,6 +59,7 @@ export function DocumentVersionHistory({ projectId, documentId, reloadKey, selec
       (versions) => {
         if (active) {
           setResult({ key: requestKey, value: { kind: "success", versions } });
+          onLoaded?.(versions);
         }
       },
       (error: unknown) => {
@@ -56,6 +75,8 @@ export function DocumentVersionHistory({ projectId, documentId, reloadKey, selec
     return () => {
       active = false;
     };
+    // onLoaded는 알림용 콜백이라 다시 조회할 이유가 아니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, documentId, requestKey, refresh]);
 
   const download = useCallback(
@@ -79,42 +100,60 @@ export function DocumentVersionHistory({ projectId, documentId, reloadKey, selec
   );
 
   return (
-    <section aria-labelledby="document-versions-heading" className="flex flex-col gap-2 border-t border-zinc-200 pt-4">
-      <h3 id="document-versions-heading" className="text-sm font-semibold text-zinc-500">
+    <section aria-labelledby="document-versions-heading" className="flex flex-col gap-2">
+      <h3 id="document-versions-heading" className={hideHeading ? "sr-only" : "text-sm font-semibold text-ink-muted"}>
         버전 히스토리
       </h3>
       {state.kind === "loading" && (
-        <p role="status" className="text-sm text-zinc-500">
+        <p role="status" className="text-sm text-ink-muted">
           버전 목록을 불러오는 중...
         </p>
       )}
       {state.kind === "error" && (
         // 사용자 동작의 결과가 아닌 배경 조회 실패이므로 정중한 알림(status)으로 알린다. 다운로드 실패는 alert.
-        <div role="status" className="flex flex-col items-start gap-2 text-sm text-red-700">
+        <div role="status" className="flex flex-col items-start gap-2 text-sm text-danger-700">
           <p>버전 목록을 불러오지 못했습니다. {state.message}</p>
           <button
             type="button"
             onClick={() => setAttempt((current) => current + 1)}
-            className="rounded border border-zinc-300 px-3 py-1 text-zinc-800"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
           >
             목록 다시 불러오기
           </button>
         </div>
       )}
       {state.kind === "success" && (
-        <ul className="flex flex-col divide-y divide-zinc-100 text-sm">
+        <ul className="flex flex-col divide-y divide-line text-sm">
           {state.versions.map((version) => (
             <li
               key={version.versionNumber}
               aria-current={selectedVersion === version.versionNumber ? "true" : undefined}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
+              className={
+                "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-2.5 " +
+                (selectedVersion === version.versionNumber ? "bg-brand-50/70" : "")
+              }
             >
-              <span className="font-medium">
-                v{version.versionNumber}
-                {version.latest && <span className="ml-1 rounded bg-zinc-100 px-1 text-xs text-zinc-600">최신</span>}
+              <span className="flex items-center gap-1.5 font-medium">
+                {onSelect ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelect(version)}
+                    aria-pressed={selectedVersion === version.versionNumber}
+                    aria-label={`v${version.versionNumber} 선택`}
+                    className="rounded-md px-1.5 py-0.5 text-brand-700 hover:bg-brand-50"
+                  >
+                    v{version.versionNumber}
+                  </button>
+                ) : (
+                  <>v{version.versionNumber}</>
+                )}
+                {version.latest && <span className="rounded bg-subtle px-1.5 text-xs text-ink-muted">최신</span>}
+                {finalVersionNumber === version.versionNumber && (
+                  <span className="rounded bg-success-50 px-1.5 text-xs font-medium text-success-700">최종</span>
+                )}
               </span>
               <span className="min-w-0 flex-1 break-all">{version.originalFilename}</span>
-              <span className="text-zinc-500">
+              <span className="text-ink-muted">
                 {version.uploadedBy.displayName} ·{" "}
                 <time dateTime={version.uploadedAt}>{formatDateTime(version.uploadedAt)}</time> ·{" "}
                 <span title={`${version.sizeBytes.toLocaleString("ko-KR")} 바이트`}>
@@ -126,7 +165,7 @@ export function DocumentVersionHistory({ projectId, documentId, reloadKey, selec
                   type="button"
                   onClick={() => onPreview(version)}
                   aria-label={`v${version.versionNumber} 미리보기`}
-                  className="rounded border border-zinc-300 px-2 py-0.5 text-zinc-800"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
                 >
                   미리보기
                 </button>
@@ -135,7 +174,7 @@ export function DocumentVersionHistory({ projectId, documentId, reloadKey, selec
                   onClick={() => void download(version)}
                   disabled={downloading === version.versionNumber}
                   aria-label={`v${version.versionNumber} 다운로드`}
-                  className="rounded border border-zinc-300 px-2 py-0.5 text-zinc-800 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
                 >
                   {downloading === version.versionNumber ? "다운로드 중..." : "다운로드"}
                 </button>
@@ -145,7 +184,7 @@ export function DocumentVersionHistory({ projectId, documentId, reloadKey, selec
         </ul>
       )}
       {downloadError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger-700">
           {downloadError}
         </p>
       )}

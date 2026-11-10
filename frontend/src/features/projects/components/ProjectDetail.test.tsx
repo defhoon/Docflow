@@ -52,12 +52,13 @@ describe("ProjectDetail", () => {
     render(<ProjectDetail />);
 
     expect(screen.getByRole("status")).toHaveTextContent("불러오는 중...");
-    expect(await screen.findByRole("heading", { name: "DocFlow 기획" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "DocFlow 기획" })).toBeInTheDocument();
     expect(fetchProjectMock).toHaveBeenCalledWith("7");
-    expect(screen.getByText("Author")).toBeInTheDocument();
+    expect(screen.getByText("오너 Author")).toBeInTheDocument();
     expect(screen.getByText(/1행/)).toHaveTextContent("1행 2행");
     expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-01-02T03:04:05Z");
-    expect(screen.getByRole("link", { name: "프로젝트 목록으로" })).toHaveAttribute("href", "/projects");
+    // #28: 목록 링크는 빵부스러기의 "프로젝트"로 제공한다.
+    expect(screen.getByRole("link", { name: "프로젝트" })).toHaveAttribute("href", "/projects");
     expect(screen.getByRole("region", { name: "문서" })).toHaveTextContent("문서 섹션 7");
   });
 
@@ -100,7 +101,7 @@ describe("ProjectDetail", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("서버 오류가 발생했습니다.");
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
-    expect(await screen.findByRole("heading", { name: "DocFlow 기획" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "DocFlow 기획" })).toBeInTheDocument();
     expect(fetchProjectMock).toHaveBeenCalledTimes(2);
   });
 

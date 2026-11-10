@@ -105,10 +105,10 @@ export function ProjectCreateForm() {
           onChange={(event) => setName(event.target.value)}
           aria-invalid={Boolean(fieldErrors.name)}
           aria-describedby={fieldErrors.name ? "project-name-error" : undefined}
-          className="rounded border border-zinc-300 px-3 py-2"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         {fieldErrors.name && (
-          <span id="project-name-error" className="text-red-700">
+          <span id="project-name-error" className="text-danger-700">
             {fieldErrors.name}
           </span>
         )}
@@ -123,23 +123,23 @@ export function ProjectCreateForm() {
           onChange={(event) => setDescription(event.target.value)}
           aria-invalid={Boolean(fieldErrors.description)}
           aria-describedby={fieldErrors.description ? "project-description-error" : undefined}
-          className="rounded border border-zinc-300 px-3 py-2"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         {fieldErrors.description && (
-          <span id="project-description-error" className="text-red-700">
+          <span id="project-description-error" className="text-danger-700">
             {fieldErrors.description}
           </span>
         )}
       </div>
       {formError && (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-danger-700">
           {formError}
         </p>
       )}
       <button
         type="submit"
         disabled={submitting}
-        className="rounded bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-50"
+        className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
       >
         {submitting ? "생성 중..." : "프로젝트 생성"}
       </button>
