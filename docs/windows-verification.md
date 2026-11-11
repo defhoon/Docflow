@@ -1,14 +1,15 @@
 # Windows 로컬 검증 안내 (#37)
 
 > 대상: SPEC-05 Windows 재검증(AC-VDL-22)과 새 워크플로 전체(가입·업로드·피드백·확정)의 로컬 수동 검증.
-> 검증 브랜치: `feat/37/pre-release-hardening` (#21~#28 변경을 모두 포함하는 스택의 맨 위).
+> 검증 브랜치: `fix/39/windows-test-failures` (#21~#37 변경 + Windows 테스트 수정을 포함하는 스택의 맨 위).
 > 결과는 아래 §7 표를 채워 알려 주세요. 실행하지 않은 항목은 "미실행"으로 남겨 주세요.
 
 ## 0. 우선순위 요약 (이 순서로 진행)
 
 1. 준비·DB: §1 → §2 → §3 (`docker compose up -d`)
 2. **SPEC-05 LibreOffice**: §4.1의 preview 테스트 + `Get-Process soffice*` 출력 없음
-3. **전체 Backend 테스트**: §4.1 `clean build --rerun-tasks` (실패 0, skipped 6)
+3. **전체 Backend 테스트**: §4.1 `clean build --rerun-tasks` (클라우드 기준 419개, 실패 0, Windows skipped 6). 이전에 실패한 2건(#39)을 먼저 단독 실행해도 된다:
+   `.\gradlew.bat test --tests "com.docflow.document.DocumentPreviewProductionPolicyIntegrationTest" --tests "com.docflow.document.preview.LibreOfficePreviewConverterTest" --tests "com.docflow.global.config.*" --rerun`
 4. **전체 Frontend 테스트**: §5.1 `npm run lint`, `npm test`, `npx tsc --noEmit`, `npm run build`
 5. **새 협업 워크플로**: §4.2 실행(기본 프로파일이면 Office 미리보기까지) → §6 1~12
 6. **UI/UX 실제 화면**: §6 13 + 데스크톱 폭에서 홈·프로젝트·문서 화면 확인
@@ -29,7 +30,7 @@
 ```powershell
 cd <저장소 경로>\Docflow
 git fetch origin
-git switch feat/37/pre-release-hardening
+git switch fix/39/windows-test-failures
 git pull
 Copy-Item .env.example .env -ErrorAction SilentlyContinue   # 이미 있으면 기존 .env 유지
 notepad .env
@@ -69,6 +70,20 @@ docker compose down -v; docker compose up -d
 
 ### 4.1 자동 테스트 (먼저 SPEC-05 Windows 재검증)
 
+**DB 접속 정보를 프로세스 환경 변수로 먼저 설정한다.** 일부 테스트(`DocumentPreviewProductionPolicyIntegrationTest` 등)는 prod 프로파일로 기동하며, prod는 의도적으로 `.env`를 읽지 않는다(#39). 이때 DB 정보가 없으면 기본값(`docflow` 사용자, 비밀번호 없음)으로 접속해 인증 오류가 난다. 아래는 루트 `.env`의 DB 값 3개만 현재 PowerShell 창에 넣으며 값을 화면에 출력하지 않는다(창을 닫으면 사라짐).
+
+```powershell
+cd <저장소 경로>\Docflow
+Get-Content .env | Where-Object { $_ -match '^\s*(DB_URL|DB_USERNAME|DB_PASSWORD)\s*=' } | ForEach-Object {
+  $name, $value = $_ -split '=', 2
+  [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim(), 'Process')
+}
+# 설정 여부만 확인(값은 출력하지 않음)
+'DB_URL','DB_USERNAME','DB_PASSWORD' | ForEach-Object { "{0}: {1}" -f $_, [bool][Environment]::GetEnvironmentVariable($_, 'Process') }
+```
+
+`.env`에 `DB_URL`·`DB_USERNAME`이 없으면 각각 `jdbc:postgresql://localhost:5432/docflow`, `docflow`로 직접 설정한다. 같은 창에서 이어서 테스트를 실행한다.
+
 ```powershell
 cd backend
 .\gradlew.bat test --tests "com.docflow.document.preview.*" --tests "com.docflow.document.DocumentPreviewIntegrationTest" --tests "com.docflow.document.DocumentPreviewEngineUnavailableIntegrationTest" --rerun --console=plain
@@ -84,9 +99,10 @@ Get-Process soffice* -ErrorAction SilentlyContinue   # 출력 없어야 함
 $env:SPRING_PROFILES_ACTIVE = "prod"
 $env:DOCFLOW_STORAGE_DIR = "$PWD\storage"            # prod 기본값(/data/storage) 대신 로컬 폴더
 $env:SESSION_COOKIE_SECURE = "false"                 # 로컬 http에서 로그인하려면 필요
+$env:DOCFLOW_ALLOW_INSECURE_COOKIES = "true"        # prod는 비보안 쿠키면 기동을 거부한다(#39). 로컬 확인 전용, 운영 금지
 $env:DB_URL = "jdbc:postgresql://localhost:5432/docflow"
 $env:DB_USERNAME = "docflow"
-$env:DB_PASSWORD = "<.env의 DB_PASSWORD>"           # prod 프로파일은 .env를 읽지 않는다
+$env:DB_PASSWORD = "<.env의 DB_PASSWORD>"           # prod 프로파일은 .env를 읽지 않는다(#39에서 실제로 보장)
 .\gradlew.bat bootRun
 ```
 
@@ -94,6 +110,7 @@ $env:DB_PASSWORD = "<.env의 DB_PASSWORD>"           # prod 프로파일은 .env
 - `Successfully applied N migrations` 또는 `Schema "public" is up to date`
 - 빈 DB이면 `Administrator bootstrap invitation is ready (expires at …)` (코드 원문은 로그에 없어야 함)
 - `Office preview disabled by configuration` (prod 기본: Office 변환 꺼짐)
+- `prod profile is running with INSECURE cookies` 경고(로컬 확인용 허용 변수 때문, 정상)
 
 Office 미리보기까지 확인하려면 prod 대신 기본 프로파일로 실행합니다(`$env:SPRING_PROFILES_ACTIVE = ""`, `.env`가 로딩됨). 기본 프로파일은 OS 격리 없이 LibreOffice를 실행하며 시작 시 WARN을 남깁니다(로컬 확인용).
 
@@ -142,6 +159,21 @@ npm run dev        # http://localhost:3000 (Backend가 8080에서 실행 중이�
 | 4.1 preview 테스트 | | |
 | 4.1 clean build (테스트 수·skip 수) | | |
 | 6-1 ~ 6-14 | | |
+
+### 7.1 검증 기록: 2026-11-11 Windows 전체 검증 (사용자, `fix/39/windows-test-failures`)
+
+| 항목 | 결과 | 비고 |
+| --- | --- | --- |
+| 4.1 실패했던 2건 + 설정 테스트(#39) | 통과 | `BUILD SUCCESSFUL in 3m 42s` |
+| 4.1 Backend 전체 `clean build --rerun-tasks` | 통과 | `BUILD SUCCESSFUL in 11m 11s`, 9 actionable tasks executed. DB 정보는 프로세스 환경 변수로 전달 |
+| 5.1 Frontend lint·test·tsc·build | 통과 | |
+| 6-1~4 관리자 로그인·초대코드 발급·가입 | 통과 | |
+| 6-5 프로젝트 생성·구성원 추가 | 통과 | |
+| 6-6~7 문서 v1/v2 업로드, 버전별 피드백·이력 유지 | 통과 | |
+| 6-8 PDF·Office 미리보기, 다운로드 | 통과 | LibreOffice 실제 변환 |
+| 6-9~11 오너의 과거 버전 최종 확정, FINALIZED 수정 차단 | 통과 | |
+| 6-13 모바일·데스크톱 UI | 통과 | |
+| 6-14 LibreOffice 프로세스 정리 | 통과 | |
 
 ## 8. 문제 발생 시 확인할 것
 

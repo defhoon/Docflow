@@ -49,6 +49,7 @@ cp .env.example .env
 - 경로 `../.env`는 **실행 시 작업 디렉터리 기준**이다. `backend/`에서 `./gradlew bootRun`, `./gradlew test`, `./gradlew build`를 실행하면 Gradle의 작업 디렉터리가 `backend/`이므로 루트 `.env`가 로딩된다.
 - 다른 작업 디렉터리(예: IDE 실행 설정이 저장소 루트를 가리키는 경우)에서 실행하면 `.env`를 찾지 못한다. `optional:`이므로 오류 없이 넘어가지만 `DB_PASSWORD`가 없어 DB 연결이 실패한다. 이때는 IDE의 작업 디렉터리를 `backend`로 지정하거나 환경변수를 직접 설정한다.
 - OS 환경변수가 설정되어 있으면 `.env` 값보다 우선한다.
+- `prod` 프로파일에서는 `.env`를 읽지 않는다(#39). 운영 값은 배포 플랫폼 환경변수로만 주입한다.
 - `.env`는 Java properties 형식으로 해석된다. 값에 따옴표를 붙이지 말고(따옴표까지 값에 포함됨), 비밀번호에 `\` 문자를 쓰지 않는다(이스케이프 문자로 처리됨).
 - Frontend(Next.js)는 루트 `.env`를 읽지 않는다. `BACKEND_URL`을 바꿀 때만 셸 환경변수로 지정한다(기본값 `http://localhost:8080`).
 

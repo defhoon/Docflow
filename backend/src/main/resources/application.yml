@@ -1,9 +1,6 @@
 spring:
   application:
     name: docflow
-  config:
-    # 저장소 루트의 .env(Git 미포함)를 선택적으로 읽는다. 실제 환경변수가 있으면 환경변수가 우선한다.
-    import: optional:file:../.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/docflow}
     username: ${DB_USERNAME:docflow}
@@ -28,6 +25,9 @@ docflow:
   auth:
     # 신뢰 프록시 수(#37). 0이면 X-Forwarded-For를 쓰지 않는다. 배포 구성을 확인한 뒤에만 설정한다(docs/deployment.md).
     trusted-proxy-hops: ${DOCFLOW_TRUSTED_PROXY_HOPS:0}
+  security:
+    # prod 프로파일의 비보안 쿠키 허용(로컬 HTTP 확인 전용, #39). 운영에는 설정하지 않는다.
+    allow-insecure-cookies: ${DOCFLOW_ALLOW_INSECURE_COOKIES:false}
   bootstrap:
     # 최초 관리자 초대코드(24~64자, 비밀 변수). 사용자가 0명일 때만 쓰이며 원문은 저장·기록하지 않는다(#37).
     admin-code: ${DOCFLOW_BOOTSTRAP_ADMIN_CODE:}
@@ -74,3 +74,13 @@ server:
         same-site: lax
         # 로컬(http://localhost)은 false, 운영(HTTPS)은 true로 설정한다.
         secure: ${SESSION_COOKIE_SECURE:false}
+
+---
+# 로컬 개발: 저장소 루트의 .env(Git 미포함)를 선택적으로 읽는다. 실제 환경변수가 있으면 환경변수가 우선한다.
+# prod 프로파일에서는 읽지 않는다(#39): 로컬 .env의 개발용 값(예: SESSION_COOKIE_SECURE=false)이 운영 기본값을 덮어쓰지 않게 한다.
+# 경로는 테스트에서 바꿀 수 있도록 docflow.dotenv 로 지정할 수 있다(기본 ../.env, 실행 디렉터리 기준).
+spring:
+  config:
+    activate:
+      on-profile: "!prod"
+    import: optional:file:${docflow.dotenv:../.env}[.properties]
