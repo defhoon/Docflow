@@ -17,7 +17,7 @@
 
 | Railway 리소스 | 소스·빌드 | 공개 여부 | 연결 |
 | --- | --- | --- | --- |
-| `Postgres` | Railway PostgreSQL 템플릿 (주 버전 16 선택·확인) | **TCP Proxy 끔** | backend가 참조 변수로 접속 |
+| `Postgres` | Railway PostgreSQL 템플릿, **주 버전 16으로 고정**(backend 이미지의 `pg_dump`가 16이라 서버가 17 이상이면 컨테이너 백업이 실패) | **TCP Proxy 끔** | backend가 참조 변수로 접속 |
 | `backend` | GitHub 저장소, Root Directory `backend`, `backend/Dockerfile` | **Public Networking 없음** | `backend.railway.internal:8080` |
 | `frontend` | GitHub 저장소, Root Directory `frontend`, `frontend/Dockerfile` | 공개 도메인(HTTPS) | `BACKEND_URL`로 backend 호출 |
 | 볼륨 | backend에 연결, Mount path `/data` | — | Hobby 5GB/볼륨 상한 |
@@ -39,6 +39,34 @@
 
 - 볼륨이 연결된 서비스는 새 배포가 기존 컨테이너와 동시에 볼륨을 쓸 수 없어 배포 중 짧은 중단이 생길 수 있다(미검증, Railway 동작 확인).
 - frontend의 `BACKEND_URL`은 rewrite 대상이 **빌드 시** 고정되므로 서비스 변수로 넣고 변수 변경 후에는 재빌드한다.
+
+### 2.1 Railway 콘솔 입력용 최종 설정표 (2026-11-11, #43)
+
+필수 = 빠지면 배포 실패·데이터 유실·보안 정책 위반. 권장 = 운영 안정성·비용 관리.
+
+| 순서 | 서비스 | 항목 | 값 | 구분 |
+| --- | --- | --- | --- | --- |
+| 1 | (워크스페이스) | 사용량 알림 / 하드 리밋 | $15 / $25 (§8.1) | 권장(하드 리밋은 강력 권장) |
+| 2 | Postgres | 생성 | PostgreSQL **16** | 필수 |
+| 2 | Postgres | TCP Proxy(공개 접속) | 끔 | 필수 |
+| 3 | backend | Source / Root Directory | GitHub 저장소 / `backend` | 필수 |
+| 3 | backend | Dockerfile 경로 | `backend/Dockerfile`(Root Directory 기준 `Dockerfile`, 자동 감지) | 필수 |
+| 3 | backend | 볼륨 Mount path | `/data` (없으면 재배포 때 파일 유실, 경고 없음) | 필수 |
+| 3 | backend | Variables | `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`(참조 변수), `PORT=8080` | 필수 |
+| 3 | backend | Secret (Sealed) | `DOCFLOW_BOOTSTRAP_ADMIN_CODE`(24~64자, 가입 후 삭제) | 필수(최초 1회) |
+| 3 | backend | 넣지 않는 변수 | `SESSION_COOKIE_SECURE`, `DOCFLOW_ALLOW_INSECURE_COOKIES`, `DOCFLOW_TRUSTED_PROXY_HOPS`(0 유지), `DOCFLOW_PREVIEW_OFFICE_ENABLED` | 필수(정책) |
+| 3 | backend | Public Networking | **없음**(내부 주소만) | 필수 |
+| 3 | backend | Healthcheck path / timeout | `/actuator/health` / 300초 | 필수 / 권장 |
+| 3 | backend | Replicas | 1 | 필수(메모리 세션·시도 제한·볼륨) |
+| 3 | backend | 메모리 제한 | 1GB | 권장 |
+| 3 | backend | Restart policy | On failure | 권장 |
+| 4 | frontend | Source / Root Directory | GitHub 저장소 / `frontend` | 필수 |
+| 4 | frontend | Dockerfile 경로 | `frontend/Dockerfile`(자동 감지) | 필수 |
+| 4 | frontend | Variables | `BACKEND_URL=http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:8080`(빌드 시 필요) | 필수 |
+| 4 | frontend | Public Networking | 도메인 생성(HTTPS) | 필수 |
+| 4 | frontend | Healthcheck path | `/login` | 권장 |
+| 4 | frontend | 메모리 제한 | 512MB | 권장 |
+| 5 | (배포 순서) | backend 배포 → 로그 확인(§5, §4) → frontend 배포 → §9 | | 필수 |
 
 ## 3. 환경 변수와 입력 방법
 
@@ -115,18 +143,21 @@ Railway 공식 요금(2026-11 확인, [docs.railway.com/pricing](https://docs.ra
 | 합계 | 소규모 사용 | **약 $10~15 (크레딧 $5 차감 후 추가 $5~10)** |
 
 - 변동 요인: 메모리는 유휴 중에도 과금, 로그인 대량 시도·다운로드 트래픽에 따른 CPU·egress 증가, 볼륨 5GB 초과 시 Pro.
-- 비용 상한: Workspace → Usage(또는 Billing)에서 **알림 금액**과 **하드 리밋**을 설정한다. 하드 리밋에 도달하면 서비스가 중지될 수 있으므로 알림은 $15, 하드 리밋은 $25 정도로 시작(콘솔에서 기능·동작 확인, 미검증).
+- 비용 상한: Workspace → Usage에서 **사용량 알림**과 **하드 리밋**을 함께 설정한다(§8.1). 알림만으로는 지출이 막히지 않는다.
+- 재평가(2026-11-11, 가정): RAM 합계 약 0.7~0.95GB + CPU 평균 0.05~0.1 vCPU + 볼륨 1.5~5.5GB + egress 수 GB → 사용량 약 $8~12.5. 청구액은 `max($5, 사용량)`이므로 **약 $8~13**. 위 표의 $10~15와 같은 범위이며 실제 값은 배포 후 Metrics·Usage로 확인한다. 단가는 확인된 공식 요금, 사용량은 가정이다.
 - backend 메모리 상한: 서비스 Settings의 리소스 제한에서 1GB 이하로 제한(JVM은 `MaxRAMPercentage=75`).
 
-### 8.1 알림과 하드 리밋의 차이 (초기 비공개 테스트 방침: 앱 수준 제한 + 감시, 2026-11-11 결정)
+### 8.1 알림과 하드 리밋의 차이 (초기 비공개 테스트 방침: 앱 수준 제한 + 감시)
 
-| 구분 | 동작 | 권장 시작값 |
+출처: Railway [Cost Control](https://docs.railway.com/reference/usage-limits) 문서의 검색 요약(2026-11-11). 이 작업 환경에서는 `docs.railway.com`에 직접 접속할 수 없어 원문을 읽지 못했다. 콘솔에서 다시 확인한다.
+
+| 구분 | 동작 (요약 기준) | 권장 시작값 |
 | --- | --- | --- |
-| 사용량 알림(email alert) | 설정 금액에 도달하면 이메일만 보낸다. 서비스는 계속 동작하고 과금도 계속된다 | $15 |
-| 하드 리밋(hard limit) | 도달하면 워크스페이스 서비스가 중지되어 더 이상 과금되지 않는다. 사용자는 접속할 수 없게 된다 | $25 |
-| 리소스 제한(서비스별 vCPU·메모리 상한) | 서비스 하나가 쓸 수 있는 최대치. 초과 시 CPU는 느려지고 메모리는 OOM으로 재시작될 수 있다 | backend 1GB, 1vCPU |
+| 사용량 알림(custom email alert) | 설정 금액을 넘으면 **이메일만** 보낸다. 서비스는 계속 동작하고 과금도 계속된다 | $15 |
+| 하드 리밋(hard limit, compute) | 도달하면 **워크스페이스의 모든 워크로드를 오프라인으로 전환**해 추가 사용을 막는다. 75%·90%·100%에서 이메일. **최소 설정 금액 $10** | $25 |
+| 서비스별 리소스 제한 | 서비스가 쓸 수 있는 vCPU·메모리 최대치. 메모리 초과 시 OOM 재시작 가능 | backend 1GB, frontend 512MB |
 
-명칭·위치는 Railway 콘솔에서 확인한다(미검증). 알림만으로는 지출을 막지 못하므로 두 가지를 함께 설정한다.
+미검증(공식 문서에서 확인 못 함): 하드 리밋 도달 후 실제 중단까지의 지연·초과 사용 범위, 중단 중 볼륨 데이터 처리, 한도 상향 후 자동 재배포 여부(제3자 가이드에만 언급). 하드 리밋은 "지출 차단"이지만 서비스 전체 중단을 뜻하므로 너무 낮게 잡지 않는다.
 
 ### 8.2 사용량·부하 확인 방법
 
@@ -135,7 +166,17 @@ Railway 공식 요금(2026-11 확인, [docs.railway.com/pricing](https://docs.ra
 - backend 로그(Observability/Logs) 필터: `Login failed`(실패, `clientIp` 포함), `Signup rejected`, `prod profile is running with INSECURE cookies`(운영에서 보이면 즉시 조치).
 - 현재 한계: 시도 제한으로 **차단된(429) 요청은 로그에 남지 않는다**. 차단 규모는 실패 로그의 급증과 CPU 그래프로 간접 판단한다. 차단 로그(키는 마스킹)를 추가하려면 별도 작업·승인이 필요하다.
 
-### 8.3 앞단 요청 제한(Cloudflare 등)이 필요해지는 조건
+### 8.3 서비스·볼륨 삭제 후에도 남을 수 있는 비용
+
+근거는 대부분 Railway 커뮤니티 포럼(공식 정책 아님, 콘솔·지원으로 확인 필요).
+
+- 데이터가 있는 볼륨을 삭제하면 **48시간 보존 기간** 후 완전히 지워지며, 그 기간에도 GB·분 단위로 과금된다는 안내가 있다.
+- **서비스를 삭제해도 볼륨이 분리된 채 남아** 계속 과금된 사례가 보고되었다. 서비스 삭제 후 Volumes 목록에서 남은 볼륨이 없는지 확인한다.
+- 삭제 전까지의 사용량은 해당 청구 기간에 포함된다.
+- Hobby 기본료($5)는 플랜을 해지하기 전까지 청구된다(추정).
+- 정리 순서: 백업 확보 → 서비스 중지 → 볼륨 삭제 확인 → Usage에서 증가가 멈췄는지 확인 → 필요 시 플랜 해지.
+
+### 8.4 앞단 요청 제한(Cloudflare 등)이 필요해지는 조건
 
 다음 중 하나라도 해당하면 앞단 요청 제한을 검토한다(도입 시 DNS·프록시 신뢰 경계 변경 → ADR·승인).
 
@@ -204,3 +245,61 @@ Railway 공식 요금(2026-11 확인, [docs.railway.com/pricing](https://docs.ra
 - 재배포·재시작 시 로그인 세션 초기화(데이터 유지). Spring Session JDBC는 의존성 1개 + 세션 테이블, 약 2~3시간 + 요청당 DB 조회 증가. 초기 공개에 필수 아님.
 - 시도 제한·세션은 단일 인스턴스 메모리 기준.
 - Hobby 볼륨 5GB 상한, Office 문서는 운영에서 미리보기 대신 다운로드 안내.
+
+## 13. Backend 컨테이너 실행 검증 (#43)
+
+CI의 Docker job은 이미지 **빌드**와 비root·`.env` 미포함만 확인하고, 컨테이너를 **실행하지 않는다.** 실행 검증 현황은 다음과 같다.
+
+### 13.1 클라우드 entrypoint 시뮬레이션 (2026-11-11, Docker 아님)
+
+Claude Code 클라우드에는 Docker daemon이 없어, 같은 Ubuntu 24.04 호스트에서 **실제 `docker-entrypoint.sh`와 같은 jar**를 이미지와 같은 경로(`/app`, `/data`)로 격리된 마운트 네임스페이스에서 root로 실행했다(JRE는 21, 이미지는 25).
+
+| 항목 | 결과 |
+| --- | --- |
+| PostgreSQL 16 연결, Flyway V1~V9 | `Successfully applied 9 migrations` |
+| `/actuator/health` | `UP` |
+| 소유권 변경 | root 소유로 준비한 `/data`·`/data/lost+found/marker`가 docflow(uid 999) 소유로 변경 |
+| 비root 전환 | java 프로세스 uid 999(docflow) |
+| `/data/storage` 쓰기·읽기 | API로 관리자 가입·프로젝트·PDF 업로드 → 저장 파일 docflow 소유, 다운로드 원본과 동일 |
+| 재시작 후 유지 | SIGTERM 후 재기동: `Schema "public" is up to date`, 재로그인 후 같은 파일 다운로드 동일, uid 999 유지 |
+
+한계: 실제 이미지(Temurin 25 JRE, 이미지 내부 사용자 생성)와 Docker 볼륨 마운트는 검증하지 않았다 → 13.2를 Docker 환경에서 실행한다.
+
+### 13.2 Docker Desktop(Windows PowerShell) 실행 검증 명령
+
+테스트 전용 이름(`docflow-smoke-*`)만 만들고 마지막에 지운다. 개발 DB·볼륨은 건드리지 않는다.
+
+```powershell
+cd <저장소 경로>\Docflow
+docker network create docflow-smoke
+docker run -d --name docflow-smoke-db --network docflow-smoke -e POSTGRES_DB=docflow -e POSTGRES_USER=docflow -e POSTGRES_PASSWORD=smoke-only-password postgres:16
+docker build -t docflow-backend:smoke backend
+docker volume create docflow-smoke-data
+# Railway처럼 root 소유 볼륨을 흉내 낸다(빈 볼륨에 root 파일 생성)
+docker run --rm -v docflow-smoke-data:/data alpine sh -c "mkdir -p /data/lost+found && echo root > /data/lost+found/marker && chown -R 0:0 /data"
+docker run -d --name docflow-smoke-backend --restart on-failure --network docflow-smoke -p 18080:8080 -v docflow-smoke-data:/data `
+  -e DB_URL=jdbc:postgresql://docflow-smoke-db:5432/docflow -e DB_USERNAME=docflow -e DB_PASSWORD=smoke-only-password `
+  -e DOCFLOW_BOOTSTRAP_ADMIN_CODE=Smoke-Bootstrap-Code-0123456789 `
+  -e SESSION_COOKIE_SECURE=false -e DOCFLOW_ALLOW_INSECURE_COOKIES=true docflow-backend:smoke
+
+function Wait-Up { for ($i=0; $i -lt 60; $i++) { try { if ((Invoke-RestMethod http://localhost:18080/actuator/health).status -eq 'UP') { return 'UP' } } catch {}; Start-Sleep 2 }; 'TIMEOUT' }
+Wait-Up                                                                        # 기대: UP
+docker logs docflow-smoke-backend 2>&1 | Select-String "Successfully applied|bootstrap invitation is ready"   # 기대: 9 migrations, ready(코드 원문 없음)
+docker exec docflow-smoke-backend sh -c "id docflow; grep -E '^(Uid|Gid):' /proc/1/status"  # 기대: PID 1(java) Uid가 docflow uid
+docker exec docflow-smoke-backend ls -ln /data /data/lost+found                # 기대: 모두 docflow uid 소유
+docker exec -u docflow docflow-smoke-backend sh -c "echo probe > /data/storage/probe.txt && cat /data/storage/probe.txt"  # 기대: probe
+docker restart docflow-smoke-backend; Wait-Up                                  # 기대: UP
+docker exec docflow-smoke-backend cat /data/storage/probe.txt                  # 기대: probe (재시작 후 유지)
+docker logs docflow-smoke-backend 2>&1 | Select-String "up to date"            # 기대: Schema "public" is up to date
+docker exec docflow-smoke-backend sh -c "command -v pg_dump && pg_dump --version"  # 기대: 16.x
+
+# 정리(테스트 전용 리소스만)
+docker rm -f docflow-smoke-backend docflow-smoke-db; docker volume rm docflow-smoke-data; docker network rm docflow-smoke
+```
+
+`--restart on-failure`는 DB보다 먼저 뜨면 재시도하도록 한 것이다(Railway Restart policy와 같은 역할). `DOCFLOW_ALLOW_INSECURE_COOKIES=true`는 로컬 HTTP 확인 전용이며 Railway에는 넣지 않는다.
+
+### 13.3 CI 실행 테스트 제안 (미적용, 승인 필요)
+
+`.github/workflows/ci.yml`의 Docker job에 13.2와 같은 단계(PostgreSQL 16 컨테이너, root 소유 볼륨, backend 기동, health·uid·쓰기·재시작 유지 확인)를 추가한다. 예상 추가 시간 약 1~2분. CI 설정 변경이므로 별도 승인 후 진행한다.
+

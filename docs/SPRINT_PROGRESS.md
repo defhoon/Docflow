@@ -7,9 +7,9 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-11 체크포인트 13 (main 통합 완료, Done 판정, 배포 준비 점검) |
-| 현재 브랜치 | `docs/41/done-judgment-after-main` (`main` `d50f18f` 기준) |
-| 마지막 검증 완료 커밋 | `main` `d50f18f` (CI run 113 성공: Backend·Frontend·Docker, 클라우드 main 기준 Backend 419·Frontend 244) |
+| 마지막 갱신 | 2026-11-11 체크포인트 14 (배포 전 최종 기술 검증, 문서 보완 #43) |
+| 현재 브랜치 | `docs/43/deployment-runbook-final` (`main` `0c1eedc` 기준) |
+| 마지막 검증 완료 커밋 | `main` `0c1eedc` (PR #42 병합, CI run 115 성공) |
 | 기준 브랜치 | `main` (스택 PR 전부 병합 완료) |
 | 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
@@ -53,6 +53,8 @@
 - CP12: 사용자 Windows 전체 검증 성공 기록(`docs/windows-verification.md` §7.1), #39 PR 생성. 다음: 사용자 main 병합 승인 → 병합 순서(아래)
 
 - CP13 (2026-11-11): **main 통합 완료** — PR #29 `98db618`, #30 `3232df6`, #31 `1e4cbec`, #32 `4c670f9`, #33 `ac3146f`, #34 `15ffd91`, #35 `58f2d80`, #36 `5398072`, #38 `01d2d64`, #40 `d50f18f` (모두 Merge commit, 단계마다 main 트리 = PR head 트리 확인). Issue #21~#28·#37·#39 자동 종료. SPEC-05~08·SPEC-AUTH 확장 Done 판정(Issue #41)
+
+- CP14 (2026-11-11): PR #42 병합(`0c1eedc`, CI run 115). 배포 전 기술 검증: Docker daemon 없음 → 실제 entrypoint·jar를 격리 네임스페이스에서 실행해 Flyway V1~V9·health·소유권 변경·비root(uid 999)·`/data/storage` 쓰기/읽기·재시작 후 유지 확인(시뮬레이션). 실제 이미지·Docker 볼륨 실행은 미검증 → `docs/deployment.md` §13.2(Windows Docker 명령). 문서 보완 #43(비용 상한 사실관계, 볼륨 잔존, PG16 고정, 콘솔 설정표)
 
 ## 진행 중
 
