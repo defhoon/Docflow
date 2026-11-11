@@ -28,12 +28,12 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }
   if (status === "error") {
     return (
-      <div role="alert" className="flex flex-col items-start gap-2 text-red-700">
+      <div role="alert" className="m-6 flex flex-col items-start gap-2 rounded-lg border border-danger-600/20 bg-danger-50 px-4 py-3 text-sm text-danger-700">
         <p>서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.</p>
         <button
           type="button"
           onClick={() => void refresh()}
-          className="rounded border border-zinc-300 px-3 py-1 text-sm text-zinc-800"
+          className="rounded-md border border-line-strong bg-surface px-3 py-1 text-sm text-ink"
         >
           다시 시도
         </button>
@@ -41,7 +41,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }
   return (
-    <p role="status" className="text-zinc-500">
+    <p role="status" className="p-6 text-sm text-ink-muted">
       로그인 상태를 확인하는 중입니다...
     </p>
   );

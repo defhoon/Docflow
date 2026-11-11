@@ -12,7 +12,7 @@ export function CurrentUserPanel() {
     <div className="flex items-center justify-between gap-4">
       <div>
         <p className="font-medium">{user.displayName}</p>
-        <p className="text-sm text-zinc-600">{user.email}</p>
+        <p className="text-sm text-ink-muted">{user.email}</p>
       </div>
       <LogoutButton />
     </div>

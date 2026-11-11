@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
 
-import { RequireAuth } from "@/features/auth/components/RequireAuth";
+import { AppShell } from "@/components/app-shell/AppShell";
+import { ShellFallback } from "@/components/app-shell/ShellFallback";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { NewProjectLink, ProjectList } from "@/features/projects/components/ProjectList";
 
 export const metadata: Metadata = {
@@ -10,19 +12,11 @@ export const metadata: Metadata = {
 
 export default function ProjectsPage() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <Link href="/" className="text-sm text-zinc-600 underline">
-        DocFlow 홈
-      </Link>
-      <RequireAuth>
-        <header className="flex items-center justify-between gap-4">
-          <h1 className="text-3xl font-semibold tracking-tight">내 프로젝트</h1>
-          <NewProjectLink />
-        </header>
-        <div className="mt-6">
-          <ProjectList />
-        </div>
-      </RequireAuth>
-    </main>
+    <Suspense fallback={<ShellFallback />}>
+      <AppShell>
+        <PageHeader title="내 프로젝트" description="오너이거나 구성원으로 참여 중인 프로젝트입니다." actions={<NewProjectLink />} />
+        <ProjectList />
+      </AppShell>
+    </Suspense>
   );
 }

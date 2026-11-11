@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
+import { AuthLayout } from "@/components/app-shell/AuthLayout";
 import { LoginForm } from "@/features/auth/components/LoginForm";
+import { SignupNotice } from "@/features/auth/components/SignupNotice";
 
 export const metadata: Metadata = {
   title: "로그인 | DocFlow",
@@ -9,15 +12,18 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col gap-6 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">DocFlow</h1>
-        <p className="text-zinc-600">로그인</p>
-      </header>
+    <AuthLayout title="로그인" subtitle="DocFlow 계정으로 로그인하세요.">
       {/* LoginForm은 useSearchParams를 사용하므로 Suspense 경계가 필요하다. */}
-      <Suspense fallback={<p role="status" className="text-zinc-500">불러오는 중...</p>}>
+      <Suspense fallback={<p role="status" className="text-sm text-ink-muted">불러오는 중...</p>}>
+        <SignupNotice />
         <LoginForm />
       </Suspense>
-    </main>
+      <p className="text-center text-sm text-ink-muted">
+        초대코드를 받으셨나요?{" "}
+        <Link href="/signup" className="font-medium text-brand-700 hover:underline">
+          회원가입
+        </Link>
+      </p>
+    </AuthLayout>
   );
 }

@@ -22,7 +22,7 @@ vi.mock("../api", () => ({
 
 const NETWORK_MESSAGE =
   "새 버전 등록 결과를 확인하지 못했습니다. 문서 상세 정보를 새로고침하여 최신 버전을 확인한 뒤 다시 시도해 주세요.";
-const GUIDE = "초안 또는 수정 요청 상태의 문서에만 새 버전을 등록할 수 있습니다.";
+const GUIDE = "최종 확정된 문서는 읽기 전용입니다. 변경이 필요하면 새 문서를 등록해 주세요.";
 
 function updated(versionNumber: number): DocumentDetail {
   return {
@@ -199,14 +199,14 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     choose(pdf());
     fireEvent.click(submitButton());
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("현재 문서 상태에서는 새 버전을 등록할 수 없습니다.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("최종 확정된 문서에는 새 버전을 등록할 수 없습니다. 변경이 필요하면 새 문서를 등록해 주세요.");
     expect(onConflict).toHaveBeenCalledTimes(1);
 
     // 다시 조회한 상태가 반영되어도 오류 문구는 유지되고 등록 영역은 비활성화된다.
     view.rerender(
       <DocumentVersionUploadForm projectId="7" documentId="3" status="FINALIZED" onUploaded={onUploaded} onConflict={onConflict} />,
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("현재 문서 상태에서는 새 버전을 등록할 수 없습니다.");
+    expect(screen.getByRole("alert")).toHaveTextContent("최종 확정된 문서에는 새 버전을 등록할 수 없습니다. 변경이 필요하면 새 문서를 등록해 주세요.");
     expect(screen.getByText(GUIDE)).toBeInTheDocument();
     expect(submitButton()).toBeDisabled();
   });

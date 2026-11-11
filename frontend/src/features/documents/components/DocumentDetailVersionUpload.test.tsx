@@ -85,13 +85,14 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
     expect(fetchDocumentMock).toHaveBeenCalledTimes(1);
   });
 
-  it("허용되지 않은 상태의 문서는 등록 영역이 비활성화되고 안내 문구가 보인다 (OQ-7)", async () => {
+  // #28: FINALIZED 문서는 등록 영역을 비활성화하는 대신 제거하고 읽기 전용 안내를 표시한다 (SPEC-07 FR-6).
+  it("FINALIZED 문서는 등록 영역이 없고 읽기 전용 안내가 보인다 (OQ-7, SPEC-07)", async () => {
     fetchDocumentMock.mockResolvedValue(detail({ status: "FINALIZED" }));
     render(<DocumentDetail />);
 
-    expect(await screen.findByText("초안 또는 수정 요청 상태의 문서에만 새 버전을 등록할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "새 버전 등록" })).toBeDisabled();
-    expect(screen.getByLabelText(/^새 버전 파일/)).toBeDisabled();
+    expect(await screen.findByText("새 버전 업로드와 피드백 작성이 종료되었습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새 버전 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^새 버전 파일/)).not.toBeInTheDocument();
   });
 
   it("409이면 오류 문구를 유지한 채 로딩 화면 없이 다시 조회해 상태를 반영한다 (I6)", async () => {
@@ -103,10 +104,11 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
     choosePdf();
     fireEvent.click(screen.getByRole("button", { name: "새 버전 등록" }));
 
+    // 다시 조회한 상태(FINALIZED)를 로딩 화면 없이 반영하고, 등록 영역 대신 읽기 전용 안내를 표시한다 (#28).
     expect(await screen.findByText("최종 확정")).toBeInTheDocument();
     expect(fetchDocumentMock).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("alert")).toHaveTextContent("현재 문서 상태에서는 새 버전을 등록할 수 없습니다.");
-    expect(screen.getByRole("button", { name: "새 버전 등록" })).toBeDisabled();
+    expect(screen.getByText("새 버전 업로드와 피드백 작성이 종료되었습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새 버전 등록" })).not.toBeInTheDocument();
     expect(screen.queryByText("불러오는 중...")).not.toBeInTheDocument();
   });
 
@@ -122,7 +124,7 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
     fireEvent.click(screen.getByRole("button", { name: "새 버전 등록" }));
 
     await waitFor(() => expect(fetchDocumentMock).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("alert")).toHaveTextContent("현재 문서 상태에서는 새 버전을 등록할 수 없습니다.");
-    expect(screen.getByRole("heading", { name: "요구사항 명세서" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("최종 확정된 문서에는 새 버전을 등록할 수 없습니다. 변경이 필요하면 새 문서를 등록해 주세요.");
+    expect(screen.getByRole("heading", { level: 1, name: "요구사항 명세서" })).toBeInTheDocument();
   });
 });

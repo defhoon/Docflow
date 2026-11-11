@@ -9,7 +9,7 @@ import { errorCode, failureMessage, isUnauthenticated } from "../errors";
 import type { Member, ProjectRole } from "../types";
 import { AddMemberForm } from "./AddMemberForm";
 
-const ROLE_LABELS: Record<ProjectRole, string> = { OWNER: "Owner", MEMBER: "Member" };
+const ROLE_LABELS: Record<ProjectRole, string> = { OWNER: "오너", MEMBER: "구성원" };
 
 type MembersResult = { kind: "error"; message: string } | { kind: "success"; members: Member[] };
 
@@ -93,10 +93,13 @@ export function ProjectMembers({ projectId, myRole, onProjectChanged }: ProjectM
   }
 
   return (
-    <section aria-labelledby="project-members-heading" className="flex flex-col gap-3">
-      <h3 id="project-members-heading" className="text-sm font-semibold text-zinc-500">
+    <section
+      aria-labelledby="project-members-heading"
+      className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-5 shadow-[var(--shadow-card)]"
+    >
+      <h2 id="project-members-heading" className="text-sm font-semibold text-ink">
         구성원
-      </h3>
+      </h2>
       {canManage && (
         <AddMemberForm
           projectId={projectId}
@@ -108,31 +111,31 @@ export function ProjectMembers({ projectId, myRole, onProjectChanged }: ProjectM
         />
       )}
       {notice && (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-danger-700">
           {notice}
         </p>
       )}
       {state === null && (
-        <p role="status" className="text-sm text-zinc-500">
+        <p role="status" className="text-sm text-ink-muted">
           구성원을 불러오는 중...
         </p>
       )}
       {state?.kind === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2 text-sm text-red-700">
+        <div role="alert" className="flex flex-col items-start gap-2 text-sm text-danger-700">
           <p>구성원을 불러오지 못했습니다.</p>
           <p>{state.message}</p>
-          <button type="button" onClick={reload} className="rounded border border-zinc-300 px-3 py-1 text-zinc-800">
+          <button type="button" onClick={reload} className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50">
             다시 시도
           </button>
         </div>
       )}
       {state?.kind === "success" && (
-        <ul aria-label="구성원 목록" className="flex flex-col divide-y divide-zinc-200 rounded-lg border border-zinc-200">
+        <ul aria-label="구성원 목록" className="flex flex-col divide-y divide-line rounded-lg border border-line">
           {state.members.map((member) => (
             <li key={member.userId} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
               <span className="break-all">
                 {member.displayName}
-                <span className="ml-2 text-zinc-500">{ROLE_LABELS[member.role]}</span>
+                <span className="ml-2 text-ink-muted">{ROLE_LABELS[member.role]}</span>
               </span>
               {canManage && member.role === "MEMBER" && (
                 <button
@@ -140,7 +143,7 @@ export function ProjectMembers({ projectId, myRole, onProjectChanged }: ProjectM
                   onClick={() => void handleRemove(member)}
                   disabled={removingUserId !== null}
                   aria-label={`${member.displayName} 제거`}
-                  className="rounded border border-zinc-300 px-3 py-1 text-zinc-800 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
                 >
                   제거
                 </button>

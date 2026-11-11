@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ErrorState, LoadingBlock } from "@/components/ui/States";
+import { Badge } from "@/components/ui/StatusBadge";
+import { fetchProjectActivities } from "@/features/activity/api";
+import { ActivityFeed } from "@/features/activity/components/ActivityFeed";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { DocumentList } from "@/features/documents/components/DocumentList";
 import { ApiError } from "@/lib/api-client";
@@ -71,13 +77,11 @@ export function ProjectDetail() {
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
 
+  const loadActivities = useCallback(() => fetchProjectActivities(projectId, 10), [projectId]);
+
   switch (state.kind) {
     case "loading":
-      return (
-        <p role="status" className="text-zinc-500">
-          불러오는 중...
-        </p>
-      );
+      return <LoadingBlock label="불러오는 중..." lines={5} />;
     case "not-found":
       return (
         <div role="alert" className="flex flex-col items-start gap-3">
@@ -86,44 +90,41 @@ export function ProjectDetail() {
         </div>
       );
     case "error":
-      return (
-        <div role="alert" className="flex flex-col items-start gap-2 text-red-700">
-          <p>프로젝트를 불러오지 못했습니다.</p>
-          <p className="text-sm">{state.message}</p>
-          <button
-            type="button"
-            onClick={retry}
-            className="rounded border border-zinc-300 px-3 py-1 text-sm text-zinc-800"
-          >
-            다시 시도
-          </button>
-        </div>
-      );
+      return <ErrorState title="프로젝트를 불러오지 못했습니다." message={state.message} onRetry={retry} />;
     case "success": {
       const { project } = state;
       return (
-        <article className="flex flex-col gap-4">
-          <h2 className="text-2xl font-semibold break-all">{project.name}</h2>
-          <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-zinc-500">Owner</dt>
-            <dd>{project.owner.displayName}</dd>
-            <dt className="text-zinc-500">생성일</dt>
-            <dd>
-              <time dateTime={project.createdAt}>{formatDateTime(project.createdAt)}</time>
-            </dd>
-          </dl>
-          <section>
-            <h3 className="mb-1 text-sm font-semibold text-zinc-500">설명</h3>
-            {project.description ? (
-              <p className="whitespace-pre-wrap break-all">{project.description}</p>
-            ) : (
-              <p className="text-zinc-500">설명이 없습니다.</p>
-            )}
-          </section>
-          <DocumentList projectId={projectId} />
-          <ProjectMembers projectId={projectId} myRole={project.myRole} onProjectChanged={retry} />
-          <ProjectsLink />
-        </article>
+        <>
+          <PageHeader
+            breadcrumb={[{ label: "프로젝트", href: "/projects" }, { label: project.name }]}
+            title={project.name}
+            description={project.description ? <span className="whitespace-pre-wrap break-words">{project.description}</span> : "설명이 없습니다."}
+            meta={
+              <>
+                <Badge tone={project.myRole === "OWNER" ? "brand" : "neutral"}>{project.myRole === "OWNER" ? "내가 오너" : "구성원"}</Badge>
+                <span>오너 {project.owner.displayName}</span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  생성 <time dateTime={project.createdAt}>{formatDateTime(project.createdAt)}</time>
+                </span>
+              </>
+            }
+          />
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-6 xl:col-span-2">
+              <DocumentList projectId={projectId} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-6">
+              <ProjectMembers projectId={projectId} myRole={project.myRole} onProjectChanged={retry} />
+              <Card aria-labelledby="project-activity">
+                <CardHeader title="최근 활동" titleId="project-activity" />
+                <CardBody className="py-1">
+                  <ActivityFeed load={loadActivities} loadKey={`project-${projectId}`} emptyText="아직 문서 활동이 없습니다." />
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        </>
       );
     }
   }
@@ -131,7 +132,7 @@ export function ProjectDetail() {
 
 function ProjectsLink() {
   return (
-    <Link href="/projects" className="text-sm text-zinc-700 underline">
+    <Link href="/projects" className="text-sm text-brand-700 underline">
       프로젝트 목록으로
     </Link>
   );

@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { ButtonLink } from "@/components/ui/Button";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { cn } from "@/components/ui/cn";
+import { FileIcon, PlusIcon } from "@/components/ui/icons";
+import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { formatDateTime } from "@/features/projects/format";
 
 import { fetchDocuments } from "../api";
-import { statusLabel } from "../format";
-import type { DocumentSummary } from "../types";
+import type { DocumentStatus, DocumentSummary } from "../types";
 
 type ListResult = { kind: "error"; message: string } | { kind: "success"; documents: DocumentSummary[] };
 
@@ -50,17 +55,22 @@ export function DocumentList({ projectId }: { projectId: string }) {
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
 
   return (
-    <section aria-labelledby="documents-heading" className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-4">
-        <h3 id="documents-heading" className="text-lg font-semibold">
-          문서
-        </h3>
-        <NewDocumentLink projectId={projectId} />
-      </div>
-      <DocumentListBody state={state} projectId={projectId} onRetry={retry} />
-    </section>
+    <Card aria-labelledby="documents-heading">
+      <CardHeader title="문서" titleId="documents-heading" description="모든 구성원이 문서를 등록하고 새 버전을 올릴 수 있습니다." actions={<NewDocumentLink projectId={projectId} />} />
+      <CardBody>
+        <DocumentListBody state={state} projectId={projectId} onRetry={retry} />
+      </CardBody>
+    </Card>
   );
 }
+
+type Filter = "ALL" | DocumentStatus;
+
+const FILTERS: Array<{ value: Filter; label: string }> = [
+  { value: "ALL", label: "전체" },
+  { value: "ACTIVE", label: "협업 중" },
+  { value: "FINALIZED", label: "최종 확정" },
+];
 
 function DocumentListBody({
   state,
@@ -71,64 +81,85 @@ function DocumentListBody({
   projectId: string;
   onRetry: () => void;
 }) {
+  const [filter, setFilter] = useState<Filter>("ALL");
   switch (state.kind) {
     case "loading":
-      return (
-        <p role="status" className="text-sm text-zinc-500">
-          문서를 불러오는 중...
-        </p>
-      );
+      return <LoadingBlock label="문서를 불러오는 중..." />;
     case "error":
+      return <ErrorState title="문서 목록을 불러오지 못했습니다." message={state.message} onRetry={onRetry} />;
+    case "success": {
+      if (state.documents.length === 0) {
+        return (
+          <EmptyState
+            icon={<FileIcon className="size-6" />}
+            title="아직 등록된 문서가 없습니다."
+            description="PDF, DOCX, XLSX, PPTX 파일을 등록하고 구성원과 버전별 피드백을 주고받으세요."
+            action={<NewDocumentLink projectId={projectId} />}
+          />
+        );
+      }
+      const visible = state.documents.filter((document) => filter === "ALL" || document.status === filter);
       return (
-        <div role="alert" className="flex flex-col items-start gap-2 text-red-700">
-          <p>문서 목록을 불러오지 못했습니다.</p>
-          <p className="text-sm">{state.message}</p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded border border-zinc-300 px-3 py-1 text-sm text-zinc-800"
-          >
-            다시 시도
-          </button>
+        <div className="flex flex-col gap-3">
+          <div role="group" aria-label="상태로 거르기" className="flex w-fit gap-1 rounded-lg bg-subtle p-1">
+            {FILTERS.map((item) => {
+              const count = state.documents.filter((document) => item.value === "ALL" || document.status === item.value).length;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-pressed={filter === item.value}
+                  onClick={() => setFilter(item.value)}
+                  className={cn(
+                    "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                    filter === item.value ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink",
+                  )}
+                >
+                  {item.label} <span className="text-ink-faint">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+          {visible.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-muted">이 상태의 문서가 없습니다.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line">
+              {visible.map((document) => (
+                <li key={document.id}>
+                  <Link
+                    href={`/projects/${projectId}/documents/${document.id}`}
+                    className="flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-subtle/60 sm:flex-row sm:items-center sm:gap-4"
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <FileIcon className="size-4 shrink-0 text-ink-faint" />
+                      <span className="font-medium break-all text-ink">{document.title}</span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                      <StatusBadge status={document.status} />
+                      <span>
+                        최신 v{document.latestVersionNumber}
+                        {document.finalVersionNumber !== null && <> · 최종 v{document.finalVersionNumber}</>}
+                      </span>
+                      <span>
+                        {document.createdBy.displayName} ·{" "}
+                        <time dateTime={document.createdAt}>{formatDateTime(document.createdAt)}</time>
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       );
-    case "success":
-      if (state.documents.length === 0) {
-        return <p className="text-sm text-zinc-600">아직 등록된 문서가 없습니다.</p>;
-      }
-      return (
-        <ul className="flex flex-col divide-y divide-zinc-200 rounded-lg border border-zinc-200">
-          {state.documents.map((document) => (
-            <li key={document.id}>
-              <Link
-                href={`/projects/${projectId}/documents/${document.id}`}
-                className="flex flex-col gap-1 px-4 py-3 hover:bg-zinc-50"
-              >
-                <span className="flex items-center justify-between gap-4">
-                  <span className="font-medium break-all">{document.title}</span>
-                  <span className="shrink-0 rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700">
-                    {statusLabel(document.status)}
-                  </span>
-                </span>
-                <span className="text-sm text-zinc-500">
-                  {document.createdBy.displayName} · v{document.latestVersionNumber} ·{" "}
-                  <time dateTime={document.createdAt}>{formatDateTime(document.createdAt)}</time>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      );
+    }
   }
 }
 
 function NewDocumentLink({ projectId }: { projectId: string }) {
   return (
-    <Link
-      href={`/projects/${projectId}/documents/new`}
-      className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
-    >
-      문서 등록
-    </Link>
+    <ButtonLink href={`/projects/${projectId}/documents/new`} variant="primary" size="sm">
+      <PlusIcon /> 문서 등록
+    </ButtonLink>
   );
 }

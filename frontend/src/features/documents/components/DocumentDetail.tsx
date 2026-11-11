@@ -4,18 +4,30 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { ButtonLink } from "@/components/ui/Button";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { CheckCircleIcon, LockIcon } from "@/components/ui/icons";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ErrorState, LoadingBlock } from "@/components/ui/States";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { fetchDocumentActivities } from "@/features/activity/api";
+import { ActivityFeed } from "@/features/activity/components/ActivityFeed";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { FeedbackPanel } from "@/features/feedback/FeedbackPanel";
+import { fetchProject } from "@/features/projects/api";
+import type { Project } from "@/features/projects/types";
 import { errorCode, failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { formatDateTime } from "@/features/projects/format";
 import { ApiError } from "@/lib/api-client";
 
 import { fetchDocument } from "../api";
-import { formatFileSize, statusLabel } from "../format";
+import { formatFileSize } from "../format";
 import type { DocumentDetail as DocumentDetailData } from "../types";
 import type { DocumentVersionSummary } from "../version-files";
 import { DocumentVersionHistory } from "./DocumentVersionHistory";
 import { DocumentVersionPreview } from "./DocumentVersionPreview";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
+import { FinalizePanel } from "./FinalizePanel";
 
 type DetailResult =
   | { kind: "project-not-found" }
@@ -28,7 +40,8 @@ type DetailState = { kind: "loading" } | DetailResult;
 const ID_PATTERN = /^[0-9]+$/;
 
 /**
- * 문서 상세: 메타데이터, 버전 히스토리·다운로드·미리보기(SPEC-05 §9), 새 버전 등록 영역(SPEC-04 §9.1)을 표시한다.
+ * 문서 협업 작업 공간 (#28): 버전 미리보기·히스토리(SPEC-05), 선택 버전의 피드백(SPEC-08), 새 버전 등록(SPEC-04),
+ * 오너의 최종 확정(SPEC-07), 활동 이력(SPEC-06). FINALIZED이면 읽기 전용으로 바뀐다.
  */
 export function DocumentDetail() {
   const { projectId, documentId } = useParams<{ projectId: string; documentId: string }>();
@@ -84,14 +97,51 @@ export function DocumentDetail() {
   const [versionsReloadKey, setVersionsReloadKey] = useState(0);
   const [previewVersion, setPreviewVersion] = useState<DocumentVersionSummary | null>(null);
   const closePreview = useCallback(() => setPreviewVersion(null), []);
+  // 피드백 대상 버전(기본: 최신)과 선택 가능한 버전 목록 (#28).
+  const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
+  const [versions, setVersions] = useState<DocumentVersionSummary[]>([]);
+  const [activityKey, setActivityKey] = useState(0);
+  const bumpActivity = useCallback(() => setActivityKey((n) => n + 1), []);
+  // 오너 여부·프로젝트 이름(빵부스러기). 실패해도 문서 화면은 표시하고 확정 영역만 숨긴다(권한은 Backend가 판정).
+  const [project, setProject] = useState<{ key: string; value: Project | null } | null>(null);
+  useEffect(() => {
+    if (!validIds) {
+      return;
+    }
+    let active = true;
+    fetchProject(projectId).then(
+      (value) => active && setProject({ key: projectId, value }),
+      () => active && setProject({ key: projectId, value: null }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [projectId, validIds]);
+  const projectInfo = project?.key === projectId ? project.value : null;
+  const loadActivities = useCallback(
+    () => fetchDocumentActivities(projectId, documentId, 15),
+    [projectId, documentId],
+  );
 
   // 새 버전 등록 성공: 응답(갱신된 상세)으로 바로 바꾼다. 로딩 화면을 거치지 않는다.
   const handleVersionUploaded = useCallback(
     (document: DocumentDetailData) => {
       setResult({ key: requestKey, value: { kind: "success", document } });
       setVersionsReloadKey((current) => current + 1);
+      setSelectedNumber(document.latestVersion.versionNumber);
+      bumpActivity();
     },
-    [requestKey],
+    [requestKey, bumpActivity],
+  );
+
+  // 최종 확정 성공: 응답으로 읽기 전용 화면으로 바꾼다.
+  const handleFinalized = useCallback(
+    (document: DocumentDetailData) => {
+      setResult({ key: requestKey, value: { kind: "success", document } });
+      setVersionsReloadKey((current) => current + 1);
+      bumpActivity();
+    },
+    [requestKey, bumpActivity],
   );
 
   // 409(상태 충돌): 등록 영역의 오류 문구를 유지하도록 로딩 화면 없이 다시 조회한다 (결정 I6). 실패하면 현재 화면을 유지한다.
@@ -108,16 +158,12 @@ export function DocumentDetail() {
 
   switch (state.kind) {
     case "loading":
-      return (
-        <p role="status" className="text-zinc-500">
-          불러오는 중...
-        </p>
-      );
+      return <LoadingBlock label="불러오는 중..." lines={6} />;
     case "project-not-found":
       return (
         <div role="alert" className="flex flex-col items-start gap-3">
           <p className="font-medium">프로젝트를 찾을 수 없습니다.</p>
-          <Link href="/projects" className="text-sm text-zinc-700 underline">
+          <Link href="/projects" className="text-sm text-brand-700 underline">
             프로젝트 목록으로
           </Link>
         </div>
@@ -130,81 +176,198 @@ export function DocumentDetail() {
         </div>
       );
     case "error":
-      return (
-        <div role="alert" className="flex flex-col items-start gap-2 text-red-700">
-          <p>문서를 불러오지 못했습니다.</p>
-          <p className="text-sm">{state.message}</p>
-          <button
-            type="button"
-            onClick={retry}
-            className="rounded border border-zinc-300 px-3 py-1 text-sm text-zinc-800"
-          >
-            다시 시도
-          </button>
-        </div>
-      );
+      return <ErrorState title="문서를 불러오지 못했습니다." message={state.message} onRetry={retry} />;
     case "success": {
       const { document } = state;
-      const version = document.latestVersion;
+      const latest = document.latestVersion;
+      const finalized = document.status === "FINALIZED";
+      const finalization = document.finalization;
+      const selected = selectedNumber ?? finalization?.versionNumber ?? latest.versionNumber;
+      const selectedSummary = versions.find((version) => version.versionNumber === selected) ?? null;
+      const isOwner = projectInfo?.myRole === "OWNER";
       return (
-        <article className="flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-4">
-            <h2 className="text-2xl font-semibold break-all">{document.title}</h2>
-            <span className="shrink-0 rounded bg-zinc-100 px-2 py-0.5 text-sm text-zinc-700">
-              {statusLabel(document.status)}
-            </span>
-          </div>
-          <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-zinc-500">작성자</dt>
-            <dd>{document.createdBy.displayName}</dd>
-            <dt className="text-zinc-500">등록일</dt>
-            <dd>
-              <time dateTime={document.createdAt}>{formatDateTime(document.createdAt)}</time>
-            </dd>
-            <dt className="text-zinc-500">최신 버전</dt>
-            <dd>v{version.versionNumber}</dd>
-            <dt className="text-zinc-500">파일</dt>
-            <dd className="break-all">{version.originalFilename}</dd>
-            <dt className="text-zinc-500">크기</dt>
-            <dd title={`${version.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(version.sizeBytes)}</dd>
-            <dt className="text-zinc-500">업로드</dt>
-            <dd>
-              <time dateTime={version.uploadedAt}>{formatDateTime(version.uploadedAt)}</time>
-            </dd>
-          </dl>
-          <section>
-            <h3 className="mb-1 text-sm font-semibold text-zinc-500">설명</h3>
-            {document.description ? (
-              <p className="whitespace-pre-wrap break-all">{document.description}</p>
-            ) : (
-              <p className="text-zinc-500">설명이 없습니다.</p>
-            )}
-          </section>
-          <DocumentVersionHistory
-            projectId={projectId}
-            documentId={documentId}
-            reloadKey={versionsReloadKey}
-            selectedVersion={previewVersion?.versionNumber ?? null}
-            onPreview={setPreviewVersion}
+        <>
+          <PageHeader
+            breadcrumb={[
+              { label: "프로젝트", href: "/projects" },
+              { label: projectInfo?.name ?? "프로젝트", href: `/projects/${projectId}` },
+              { label: document.title },
+            ]}
+            title={document.title}
+            description={document.description ? <span className="whitespace-pre-wrap break-words">{document.description}</span> : undefined}
+            meta={
+              <>
+                <StatusBadge status={document.status} />
+                <span>작성자 {document.createdBy.displayName}</span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  등록 <time dateTime={document.createdAt}>{formatDateTime(document.createdAt)}</time>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>최신 버전 v{latest.versionNumber}</span>
+                {finalization && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-medium text-success-700">최종 버전 v{finalization.versionNumber}</span>
+                  </>
+                )}
+              </>
+            }
           />
-          {previewVersion && (
-            <DocumentVersionPreview
-              key={previewVersion.versionNumber}
-              projectId={projectId}
-              documentId={documentId}
-              version={previewVersion}
-              onClose={closePreview}
-            />
+          {finalized && finalization && (
+            <div role="status" className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-success-600/25 bg-success-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-3">
+                <CheckCircleIcon className="mt-0.5 size-5 shrink-0 text-success-700" />
+                <div className="text-sm">
+                  <p className="font-semibold text-success-700">v{finalization.versionNumber}이 최종 버전으로 확정되었습니다.</p>
+                  <p className="mt-0.5 text-ink-muted">
+                    {finalization.finalizedBy.displayName} ·{" "}
+                    <time dateTime={finalization.finalizedAt}>{formatDateTime(finalization.finalizedAt)}</time>. 이 문서는 읽기 전용이며
+                    다시 열 수 없습니다. 변경이 필요하면 새 문서를 등록해 주세요.
+                  </p>
+                </div>
+              </div>
+              <ButtonLink href={`/projects/${projectId}/documents/new`} size="sm">
+                새 문서 등록
+              </ButtonLink>
+            </div>
           )}
-          <DocumentVersionUploadForm
-            projectId={projectId}
-            documentId={documentId}
-            status={document.status}
-            onUploaded={handleVersionUploaded}
-            onConflict={reloadInBackground}
-          />
-          <ProjectLink projectId={projectId} />
-        </article>
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+            <div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
+              <Card aria-labelledby="preview-heading">
+                <CardHeader
+                  title={`미리보기 · v${selected}`}
+                  titleId="preview-heading"
+                  description={selectedSummary ? selectedSummary.originalFilename : undefined}
+                />
+                <CardBody>
+                  {previewVersion ? (
+                    <DocumentVersionPreview
+                      key={previewVersion.versionNumber}
+                      projectId={projectId}
+                      documentId={documentId}
+                      version={previewVersion}
+                      onClose={closePreview}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line-strong bg-subtle/50 px-6 py-12 text-center">
+                      <p className="text-sm text-ink-muted">
+                        버전 목록에서 &lsquo;미리보기&rsquo;를 누르면 여기에 표시됩니다. Office 문서는 환경에 따라 미리보기가 제공되지 않을 수
+                        있으며 원본을 내려받아 확인할 수 있습니다.
+                      </p>
+                      {selectedSummary && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewVersion(selectedSummary)}
+                          className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle"
+                        >
+                          v{selected} 미리보기 열기
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+              <Card aria-labelledby="versions-card-heading">
+                <CardHeader title="버전" titleId="versions-card-heading" description="버전 번호를 누르면 그 버전의 피드백을 보고 남길 수 있습니다." />
+                <CardBody className="py-2">
+                  <DocumentVersionHistory
+                    projectId={projectId}
+                    documentId={documentId}
+                    reloadKey={versionsReloadKey}
+                    selectedVersion={selected}
+                    hideHeading
+                    finalVersionNumber={finalization?.versionNumber ?? null}
+                    onLoaded={setVersions}
+                    onSelect={(version) => setSelectedNumber(version.versionNumber)}
+                    onPreview={(version) => {
+                      setSelectedNumber(version.versionNumber);
+                      setPreviewVersion(version);
+                    }}
+                  />
+                </CardBody>
+              </Card>
+            </div>
+            <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
+              <Card aria-labelledby="feedback-heading">
+                <CardHeader
+                  title={`피드백 · v${selected}`}
+                  titleId="feedback-heading"
+                  description={finalized ? "최종 확정된 문서의 피드백은 조회만 할 수 있습니다." : "모든 구성원이 각 버전에 피드백을 남길 수 있습니다."}
+                />
+                <CardBody>
+                  <FeedbackPanel
+                    projectId={projectId}
+                    documentId={documentId}
+                    versionNumber={selected}
+                    canWrite={!finalized}
+                    onFinalizedConflict={reloadInBackground}
+                    onCreated={bumpActivity}
+                  />
+                </CardBody>
+              </Card>
+              {!finalized && (
+                <Card>
+                  <CardBody>
+                    <DocumentVersionUploadForm
+                      projectId={projectId}
+                      documentId={documentId}
+                      status={document.status}
+                      onUploaded={handleVersionUploaded}
+                      onConflict={reloadInBackground}
+                    />
+                  </CardBody>
+                </Card>
+              )}
+              {!finalized && isOwner && (
+                <Card className="border-warning-700/20">
+                  <CardBody>
+                    <FinalizePanel
+                      projectId={projectId}
+                      documentId={documentId}
+                      versions={versions}
+                      defaultVersion={selected}
+                      onFinalized={handleFinalized}
+                      onConflict={reloadInBackground}
+                    />
+                  </CardBody>
+                </Card>
+              )}
+              {finalized && (
+                <p className="flex items-center gap-2 text-xs text-ink-muted">
+                  <LockIcon /> 새 버전 업로드와 피드백 작성이 종료되었습니다.
+                </p>
+              )}
+              <Card aria-labelledby="document-info-heading">
+                <CardHeader title="최신 버전 정보" titleId="document-info-heading" />
+                <CardBody>
+                  <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+                    <dt className="text-ink-muted">최신 버전</dt>
+                    <dd>v{latest.versionNumber}</dd>
+                    <dt className="text-ink-muted">파일</dt>
+                    <dd className="break-all">{latest.originalFilename}</dd>
+                    <dt className="text-ink-muted">크기</dt>
+                    <dd title={`${latest.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(latest.sizeBytes)}</dd>
+                    <dt className="text-ink-muted">업로드</dt>
+                    <dd>
+                      <time dateTime={latest.uploadedAt}>{formatDateTime(latest.uploadedAt)}</time>
+                    </dd>
+                  </dl>
+                </CardBody>
+              </Card>
+              <Card aria-labelledby="document-activity-heading">
+                <CardHeader title="활동 이력" titleId="document-activity-heading" />
+                <CardBody className="py-1">
+                  <ActivityFeed
+                    load={loadActivities}
+                    loadKey={`document-${projectId}-${documentId}-${activityKey}`}
+                    showDocument={false}
+                  />
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        </>
       );
     }
   }
@@ -212,7 +375,7 @@ export function DocumentDetail() {
 
 function ProjectLink({ projectId }: { projectId: string }) {
   return (
-    <Link href={`/projects/${projectId}`} className="text-sm text-zinc-700 underline">
+    <Link href={`/projects/${projectId}`} className="text-sm text-brand-700 underline">
       프로젝트로 돌아가기
     </Link>
   );

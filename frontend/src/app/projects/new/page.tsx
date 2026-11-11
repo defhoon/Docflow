@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
 
-import { RequireAuth } from "@/features/auth/components/RequireAuth";
+import { AppShell } from "@/components/app-shell/AppShell";
+import { ShellFallback } from "@/components/app-shell/ShellFallback";
+import { Card, CardBody } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ProjectCreateForm } from "@/features/projects/components/ProjectCreateForm";
 
 export const metadata: Metadata = {
@@ -10,14 +13,21 @@ export const metadata: Metadata = {
 
 export default function NewProjectPage() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <Link href="/projects" className="text-sm text-zinc-600 underline">
-        프로젝트 목록으로
-      </Link>
-      <RequireAuth>
-        <h1 className="mb-6 text-3xl font-semibold tracking-tight">새 프로젝트</h1>
-        <ProjectCreateForm />
-      </RequireAuth>
-    </main>
+    <Suspense fallback={<ShellFallback />}>
+      <AppShell>
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+          <PageHeader
+            breadcrumb={[{ label: "프로젝트", href: "/projects" }, { label: "새 프로젝트" }]}
+            title="새 프로젝트"
+            description="프로젝트를 만든 사람이 오너가 되며, 구성원 관리와 문서 최종 확정을 맡습니다."
+          />
+          <Card>
+            <CardBody className="py-6">
+              <ProjectCreateForm />
+            </CardBody>
+          </Card>
+        </div>
+      </AppShell>
+    </Suspense>
   );
 }

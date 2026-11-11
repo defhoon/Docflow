@@ -33,7 +33,7 @@ const documents = [
     createdBy: { id: 1, displayName: "Owner" },
     createdAt: "2026-10-27T09:00:00Z",
     latestVersionNumber: 1,
-    finalVersionNumber: null,
+    finalVersionNumber: 1,
   },
 ];
 
@@ -54,9 +54,12 @@ describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
     expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/projects/7/documents/2");
     expect(items[0]).toHaveTextContent("둘째 문서");
     expect(items[0]).toHaveTextContent("협업 중");
-    expect(items[0]).toHaveTextContent("Member · v2");
+    expect(items[0]).toHaveTextContent("최신 v2");
+    expect(items[0]).toHaveTextContent("Member");
     expect(items[1]).toHaveTextContent("최종 확정");
     expect(screen.getByRole("link", { name: "문서 등록" })).toHaveAttribute("href", "/projects/7/documents/new");
+    // 최종 확정 문서는 최종 버전 번호를 함께 표시한다 (SPEC-07)
+    expect(items[1]).toHaveTextContent("최종 v1");
   });
 
   it("문서가 없으면 빈 상태와 등록 링크를 표시한다", async () => {
@@ -64,7 +67,8 @@ describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
     render(<DocumentList projectId="7" />);
 
     expect(await screen.findByText("아직 등록된 문서가 없습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "문서 등록" })).toBeInTheDocument();
+    // 카드 머리글과 빈 상태 안내에 모두 등록 링크가 있다 (#28).
+    expect(screen.getAllByRole("link", { name: "문서 등록" })).toHaveLength(2);
   });
 
   it("실패하면 오류와 다시 시도를 표시하고 다시 요청한다", async () => {

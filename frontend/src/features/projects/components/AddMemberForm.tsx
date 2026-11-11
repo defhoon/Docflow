@@ -95,23 +95,23 @@ export function AddMemberForm({ projectId, onAdded, onProjectChanged }: AddMembe
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={Boolean(fieldError)}
           aria-describedby={fieldError ? "member-email-error" : undefined}
-          className="min-w-0 flex-1 rounded border border-zinc-300 px-3 py-2 text-sm"
+          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         <button
           type="submit"
           disabled={submitting}
-          className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {submitting ? "추가 중..." : "추가"}
         </button>
       </div>
       {fieldError && (
-        <span id="member-email-error" className="text-sm text-red-700">
+        <span id="member-email-error" className="text-sm text-danger-700">
           {fieldError}
         </span>
       )}
       {formError && (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-danger-700">
           {formError}
         </p>
       )}

@@ -7,9 +7,9 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-10 체크포인트 6 (#27 배포 준비 완료) |
-| 현재 브랜치 | `feat/27/deployment-prep` |
-| 마지막 검증 완료 커밋 | 이 문서를 포함한 #27 커밋 (Backend 398 통과, Frontend 225·lint·tsc·build 통과) |
+| 마지막 갱신 | 2026-11-10 체크포인트 7 (#28 UI 1차 완료) |
+| 현재 브랜치 | `feat/28/ui-overhaul` |
+| 마지막 검증 완료 커밋 | 이 문서를 포함한 #28 커밋 (Backend 398 통과(#27 기준, #28은 Frontend만 변경), Frontend 244·lint·tsc·build 통과, 실제 브라우저 3개 뷰포트 확인) |
 | 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
 | 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
@@ -26,7 +26,7 @@
 | 4 | #25 | `feat/25/version-feedback` | SPEC-08 버전별 Feedback | Backend 완료 (`52ab113`) |
 | 5 | #26 | `feat/26/invite-signup` | 초대코드 가입, 로그인 시도 제한 | Backend 완료 (`0f10a10`) |
 | 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포) |
-| 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 예정 |
+| 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 1차 완료 |
 
 ## 완료된 작업
 
@@ -37,9 +37,11 @@
 - CP5 (#26): V9 초대코드·`system_role`, 가입 API, 관리자 초대 API, 최초 관리자 코드(로그 1회), 로그인·가입 시도 제한(429)
 - CP6 (#27): `application-prod.yml`, Office 변환 비활성화·격리 필수 설정, Dockerfile 2종, CI docker 빌드 job, ADR-0007, `docs/deployment.md`(비용·변수·절차·점검표·백업)
 
+- CP7 (#28): 디자인 토큰(`globals.css` @theme), `components/ui`(Button, Card, Field/Input/Textarea/Select, StatusBadge, Dialog, Toast, States, PageHeader/Breadcrumb, icons), AppShell(사이드바·모바일 서랍), '내 작업' 홈(내 프로젝트·최근 활동), 프로젝트 목록(검색·정렬)·상세(문서 상태 필터·구성원·활동), 문서 협업 작업 공간(미리보기·버전 선택·버전별 피드백·새 버전·오너 확정 Dialog·FINALIZED 읽기 전용·활동), 로그인·초대 가입·초대 관리 화면
+
 ## 진행 중
 
-- 없음. 다음: #28 UI/UX (`feat/28/ui-overhaul`, `feat/27` 위에서 생성)
+- 없음. 남은 UI 후보: FileUpload 드래그 앤 드롭 컴포넌트(현재 브라우저 기본 파일 입력에 스타일만 적용), 문서 등록·프로젝트 생성 폼의 Field 컴포넌트 전환
 
 ## 변경 파일
 
@@ -52,6 +54,8 @@
 | 기준(`e22cad5`) | 클라우드 / CI run 79 | Backend 365, Frontend 228, E2E 19/19 / success |
 | #27 | 클라우드 | Backend 398 통과, Frontend Vitest 225·lint·tsc·build 통과 |
 | #27 | 클라우드 수동 | prod 프로파일 jar + Next standalone: 최초 관리자 가입→로그인→프로젝트→업로드→DOCX 미리보기 503→다운로드 동일 바이트→피드백→확정, 재시작 후 데이터·파일 유지(세션은 재로그인), 22MiB 413 JSON |
+| #28 | 클라우드 | Frontend Vitest 244·lint·tsc·build 통과 |
+| #28 | 클라우드 실제 브라우저(Chromium, prod 프로파일 jar + standalone) | 390/768/1440px × 로그인·가입·홈·프로젝트 목록·상세·문서(오너/구성원/확정)·초대 관리: 가로 오버플로 0, 로그인 기본 입력값 없음, 구성원에게 확정·초대 메뉴 없음, UI로 피드백 작성(스크립트 문자열은 텍스트로 표시), PDF 미리보기 iframe 표시, PPTX 미리보기는 운영 비활성 안내, 오너가 Dialog로 확정 → 업로드·피드백 폼 제거 |
 | #23, #24 | GitHub Actions | success (run 80, 81) |
 | #25~#27 | GitHub Actions | 확인 필요 |
 
@@ -78,6 +82,7 @@ cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run 
 
 ## 다음 작업 우선순위
 
-1. #28 UI: 디자인 토큰·공통 컴포넌트 → App Shell → 문서 상세 협업 작업 공간(피드백·확정·읽기 전용) → 홈(내 프로젝트·최근 활동) → 로그인·가입·관리자 초대 → 반응형 스크린샷 검증
-2. CI 결과 확인(#25~#28)
+1. CI 결과 확인(#25~#28, docker job 포함)
+2. 사용자 수동 검증(데스크톱 브라우저, Windows) 후 SPEC-06~08·#26·#28 Done 판정
+3. PR 생성(사용자 요청 시, 스택 순서)
 3. 사용자 승인 후 Railway 배포·점검표·백업 복구 검증

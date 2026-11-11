@@ -107,52 +107,52 @@ export function DocumentVersionPreview({ projectId, documentId, version, onClose
   }, [projectId, documentId, versionNumber, version.originalFilename, requestKey, refresh]);
 
   return (
-    <section aria-labelledby="document-preview-heading" className="flex flex-col gap-2 border-t border-zinc-200 pt-4">
+    <section aria-labelledby="document-preview-heading" className="flex flex-col gap-2 border-t border-line pt-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 id="document-preview-heading" className="text-sm font-semibold text-zinc-500">
+        <h3 id="document-preview-heading" className="text-sm font-semibold text-ink-muted">
           미리보기 · v{versionNumber}
         </h3>
-        <button type="button" onClick={onClose} className="rounded border border-zinc-300 px-2 py-0.5 text-sm">
+        <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50">
           미리보기 닫기
         </button>
       </div>
       {state.kind === "loading" && (
-        <p role="status" className="text-sm text-zinc-500">
+        <p role="status" className="text-sm text-ink-muted">
           미리보기를 불러오는 중...
         </p>
       )}
       {state.kind === "converting" && (
-        <p role="status" className="text-sm text-zinc-500">
+        <p role="status" className="text-sm text-ink-muted">
           미리보기를 준비하는 중입니다. 파일에 따라 최대 1분 정도 걸릴 수 있습니다.
         </p>
       )}
       {state.kind === "ready" && (
         <>
-          <p className="text-xs text-zinc-500">미리보기는 참고용이며 원본 파일이 기준입니다.</p>
+          <p className="text-xs text-ink-muted">미리보기는 참고용이며 원본 파일이 기준입니다.</p>
           <iframe
             title={`v${versionNumber} 미리보기`}
             src={`${state.url}${PREVIEW_VIEWER_FRAGMENT}`}
             {...(PREVIEW_IFRAME_SANDBOX === null ? {} : { sandbox: PREVIEW_IFRAME_SANDBOX })}
-            className="h-[80vh] w-full rounded border border-zinc-200"
+            className="h-[80vh] w-full rounded border border-line"
           />
         </>
       )}
       {state.kind === "failed" && (
         <div role="alert" className="flex flex-col items-start gap-2 text-sm">
-          <p className="text-red-700">{state.message}</p>
+          <p className="text-danger-700">{state.message}</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => void download()}
               disabled={downloading}
-              className="rounded bg-zinc-900 px-3 py-1 text-white disabled:opacity-50"
+              className="inline-flex h-8 items-center justify-center rounded-md bg-brand-600 px-3 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
               {downloading ? "다운로드 중..." : "원본 다운로드"}
             </button>
             <button
               type="button"
               onClick={() => setAttempt((current) => current + 1)}
-              className="rounded border border-zinc-300 px-3 py-1 text-zinc-800"
+              className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
             >
               미리보기 다시 시도
             </button>
