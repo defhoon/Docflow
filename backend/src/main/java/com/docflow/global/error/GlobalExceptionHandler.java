@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 import com.docflow.document.validation.InvalidDocumentFileException;
 
@@ -91,6 +92,11 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
 	ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
+		// 다운로드 중 클라이언트가 연결을 끊은 경우: 정상적인 중단이며 이미 커밋된 응답에 본문을 쓰지 않는다 (SPEC-05 §7.5).
+		if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
+			log.debug("Client disconnected: {}", ex.getClass().getName());
+			return null;
+		}
 		// Spring MVC가 4xx로 분류한 기타 요청 오류는 서버 오류로 기록하지 않는다.
 		if (ex instanceof org.springframework.web.ErrorResponse errorResponse
 				&& errorResponse.getStatusCode().is4xxClientError()) {

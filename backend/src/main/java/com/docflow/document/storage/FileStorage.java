@@ -1,6 +1,7 @@
 package com.docflow.document.storage;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 
 /**
@@ -20,6 +21,12 @@ public interface FileStorage {
 
 	/** 보상 삭제. {@link #store}가 이 요청에서 생성한 저장 키에만 호출한다. 없으면 아무 일도 하지 않는다. */
 	void delete(String storageKey) throws IOException;
+
+	/** 저장된 파일을 읽기 전용으로 연다 (SPEC-05 §7.4). 파일이 없으면 {@link java.nio.file.NoSuchFileException}. */
+	InputStream openForRead(String storageKey) throws IOException;
+
+	/** 저장된 파일의 실제 크기. 파일이 없으면 {@link java.nio.file.NoSuchFileException}. */
+	long size(String storageKey) throws IOException;
 
 	/** 임시 파일 정리. 없으면 아무 일도 하지 않는다. */
 	void deleteTemp(Path tempFile) throws IOException;

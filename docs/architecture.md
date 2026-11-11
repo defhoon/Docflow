@@ -1,6 +1,6 @@
 # DocFlow 아키텍처 개요
 
-> 기준: 6주차 프로젝트 초기화 (2026-10-14), SPEC-03 문서 등록 반영 (2026-10-28), SPEC-04 문서 버전 등록 반영 (2026-11-04). 요구사항과 범위는 [`spec.md`](../spec.md) Draft v0.2를 따른다.
+> 기준: 6주차 프로젝트 초기화 (2026-10-14), SPEC-03 문서 등록 반영 (2026-10-28), SPEC-04 문서 버전 등록, SPEC-05 버전 조회·다운로드·미리보기 반영 (2026-11-04). 요구사항과 범위는 [`spec.md`](../spec.md) Draft v0.2를 따른다.
 > 결정 근거는 [`docs/adr/`](./adr)를 참고한다.
 
 ## 1. 시스템 구성
@@ -41,7 +41,7 @@ docflow/
 │       └── features/
 │           ├── auth/          # AuthProvider, api, LoginForm, RequireAuth, LogoutButton
 │           ├── projects/      # api, types, validation(§5.5 입력 규칙), ProjectList, ProjectCreateForm, ProjectDetail, ProjectMembers, AddMemberForm
-│           ├── documents/     # api(FormData 등록·새 버전), types, validation(제목·설명·파일 사전 검사), errors, DocumentList, DocumentCreateForm, DocumentDetail, DocumentVersionUploadForm
+│           ├── documents/     # api(FormData 등록·새 버전), version-files(버전 목록·다운로드·미리보기 fetch), types, validation, errors, DocumentList, DocumentCreateForm, DocumentDetail, DocumentVersionUploadForm, DocumentVersionHistory, DocumentVersionPreview
 │           └── backend-health/
 ├── docs/
 │   ├── architecture.md
@@ -128,6 +128,25 @@ DocumentVersionController ─▶ DocumentVersionService
 - 같은 문서의 동시 등록은 문서 행 잠금으로 직렬화되어 번호가 중복·누락 없이 할당된다. 잠금은 파일 배치가 끝난 뒤의 짧은 DB 작업 동안만 잡으며 잠금 대기 상한은 두지 않는다(OQ-4). 잠금을 기다리는 요청은 커넥션을 하나씩 점유한다.
 - 문서 상태는 바꾸지 않는다. 예상하지 못한 `uk_document_versions_document_version` 위반은 원인 로그(`projectId`·`documentId`·`versionNumber`·제약 이름·`storageKey`)를 남기고 `500`으로 응답한다.
 
+### 버전 조회·다운로드·미리보기 흐름 (SPEC-05)
+
+```text
+DocumentVersionController
+  GET …/versions                       → DocumentVersionQueryService: 접근(404) → 문서(404) → 버전 목록(업로더 join, 최신 먼저)
+  GET …/versions/{n}/download          → 접근·문서·버전 확인(readOnly 트랜잭션 종료) → 파일 크기 확인(누락·불일치 500 DOCUMENT_FILE_UNAVAILABLE)
+                                          → attachment·RFC 5987 파일명·CSP sandbox로 스트리밍
+  GET …/versions/{n}/preview           → DocumentPreviewService
+       PDF 원본 → 원본 스트리밍
+       Office  → previews/cache/<sha256(storageKey)>.pdf 있으면 스트리밍
+               → 없으면 작업 등록(같은 버전은 1개만, 동시 1·대기열 10, 가득 차면 503) → 202 + Retry-After
+               [작업] previews/work/<UUID>/ 에 input.<ext> 복사 → (래퍼 +) soffice --convert-to pdf, 독립 프로필, 60초 제한
+                      → %PDF·100MiB 확인 → 캐시로 원자적 이동 → 작업 디렉터리 삭제 / 실패·시간 초과 → 422 기록
+```
+
+- 변환 엔진은 `DocumentPreviewConverter` 인터페이스 뒤의 `LibreOfficePreviewConverter`이며 LibreOffice를 자식 프로세스로 실행한다([ADR-0006](./adr/0006-document-preview-conversion.md)). 셸을 거치지 않는 인수 배열, 작업별 디렉터리·사용자 프로필, 매크로·링크 갱신 비활성화, 최소 환경 변수, 시간 초과 시 프로세스 트리 종료를 적용한다. Linux에서는 `docflow.preview.launcher`(예: `unshare,-rn`)로 네트워크를 차단할 수 있고, 지정한 래퍼가 동작하지 않으면 격리 없이 실행하지 않는다.
+- 캐시는 원본(`documents/`)과 분리된 `previews/cache/`에 두고 API의 접근 확인을 통과한 요청에만 전달한다. 전체 용량 상한(기본 2GiB, LRU)과 30일 미사용 정리를 적용하며 전송 중인 캐시와 원본은 삭제하지 않는다. 작업·실패 상태와 캐시 색인은 메모리에 있으며 단일 인스턴스를 가정한다.
+- Frontend는 `fetch`로 받은 PDF를 `application/pdf`로 고정한 Blob URL(`#navpanes=0&view=FitH`)로 같은 화면의 iframe에 표시한다. Blob URL에는 응답 헤더가 적용되지 않으므로 `X-Frame-Options: DENY` 등 기존 보안 설정을 바꾸지 않는다. iframe `sandbox`는 Chromium 내장 PDF 뷰어를 막으므로 쓰지 않는다(SPEC-05 §7.4).
+
 ## 6. 보안 관련 현재 상태
 
 - Spring Security 서버 세션 인증을 사용한다(SPEC-AUTH, [ADR-0005](./adr/0005-session-authentication.md)). JWT는 사용하지 않는다.
@@ -147,6 +166,7 @@ DocumentVersionController ─▶ DocumentVersionService
   - OWNER·MEMBER 모두 허용하고, 비구성원은 `404 PROJECT_NOT_FOUND`다. 문서는 항상 경로의 `projectId`와 `documentId`를 함께 조건으로 조회해 다른 프로젝트 문서 ID는 `404 DOCUMENT_NOT_FOUND`로 응답한다(IDOR 방어).
   - 형식·파일명·빈 파일 오류는 `400 VALIDATION_FAILED` + `fieldErrors[file]`, 크기 초과는 `413 FILE_TOO_LARGE`, 저장·DB 오류는 내부 경로 없는 `500 INTERNAL_ERROR`다.
   - CSRF 헤더 없이 크기를 초과한 요청은 CSRF 판단 전에 multipart 해석이 일어나 Spring Boot 기본 오류 형식의 `413`을 받는다(정상 SPA 요청은 해당 없음).
+- 버전 조회 API(SPEC-05 §6): `GET …/documents/{documentId}/versions`(목록), `GET …/versions/{versionNumber}/download`(원본), `GET …/versions/{versionNumber}/preview`(PDF `200` / 변환 중 `202` / 실패 `422 DOCUMENT_PREVIEW_FAILED` / 엔진 없음·대기열 초과 `503 DOCUMENT_PREVIEW_UNAVAILABLE`). 구성원만, 다른 문서의 버전 번호는 `404 DOCUMENT_VERSION_NOT_FOUND`, 저장 키·서버 경로·캐시 경로는 응답에 넣지 않는다.
 - 새 버전 API(SPEC-04 §6): `POST /api/projects/{projectId}/documents/{documentId}/versions`(multipart `file`만, 구성원, `201` + `Location`은 문서 상세). 허용되지 않은 상태는 `409 DOCUMENT_STATUS_CONFLICT`(본문에 상태 값 없음), 그 밖의 오류 계약은 문서 등록과 같다.
 - MVP 한계: `/me` 이외의 보호 API는 요청마다 계정 활성 여부를 다시 확인하지 않는다. 로그인 실패 횟수 제한이 없다.
 
@@ -154,4 +174,3 @@ DocumentVersionController ─▶ DocumentVersionService
 
 | 시점 | 추가 요소 |
 | --- | --- |
-| SPEC-05 Version 조회 | 버전 목록, 파일 다운로드 |

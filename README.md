@@ -4,7 +4,7 @@ Document Review Workflow Management System
 
 문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인 과정을 관리하는 시스템이다. 요구사항과 MVP 범위는 [`spec.md`](./spec.md)를 따른다.
 
-> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현·검증을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10)으로 `main`에 병합되었다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). SPEC-02(프로젝트 구성원 관리)는 PR [#14](https://github.com/defhoon/Docflow/pull/14)로 `main`에 병합되었다([Issue #13](https://github.com/defhoon/Docflow/issues/13), [`specs/02-project-members.md`](./specs/02-project-members.md)). SPEC-03(문서 등록·목록·상세)은 PR [#16](https://github.com/defhoon/Docflow/pull/16)으로 `main`에 병합되었다([Issue #15](https://github.com/defhoon/Docflow/issues/15), [`specs/03-document-create.md`](./specs/03-document-create.md)). Windows 실환경 수동 E2E는 [#17](https://github.com/defhoon/Docflow/issues/17), D4 제한사항 개선은 [#18](https://github.com/defhoon/Docflow/issues/18)에서 후속으로 다룬다. SPEC-04(문서 버전 등록)는 [Issue #19](https://github.com/defhoon/Docflow/issues/19) 브랜치에서 구현과 클라우드·CI·Windows 자동 검증을 마쳐 Done으로 판정되었고 PR 생성을 앞두고 있다([`specs/04-document-version-create.md`](./specs/04-document-version-create.md)). 버전 목록·다운로드·검토·피드백 기능은 아직 구현되지 않았다.
+> **현재 단계 (7주차):** SPEC-AUTH(세션 기반 로그인·로그아웃·현재 사용자 조회)는 병합되었다([`specs/00-auth.md`](./specs/00-auth.md)). SPEC-01(프로젝트 생성·내 프로젝트 목록·상세 조회)은 구현·검증을 마치고 PR [#10](https://github.com/defhoon/Docflow/pull/10)으로 `main`에 병합되었다([Issue #6](https://github.com/defhoon/Docflow/issues/6), [`specs/01-project-create.md`](./specs/01-project-create.md)). SPEC-02(프로젝트 구성원 관리)는 PR [#14](https://github.com/defhoon/Docflow/pull/14)로 `main`에 병합되었다([Issue #13](https://github.com/defhoon/Docflow/issues/13), [`specs/02-project-members.md`](./specs/02-project-members.md)). SPEC-03(문서 등록·목록·상세)은 PR [#16](https://github.com/defhoon/Docflow/pull/16)으로 `main`에 병합되었다([Issue #15](https://github.com/defhoon/Docflow/issues/15), [`specs/03-document-create.md`](./specs/03-document-create.md)). Windows 실환경 수동 E2E는 [#17](https://github.com/defhoon/Docflow/issues/17), D4 제한사항 개선은 [#18](https://github.com/defhoon/Docflow/issues/18)에서 후속으로 다룬다. SPEC-04(문서 버전 등록)는 PR [#20](https://github.com/defhoon/Docflow/pull/20)으로 `main`에 병합되었다([`specs/04-document-version-create.md`](./specs/04-document-version-create.md)). SPEC-05(버전 조회·다운로드·미리보기)는 [Issue #21](https://github.com/defhoon/Docflow/issues/21) 브랜치에서 구현과 클라우드·CI 검증을 마쳤고 Windows 검증을 기다린다([`specs/05-document-version-download.md`](./specs/05-document-version-download.md), [ADR-0006](./docs/adr/0006-document-preview-conversion.md)). 검토·피드백 기능은 아직 구현되지 않았다.
 
 ## 기술 스택
 
@@ -21,6 +21,7 @@ Document Review Workflow Management System
 - JDK 25 — Gradle이 JDK를 자동으로 다운로드하지 않으므로 직접 설치한다 (예: Eclipse Temurin 25). Java 21에서 변경된 이유는 [ADR-0004](./docs/adr/0004-java-25-upgrade.md) 참고
 - Node.js 22, npm
 - Docker (Docker Compose v2) — 로컬 PostgreSQL 실행용
+- LibreOffice — 문서 미리보기(Office → PDF 변환)와 Backend 테스트에 필요하다(SPEC-05, [ADR-0006](./docs/adr/0006-document-preview-conversion.md)). `soffice`가 PATH에 있거나 Windows 기본 설치 경로(`C:\Program Files\LibreOffice\program\soffice.com`, 콘솔용 실행 파일)에 있으면 자동으로 찾는다. 다른 위치면 `DOCFLOW_PREVIEW_SOFFICE_PATH`로 지정한다. 없으면 Office 미리보기만 사용할 수 없고(503) Backend 미리보기 테스트는 실패한다
 
 ## 로컬 실행
 
@@ -128,6 +129,13 @@ Windows 수동 확인 절차는 [`specs/03-document-create.md`](./specs/03-docum
 - 문서 상태가 "초안"·"수정 요청"일 때만 등록할 수 있다. 그 밖의 상태에서는 등록 영역이 비활성화되고 안내 문구가 보이며, 서버도 `409`로 거부한다.
 - 파일 형식·크기 규칙은 문서 등록과 같다. 업로드 중 연결이 끊기면 결과를 확인할 수 없다는 안내가 표시되고 자동으로 다시 보내지 않는다. 상세 화면을 새로고침해 최신 버전을 확인한 뒤 다시 시도한다.
 
+#### 버전 히스토리·다운로드·미리보기 (SPEC-05)
+
+- 문서 상세의 "버전 히스토리"에서 모든 버전(최신 먼저, 업로더·업로드 시각·크기)을 보고 버전별로 원본을 내려받거나 미리볼 수 있다. 다운로드는 원본 파일명으로 저장된다.
+- 미리보기는 같은 화면 아래에 열린다. PDF는 바로, DOCX·XLSX·PPTX는 처음 한 번 서버에서 PDF로 변환하는 동안 "미리보기를 준비하는 중입니다"가 보인다(보통 수 초, 최대 1분). 변환 결과는 캐시되어 다시 열면 바로 보인다. 미리보기는 참고용이며 원본 파일이 기준이다.
+- 변환할 수 없거나 1분 안에 끝나지 않는 문서는 실패 안내와 함께 원본 다운로드를 제공한다. 원본 파일은 미리보기로 바뀌지 않는다.
+- 미리보기 캐시는 `DOCFLOW_STORAGE_DIR` 아래 `previews/cache/`에 있으며 전체 용량 상한(기본 2GB, `DOCFLOW_PREVIEW_CACHE_MAX_BYTES`)과 30일 미사용 정리가 적용된다. Linux에서는 `DOCFLOW_PREVIEW_LAUNCHER=unshare,-rn`으로 변환 프로세스의 네트워크를 차단할 수 있다. 설정하지 않으면 시작 후 첫 미리보기 때 경고 로그를 남긴다(ADR-0006).
+
 브라우저는 `localhost:3000`만 호출한다. `/api/*` 요청은 Next.js rewrite로 Backend에 전달되므로 세션 쿠키(`JSESSIONID`)와 CSRF 쿠키(`XSRF-TOKEN`)는 `localhost:3000`에 저장된다.
 
 ## Windows (PowerShell) 실행 절차
@@ -190,7 +198,7 @@ cd backend
 ## 테스트·검증 명령어
 
 ```bash
-# Backend — PostgreSQL이 실행 중이어야 한다 (docker compose up -d)
+# Backend — PostgreSQL이 실행 중이어야 하고(docker compose up -d), LibreOffice가 설치되어 있어야 한다(미리보기 변환 테스트)
 cd backend && ./gradlew build          # 컴파일 + 테스트
 
 # Frontend
