@@ -40,7 +40,7 @@ public final class DocumentTestSupport {
 	/** FK 순서: (audit_logs, document_versions, documents) → projects(구성원 CASCADE) → users. */
 	public static void cleanDatabase(JdbcTemplate jdbcTemplate) {
 		// documents.final_version_id ↔ document_versions.document_id가 서로 참조하므로(SPEC-07) 한 문장으로 비운다.
-		jdbcTemplate.execute("TRUNCATE audit_logs, document_versions, documents");
+		jdbcTemplate.execute("TRUNCATE audit_logs, feedbacks, document_versions, documents");
 		jdbcTemplate.update("DELETE FROM projects");
 		jdbcTemplate.update("DELETE FROM users");
 	}
