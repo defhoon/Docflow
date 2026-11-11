@@ -583,7 +583,7 @@ frontend/src
 ## 확장 (2026-11-10, Issue #26): 초대코드 회원가입·로그인 시도 제한·최초 운영 관리자
 
 > 공개 운영을 위해 사용자 승인으로 범위를 변경했다. 기존 "회원가입 Out of Scope"(§Out of Scope)는 이 절로 대체된다. 기존 로그인·로그아웃·세션·CSRF 규칙은 바뀌지 않는다.
-> 상태: Backend 구현·자동 테스트 완료 (클라우드). 가입·초대 관리 화면은 #28.
+> 상태: **Done (2026-11-11, AC-INV-01~14 충족)**. 화면(가입·초대 관리·로그인 429 안내)은 #28, 최초 관리자·시도 제한 강화는 #37, prod `.env` 격리·Secure 쿠키 강제는 #39.
 
 ### E.1 결정
 
@@ -646,3 +646,15 @@ frontend/src
 | 2026-11-10 | 동일 | `./gradlew test` | 393 통과, 0 실패 |
 | 2026-11-10 (#37) | 동일 | `./gradlew test` | 415 통과(SignupIntegrationTest 11, ClientIpResolverTest 4, AuthAttemptGuardTest 5, AccessControlRegressionIntegrationTest 6 포함) |
 | — | GitHub Actions / 로컬 | | 미확인 |
+
+### E.6 Done 판정 (2026-11-11, Issue #41)
+
+| DoD | 근거 |
+| --- | --- |
+| AC 전부 충족 | AC-INV-01~14: `SignupIntegrationTest`, `AuthAttemptGuardTest`, `ClientIpResolverTest`, `AttemptLimiterTest`, 기존 SPEC-AUTH 테스트 |
+| 운영 설정 | `ProductionConfigIsolationTest`(prod에서 `.env` 무시, 비보안 쿠키 기동 거부), `DocumentPreviewProductionPolicyIntegrationTest` |
+| 실제 동작 | 클라우드 prod 모드: 운영자 코드로 관리자 가입(로그에 코드 없음)·코드 재사용 거부·초대 가입. 로그인 실패 5회 후 6번째 429 + `Retry-After: 900`, 차단 중 올바른 비밀번호도 429, 다른 계정 영향 없음, 로그에 비밀번호·쿠키 값 없음(2026-11-11) |
+| 자동 테스트 | main 기준 Backend 419·Frontend 244, GitHub Actions main run 113 (`d50f18f`): Backend·Frontend·Docker 성공 |
+| 수동 검증 | Windows 수동(사용자, 2026-11-11): `docs/windows-verification.md` §7.1 (관리자 로그인·초대코드 가입) |
+| 알려진 제약 | 신뢰 프록시 확인 전 hops=0이면 이메일 기준 잠금 악용 가능(15분), 메모리 기반 카운터, 차단(429) 요청은 로그에 남지 않음 → `docs/deployment.md` §11 |
+

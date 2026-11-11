@@ -7,10 +7,10 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-11 체크포인트 12 (Windows 전체 검증 성공, PR #39 생성, main 병합 승인 대기) |
-| 현재 브랜치 | `fix/39/windows-test-failures` (`feat/37` 위) |
-| 마지막 검증 완료 커밋 | #39 커밋 (클라우드 Backend 419 통과: `.env`에 `SESSION_COOKIE_SECURE=false`를 넣은 Windows 재현 조건과 원래 조건 모두) |
-| 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
+| 마지막 갱신 | 2026-11-11 체크포인트 13 (main 통합 완료, Done 판정, 배포 준비 점검) |
+| 현재 브랜치 | `docs/41/done-judgment-after-main` (`main` `d50f18f` 기준) |
+| 마지막 검증 완료 커밋 | `main` `d50f18f` (CI run 113 성공: Backend·Frontend·Docker, 클라우드 main 기준 Backend 419·Frontend 244) |
+| 기준 브랜치 | `main` (스택 PR 전부 병합 완료) |
 | 배포 준비 상태 | 이미지·운영 프로파일·문서 준비 완료, **미배포**. Railway 리소스 생성·외부 공개는 사용자 승인 필요(docs/deployment.md) |
 
 ## Issue · 브랜치 스택
@@ -52,6 +52,8 @@
 
 - CP12: 사용자 Windows 전체 검증 성공 기록(`docs/windows-verification.md` §7.1), #39 PR 생성. 다음: 사용자 main 병합 승인 → 병합 순서(아래)
 
+- CP13 (2026-11-11): **main 통합 완료** — PR #29 `98db618`, #30 `3232df6`, #31 `1e4cbec`, #32 `4c670f9`, #33 `ac3146f`, #34 `15ffd91`, #35 `58f2d80`, #36 `5398072`, #38 `01d2d64`, #40 `d50f18f` (모두 Merge commit, 단계마다 main 트리 = PR head 트리 확인). Issue #21~#28·#37·#39 자동 종료. SPEC-05~08·SPEC-AUTH 확장 Done 판정(Issue #41)
+
 ## 진행 중
 
 - 없음. 남은 UI 후보: FileUpload 드래그 앤 드롭 컴포넌트(현재 브라우저 기본 파일 입력에 스타일만 적용), 문서 등록·프로젝트 생성 폼의 Field 컴포넌트 전환
@@ -66,7 +68,7 @@
 | --- | --- | --- |
 | 기준(`e22cad5`) | 클라우드 / CI run 79 | Backend 365, Frontend 228, E2E 19/19 / success |
 | #27 | 클라우드 | Backend 398 통과, Frontend Vitest 225·lint·tsc·build 통과 |
-| #27 | 클라우드 수동 | prod 프로파일 jar + Next standalone: 최초 관리자 가입→로그인→프로젝트→업로드→DOCX 미리보기 503→다운로드 동일 바이트→피드백→확정, 재시작 후 데이터·파일 유지(세션은 재로그인), 22MiB 413 JSON |
+| #27 | 클라우드 수동 | prod 프로파일 jar + Next standalone: 최초 관리자 가입→로그인→프로젝트→업로드→DOCX 미리보기 503→다운로드 동일 바이트→피드백→확정, 재시작 후 데이터·파일 유지(세션은 재로그인), 22MiB는 curl에서 413(정정: fetch·브라우저는 연결 종료, #18 참고) |
 | #28 | 클라우드 | Frontend Vitest 244·lint·tsc·build 통과 |
 | #28 | 클라우드 실제 브라우저(Chromium, prod 프로파일 jar + standalone) | 390/768/1440px × 로그인·가입·홈·프로젝트 목록·상세·문서(오너/구성원/확정)·초대 관리: 가로 오버플로 0, 로그인 기본 입력값 없음, 구성원에게 확정·초대 메뉴 없음, UI로 피드백 작성(스크립트 문자열은 텍스트로 표시), PDF 미리보기 iframe 표시, PPTX 미리보기는 운영 비활성 안내, 오너가 Dialog로 확정 → 업로드·피드백 폼 제거 |
 | #23, #24 | GitHub Actions | success (run 80, 81) |
@@ -79,7 +81,7 @@
 - Docker 이미지 빌드는 클라우드에 Docker 데몬이 없어 CI job으로만 검증 예정
 - 백업·복구 절차는 Railway 환경에서 미실행
 - 재배포 시 세션 초기화(Spring Session JDBC는 새 의존성 → 승인 필요)
-- #18: 로컬 standalone에서는 22MiB가 413 JSON으로 응답(재현 안 됨). dev 서버·Windows 재확인 필요
+- #18 (정정 2026-11-11): 이전 "standalone에서 재현 안 됨"은 curl(응답을 먼저 읽음) 결과로 인한 오판. main 빌드 standalone에서 Node fetch 22·26MiB 5/5 EPIPE, Chromium fetch 3/3 `Failed to fetch`, 20MiB+1은 413 정상, 저장 0건. 정상 UI는 20MiB 초과를 전송 전에 차단하므로 운영 영향은 API 직접 호출에 한정 — 미해결 유지
 - `spec.md` §16.2: 삭제 기능, 피드백 수정·삭제, 파일 형식 범위 미결정
 
 ## 다음 실행 명령 (클라우드 재개 시)
@@ -102,6 +104,6 @@ cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run 
 
 ## 다음 작업 우선순위
 
-1. 사용자 main 병합 승인 → 위 "병합 순서"대로 사용자가 병합(Merge commit), 단계마다 base 변경·CI 확인
-2. 병합 후 SPEC-05~08·#26 Done 판정과 `specs/README.md`·각 SPEC 검증 기록 갱신
-3. 로그인 폭주 대응 방침 결정 → Railway 리소스 생성 승인 → `docs/deployment.md` §9 체크리스트
+1. 사용자: Issue #41 PR 검토·병합(Merge commit)
+2. Railway 리소스 생성 승인 → `docs/deployment.md` §4·§9 (hops=0 유지, 첫 백업·복구 리허설 포함)
+3. 기존 Issue: #9 → 원래 braces 경고는 사라졌으나 새 dev 전용 경고(undici·typescript-eslint) → 정리 방향 결정, #17 → SPEC-03 §16.2 항목 Windows 실행 필요, #18 → 개선 선택지 결정(배포 차단 아님)

@@ -1,7 +1,7 @@
 # SPEC-07 문서 협업 상태와 최종 버전 확정
 
 - Issue: #24 · 브랜치: `feat/24/document-finalize` (선행 `feat/23`)
-- 상태: Draft v0.1 (2026-11-10) — Backend 구현·자동 테스트 완료, 확정 Dialog·읽기 전용 화면은 #28
+- 상태: **Done (2026-11-11, AC-FIN-01~12 충족)**. main 병합 완료
 - 대체: v0.4 SPEC-12 승인, SPEC-06/10/11의 상태 전이 (`spec.md` §9.1)
 
 ## 1. 목적
@@ -103,3 +103,14 @@
 - 기존 테스트 갱신(삭제 아님): SPEC-04 AC-VER-05·06과 SPEC-05 AC-VDL-06의 상태 매개변수를 ACTIVE/FINALIZED 기준으로 바꿨고, 응답 필드 수 검증에 `finalization`·`finalVersionNumber`를 반영했다.
 - `documents.final_version_id ↔ document_versions.document_id` 상호 참조 때문에 테스트 정리는 `TRUNCATE audit_logs, document_versions, documents`로 바꿨다. 운영에는 삭제 기능이 없다.
 - PostgreSQL은 CHECK 제약을 이름 순으로 평가하므로 확정 정보 CHECK 이름을 `ck_documents_status_finalization`으로 두어 잘못된 상태 값은 `ck_documents_status`로 보고된다.
+
+### Done 판정 (2026-11-11, Issue #41)
+
+| DoD (`spec.md` §14) | 근거 |
+| --- | --- |
+| AC 전부 충족 | AC-FIN-01~12: 통합·단위 테스트(위 검증 기록) |
+| 권한·상태 전이 | `AccessControlRegressionIntegrationTest`(#37): 비로그인 401·비구성원 404·구성원 확정 403·FINALIZED 변경 409 |
+| Frontend 상태·연동 | 오너 확정 Dialog(최신 아님 경고)·FINALIZED 읽기 전용 화면(#28). 클라우드 실제 브라우저 14단계 시나리오와 Windows에서 과거 버전 확정·변경 차단 확인 |
+| 자동 테스트 | main 기준 Backend 419·Frontend 244 통과(클라우드), GitHub Actions main run 113 (`d50f18f`): Backend·Frontend·Docker 성공 |
+| 수동 검증 | Windows 수동(사용자, 2026-11-11): `docs/windows-verification.md` §7.1 |
+

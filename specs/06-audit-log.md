@@ -1,7 +1,7 @@
 # SPEC-06 활동 이력 (Audit Log)
 
 - Issue: #23 · 브랜치: `feat/23/audit-log` (선행 `docs/22`, `feat/21`)
-- 상태: Draft v0.1 (2026-11-10) — Backend 구현·자동 테스트 완료, Frontend 표시는 #28
+- 상태: **Done (2026-11-11, AC-AUD-01~09 충족)**. main 병합 완료
 - 대체: v0.4 SPEC-13 Audit Log (`spec.md` §9.1)
 
 ## 1. 목적
@@ -101,3 +101,14 @@
 | — | GitHub Actions | push 후 PR에서 실행 | 미확인 (`feat/**` push CI 결과로 확인 예정) |
 
 구현 메모: AC-AUD-04는 `AuditLogRepository.save` 실패를 주입해 문서·버전·파일이 남지 않음을 확인했다.
+
+### Done 판정 (2026-11-11, Issue #41)
+
+| DoD (`spec.md` §14) | 근거 |
+| --- | --- |
+| AC 전부 충족 | AC-AUD-01~09: 통합·단위 테스트(위 검증 기록) |
+| 권한·상태 전이 | `AccessControlRegressionIntegrationTest`(#37): 비로그인 401·비구성원 404·구성원 확정 403·FINALIZED 변경 409 |
+| Frontend 상태·연동 | 홈 최근 활동·프로젝트·문서 활동 이력 화면(#28), 클라우드 실제 브라우저 시나리오에서 활동 기록 확인 |
+| 자동 테스트 | main 기준 Backend 419·Frontend 244 통과(클라우드), GitHub Actions main run 113 (`d50f18f`): Backend·Frontend·Docker 성공 |
+| 수동 검증 | Windows 수동(사용자, 2026-11-11): `docs/windows-verification.md` §7.1 |
+

@@ -1,6 +1,6 @@
 # SPEC-05: 문서 버전 조회·다운로드·미리보기
 
-- 상태: **구현·클라우드·CI 검증 완료 (2026-11-04). Windows 검증(AC-VDL-22) 대기. 설계 확정 v0.3(Q1~Q5, P1~P7, A1~A4) 기준. PR 미생성**
+- 상태: **Done (2026-11-11, AC-VDL-01~23 충족). main 병합 완료 (PR #29, `98db618`). 이후 SPEC-07에서 문서 상태가 ACTIVE/FINALIZED로 바뀌었고 조회·다운로드·미리보기는 두 상태 모두 허용(AC-VDL-06 갱신, #24)**
 - Issue: [#21](https://github.com/defhoon/Docflow/issues/21)
 - 브랜치: `feat/21/document-version-download`
 - 관련 문서: [`spec.md`](../spec.md) §3, §4.1, §8 US-05, §9, §11, §12, §14, §16.2 / [`specs/03-document-create.md`](./03-document-create.md) §5.4~§5.7, §5.6(D4·프록시 타임아웃), §13 R8 / [`specs/04-document-version-create.md`](./04-document-version-create.md) §5, §6.3(OQ-1), §14 / [`specs/02-project-members.md`](./02-project-members.md) §7.2(D5) / [ADR-0006](../docs/adr/0006-document-preview-conversion.md)(미리보기 변환 엔진), [ADR-0001](../docs/adr/0001-technology-stack.md) Q2, [ADR-0005](../docs/adr/0005-session-authentication.md) / [`CLAUDE.md`](../CLAUDE.md) §2~§6
@@ -503,8 +503,8 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 
 | 항목 | Claude Code 클라우드 | GitHub Actions CI | Windows 로컬 (사용자) |
 | --- | --- | --- | --- |
-| Backend build·test | 성공, 360개 통과(기존 299 + 신규 61), 실제 LibreOffice 변환 포함 | 성공 (§18.2) | 미실행 |
-| Frontend lint·`tsc`·test·build | 성공, Vitest 228개(기존 198 + 신규 30) | 성공 (§18.2) | 미실행 |
+| Backend build·test | 성공, 360개 통과(기존 299 + 신규 61), 실제 LibreOffice 변환 포함 | 성공 (§18.2) | 성공 (2026-11-11, main 통합 직전 `fix/39`, `clean build --rerun-tasks`) |
+| Frontend lint·`tsc`·test·build | 성공, Vitest 228개(기존 198 + 신규 30) | 성공 (§18.2) | 성공 (2026-11-11) |
 | 실제 브라우저 E2E (§12.5) | 19/19 통과 (§18.4, 시각 확인 한계 있음) | — | — |
 
 ### 18.2 실행 환경
@@ -538,7 +538,7 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 | AC-VDL-19 | Vitest(등록 후 목록 재조회), E2E 8 | 통과 |
 | AC-VDL-20 | E2E 19/19 (§18.4) | 통과 (시각 확인 한계 §18.4) |
 | AC-VDL-21 | CI(LibreOffice 설치·격리 래퍼·실제 변환 테스트 포함) | 통과 |
-| AC-VDL-22 | Windows | **미실행 (사용자, §18.6)** |
+| AC-VDL-22 | Windows(사용자, 2026-11-11): Backend `clean build --rerun-tasks` 성공(실제 LibreOffice 변환 테스트 포함, OS 전용 6개 skipped), Frontend lint·test·tsc·build 성공. 실제 화면 PDF·Office 미리보기·다운로드와 LibreOffice 프로세스 정리 정상 (`docs/windows-verification.md` §7.1) | 통과 |
 | AC-VDL-23 | 기존 Backend 299개·Frontend 198개 수정 없이 통과(기존 파일 변경 없음) | 통과 |
 
 ### 18.4 클라우드 실제 브라우저 E2E (2026-11-04)
@@ -564,8 +564,7 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 
 ### 18.5 미실행·남은 항목
 
-- AC-VDL-22 Windows 검증(사용자): §18.6.
-- 실제 데스크톱 브라우저에서 문서 상세 안 미리보기 본문 표시 확인(§18.4 한계). Windows 수동 확인 권장 항목으로 §18.6에 포함한다.
+- (해결 2026-11-11) AC-VDL-22 Windows 검증과 데스크톱 브라우저 미리보기 본문 표시: 사용자 Windows 검증으로 통과.
 - Firefox·Safari·모바일 브라우저 미확인(R7).
 
 ### 18.6 Windows 검증 명령과 기대 결과 (사용자)
@@ -616,3 +615,13 @@ GET preview → 접근·문서·버전 확인(readOnly 트랜잭션, 종료)
 - 테스트: 읽기 전용 알려진 폴더를 만드는 가짜 엔진으로 "결과가 보이는 시점에 작업 루트가 비어 있음"을 검증하고, `PreviewWorkspace` 단위 테스트를 추가했다. 실제 변환 테스트·보안 검증은 그대로다. 클라우드 Backend 365개 통과.
 - 기본 탐색: Windows 기본 경로·PATH 탐색을 `soffice.exe`에서 `soffice.com`으로 바꿨다. 보고된 503은 `soffice.exe`의 `--version` 점검 실패로 판단한다(`soffice.com` 지정 시 해소).
 - 남은 확인: Windows 재실행(§18.6 명령).
+
+### 18.8 Done 판정 (2026-11-11, Issue #41)
+
+| DoD (`spec.md` §14) | 근거 |
+| --- | --- |
+| AC 전부 충족 | §18.3: AC-VDL-01~21·23 통과(클라우드·CI), AC-VDL-22 통과(Windows, 사용자) |
+| 자동 테스트 | main 기준 Backend 419·Frontend 244 통과(클라우드), GitHub Actions main run 113 (`d50f18f`): Backend·Frontend·Docker 성공 |
+| 수동 검증 | 클라우드 실제 브라우저 E2E 19/19(§18.4), Windows 실제 화면 미리보기·다운로드(사용자) |
+| 남은 위험(Done 판정과 별개) | Firefox·Safari·모바일 미확인(R7), 운영은 Office 변환 비활성화(ADR-0007) |
+
