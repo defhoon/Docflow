@@ -105,3 +105,16 @@ jobs:
           docker run --rm --entrypoint sh docflow-backend:ci -c 'id docflow && test ! -e /app/.env && command -v pg_dump'
           docker run --rm --entrypoint sh docflow-frontend:ci -c 'test ! -e /app/.env'
 
+  # 실제 backend 이미지를 임시 PostgreSQL 16·임시 볼륨과 함께 실행해 기동·Flyway·health·비root·볼륨 쓰기/읽기·
+  # 재시작 후 유지를 확인한다(#45, docs/deployment.md §13). 기존 Docker 빌드 job과 병렬로 실행한다.
+  backend-container:
+    name: Backend container run (smoke test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build backend image
+        run: docker build -t docflow-backend:smoke backend
+      - name: Run container smoke test
+        run: scripts/ci/backend-container-smoke.sh docflow-backend:smoke
+
