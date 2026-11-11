@@ -43,6 +43,11 @@ public class UserAccountService {
 	}
 
 	@Transactional(readOnly = true)
+	public boolean adminExists() {
+		return this.userRepository.existsBySystemRole(com.docflow.user.domain.SystemRole.ADMIN);
+	}
+
+	@Transactional(readOnly = true)
 	public boolean existsByEmail(String email) {
 		return this.userRepository.existsByEmail(User.normalizeEmail(email));
 	}

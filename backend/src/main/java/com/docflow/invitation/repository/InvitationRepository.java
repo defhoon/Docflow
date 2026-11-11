@@ -22,6 +22,8 @@ public interface InvitationRepository extends JpaRepository<Invitation, Long> {
 	@Query("select i from Invitation i left join fetch i.usedBy left join fetch i.createdBy order by i.id desc")
 	List<Invitation> findRecent(Limit limit);
 
+	Optional<Invitation> findByCodeHash(String codeHash);
+
 	@Query("select i from Invitation i where i.grantsAdmin = true and i.usedAt is null and i.revokedAt is null")
 	List<Invitation> findUnusedAdminInvitations();
 

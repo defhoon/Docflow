@@ -15,4 +15,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	boolean existsByEmail(String email);
 
+	boolean existsBySystemRole(com.docflow.user.domain.SystemRole systemRole);
+
 }

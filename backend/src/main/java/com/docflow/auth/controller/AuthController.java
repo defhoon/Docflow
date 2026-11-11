@@ -24,6 +24,7 @@ import com.docflow.auth.dto.AuthUserResponse;
 import com.docflow.auth.dto.LoginRequest;
 import com.docflow.auth.security.AuthenticatedUser;
 import com.docflow.auth.dto.SignupRequest;
+import com.docflow.auth.security.ClientIpResolver;
 import com.docflow.auth.service.AuthService;
 import com.docflow.auth.service.SignupService;
 import com.docflow.global.error.BusinessException;
@@ -49,10 +50,14 @@ public class AuthController {
 
 	private final SignupService signupService;
 
+	private final ClientIpResolver clientIpResolver;
+
 	public AuthController(AuthService authService, SessionAuthenticationStrategy sessionAuthenticationStrategy,
-			SecurityContextRepository securityContextRepository, SignupService signupService) {
+			SecurityContextRepository securityContextRepository, SignupService signupService,
+			ClientIpResolver clientIpResolver) {
 		this.authService = authService;
 		this.signupService = signupService;
+		this.clientIpResolver = clientIpResolver;
 		this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
 		this.securityContextRepository = securityContextRepository;
 	}
@@ -69,7 +74,8 @@ public class AuthController {
 	@PostMapping("/login")
 	public AuthUserResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
-		Authentication authentication = this.authService.authenticate(request.email(), request.password());
+		Authentication authentication = this.authService.authenticate(request.email(), request.password(),
+				this.clientIpResolver.resolve(httpRequest));
 
 		// 세션 고정 방어(세션 ID 변경)와 CSRF 토큰 교체
 		this.sessionAuthenticationStrategy.onAuthentication(authentication, httpRequest, httpResponse);
@@ -89,8 +95,10 @@ public class AuthController {
 	 * 초대코드 회원가입 (#26). 가입 후 자동 로그인하지 않는다(로그인 절차·시도 제한을 한 경로로 유지).
 	 */
 	@PostMapping("/signup")
-	public ResponseEntity<AuthUserResponse> signup(@Valid @RequestBody SignupRequest request) {
-		return ResponseEntity.status(HttpStatus.CREATED).body(this.signupService.signup(request));
+	public ResponseEntity<AuthUserResponse> signup(@Valid @RequestBody SignupRequest request,
+			HttpServletRequest httpRequest) {
+		return ResponseEntity.status(HttpStatus.CREATED)
+			.body(this.signupService.signup(request, this.clientIpResolver.resolve(httpRequest)));
 	}
 
 	/**
