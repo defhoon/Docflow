@@ -37,8 +37,9 @@ public final class DocumentTestSupport {
 				UsernamePasswordAuthenticationToken.authenticated(AuthenticatedUser.from(user), null, List.of()));
 	}
 
-	/** FK 순서: document_versions → documents → projects(구성원 CASCADE) → users. */
+	/** FK 순서: audit_logs → document_versions → documents → projects(구성원 CASCADE) → users. */
 	public static void cleanDatabase(JdbcTemplate jdbcTemplate) {
+		jdbcTemplate.update("DELETE FROM audit_logs");
 		jdbcTemplate.update("DELETE FROM document_versions");
 		jdbcTemplate.update("DELETE FROM documents");
 		jdbcTemplate.update("DELETE FROM projects");
