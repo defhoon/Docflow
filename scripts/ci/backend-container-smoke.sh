@@ -3,7 +3,7 @@
 #
 # 실제 backend 이미지를 임시 PostgreSQL 16 컨테이너·임시 볼륨과 함께 실행해 다음을 확인한다.
 #   이미지 Java·pg_dump 버전 / root 소유 볼륨 연결 / 기동·Flyway·health / 비root 실행 /
-#   볼륨 쓰기·읽기(API 업로드·다운로드 포함) / 재시작 후 데이터 유지
+#   볼륨 쓰기·읽기(API 업로드·다운로드 포함) / 백업·복원(docs §7) / 재시작 후 데이터 유지
 #
 # 운영 기본값(prod 프로파일, Secure 쿠키)을 그대로 쓴다. 쿠키 관련 완화 변수는 넣지 않는다.
 # 만드는 리소스는 이 실행 전용 이름(docflow-smoke-*)이며 종료 시 모두 삭제한다. 기존 DB·볼륨에는 접근하지 않는다.
@@ -196,8 +196,10 @@ grep -qE "version \"${EXPECTED_JAVA_MAJOR}(\.|\")" <<<"$JAVA_VERSION_OUTPUT" ||
 pass "image Java ${EXPECTED_JAVA_MAJOR}"
 PG_DUMP_VERSION="$(docker run --rm --entrypoint pg_dump "$IMAGE" --version)"
 echo "    ${PG_DUMP_VERSION}"
-grep -qE " ${EXPECTED_PG_MAJOR}\." <<<"$PG_DUMP_VERSION" || fail "image pg_dump major version is not ${EXPECTED_PG_MAJOR}"
-pass "image pg_dump ${EXPECTED_PG_MAJOR}"
+PG_DUMP_MAJOR="$(grep -oE '\) [0-9]+' <<<"$PG_DUMP_VERSION" | grep -oE '[0-9]+' || true)"
+[ -n "$PG_DUMP_MAJOR" ] || fail "cannot read the pg_dump major version"
+# pg_dump는 자신과 같거나 낮은 주 버전의 서버만 백업할 수 있다. 서버 버전과 비교는 2단계 이후, 실제 백업·복원은 8단계에서 확인한다.
+pass "image pg_dump major ${PG_DUMP_MAJOR}"
 
 # ---------------------------------------------------------------- 2. PostgreSQL 16
 
@@ -212,6 +214,9 @@ case "$SERVER_VERSION" in
 "${EXPECTED_PG_MAJOR}".*) pass "PostgreSQL server ${SERVER_VERSION}" ;;
 *) fail "unexpected PostgreSQL server version ${SERVER_VERSION}" ;;
 esac
+[ "$PG_DUMP_MAJOR" -ge "$EXPECTED_PG_MAJOR" ] ||
+	fail "image pg_dump ${PG_DUMP_MAJOR} is older than the PostgreSQL ${EXPECTED_PG_MAJOR} server; backups would fail"
+pass "image pg_dump ${PG_DUMP_MAJOR} >= server ${EXPECTED_PG_MAJOR}"
 
 # ---------------------------------------------------------------- 3. root-owned volume
 
@@ -308,11 +313,26 @@ STORED_FILES="$(app_exec 'find /data/storage -type f ! -name smoke-probe.txt | w
 [ -z "$(app_exec 'find /data/storage ! -user docflow')" ] || fail "stored files not owned by docflow"
 pass "API upload stored ${STORED_FILES} file(s) on the volume as docflow; download identical (sha256 ${ORIGINAL_SHA:0:12}…)"
 
-# 컨테이너 안 pg_dump(16)가 PostgreSQL 16 서버를 백업할 수 있는지 확인한다(docs/deployment.md §1·§6).
-docker exec -e PGPASSWORD="$DB_PASSWORD" "$APP" pg_dump -h "$DB" -U docflow -d docflow --schema-only >"$WORK/schema.sql" ||
-	fail "pg_dump inside the backend image failed against the PostgreSQL ${EXPECTED_PG_MAJOR} server"
-grep -q 'CREATE TABLE public.documents' "$WORK/schema.sql" || fail "pg_dump output does not contain the documents table"
-pass "in-image pg_dump can back up the PostgreSQL ${EXPECTED_PG_MAJOR} database"
+# docs/deployment.md §7 백업 명령을 컨테이너 안에서 그대로 실행하고, 같은 임시 DB 서버의 새 DB로 복원해 비교한다.
+log "8b. backup (docs §7) and restore with in-image pg_dump/pg_restore"
+docker exec "$APP" sh -c 'set -e
+	PGPASSWORD="$DB_PASSWORD" pg_dump --format=custom --no-owner \
+	  --host "$(echo "$DB_URL" | sed -E "s#jdbc:postgresql://([^:/]+).*#\1#")" \
+	  --port "$(echo "$DB_URL" | sed -E "s#.*:([0-9]+)/.*#\1#")" \
+	  --username "$DB_USERNAME" --dbname "$(echo "$DB_URL" | sed -E "s#.*/##")" \
+	  --file /tmp/smoke-backup.dump' || fail "pg_dump (docs §7 command) failed inside the backend image"
+psql_value 'CREATE DATABASE docflow_restore_check' >/dev/null
+docker exec -e PGPASSWORD="$DB_PASSWORD" "$APP" \
+	pg_restore --no-owner --exit-on-error --host "$DB" --username docflow --dbname docflow_restore_check /tmp/smoke-backup.dump ||
+	fail "pg_restore of the backup into an empty PostgreSQL ${EXPECTED_PG_MAJOR} database failed"
+COUNT_SQL="SELECT (SELECT count(*) FROM users) || '/' || (SELECT count(*) FROM projects) || '/' || (SELECT count(*) FROM documents) || '/' || (SELECT count(*) FROM document_versions) || '/' || (SELECT count(*) FROM audit_logs) || '/' || (SELECT count(*) FROM flyway_schema_history WHERE success)"
+SOURCE_COUNTS="$(psql_value "$COUNT_SQL")"
+RESTORED_COUNTS="$(docker exec "$DB" psql -U docflow -d docflow_restore_check -tAc "$COUNT_SQL")"
+echo "    users/projects/documents/versions/audit_logs/migrations: source ${SOURCE_COUNTS}, restored ${RESTORED_COUNTS}"
+[ "$SOURCE_COUNTS" = "$RESTORED_COUNTS" ] || fail "restored row counts differ from the source"
+psql_value 'DROP DATABASE docflow_restore_check' >/dev/null
+app_exec 'rm -f /tmp/smoke-backup.dump'
+pass "pg_dump ${PG_DUMP_MAJOR} backup of PostgreSQL ${EXPECTED_PG_MAJOR} restores with identical row counts"
 
 # ---------------------------------------------------------------- 9. restart and persistence
 
