@@ -313,8 +313,28 @@ STORED_FILES="$(app_exec 'find /data/storage -type f ! -name smoke-probe.txt | w
 [ -z "$(app_exec 'find /data/storage ! -user docflow')" ] || fail "stored files not owned by docflow"
 pass "API upload stored ${STORED_FILES} file(s) on the volume as docflow; download identical (sha256 ${ORIGINAL_SHA:0:12}…)"
 
+# ---------------------------------------------------------------- 9. restart and persistence
+
+log "9. restart container and verify persistence"
+docker restart -t 60 "$APP" >/dev/null
+wait_until "backend health after restart" "$STARTUP_TIMEOUT_SECONDS" backend_healthy
+SECOND_STARTED_AT="$(docker inspect -f '{{.State.StartedAt}}' "$APP")"
+[ "$SECOND_STARTED_AT" != "$FIRST_STARTED_AT" ] || fail "container start time did not change after restart"
+app_log_has 'Schema "public" is up to date. No migration necessary.' ||
+	fail "Flyway did not report an up-to-date schema after restart"
+[ "$(app_exec 'cat /data/storage/smoke-probe.txt')" = "$PROBE_TEXT" ] || fail "probe file lost after restart"
+# 세션은 서버 메모리에 있으므로 재시작 후에는 무효여야 한다(실제로 새 프로세스인지 확인).
+http GET /api/auth/me
+expect_status 401 "GET /api/auth/me with the pre-restart session"
+login
+[ "$(download_sha)" = "$ORIGINAL_SHA" ] || fail "downloaded file differs after restart"
+check_non_root
+pass "restarted (${FIRST_STARTED_AT} -> ${SECOND_STARTED_AT}); schema up to date; probe file, DB rows and uploaded file preserved"
+
+# ---------------------------------------------------------------- 10. backup / restore
+
 # docs/deployment.md §7 백업 명령을 컨테이너 안에서 그대로 실행하고, 같은 임시 DB 서버의 새 DB로 복원해 비교한다.
-log "8b. backup (docs §7) and restore with in-image pg_dump/pg_restore"
+log "10. backup (docs §7) and restore with in-image pg_dump/pg_restore"
 docker exec "$APP" sh -c 'set -e
 	PGPASSWORD="$DB_PASSWORD" pg_dump --format=custom --no-owner \
 	  --host "$(echo "$DB_URL" | sed -E "s#jdbc:postgresql://([^:/]+).*#\1#")" \
@@ -333,23 +353,5 @@ echo "    users/projects/documents/versions/audit_logs/migrations: source ${SOUR
 psql_value 'DROP DATABASE docflow_restore_check' >/dev/null
 app_exec 'rm -f /tmp/smoke-backup.dump'
 pass "pg_dump ${PG_DUMP_MAJOR} backup of PostgreSQL ${EXPECTED_PG_MAJOR} restores with identical row counts"
-
-# ---------------------------------------------------------------- 9. restart and persistence
-
-log "9. restart container and verify persistence"
-docker restart -t 60 "$APP" >/dev/null
-wait_until "backend health after restart" "$STARTUP_TIMEOUT_SECONDS" backend_healthy
-SECOND_STARTED_AT="$(docker inspect -f '{{.State.StartedAt}}' "$APP")"
-[ "$SECOND_STARTED_AT" != "$FIRST_STARTED_AT" ] || fail "container start time did not change after restart"
-app_log_has 'Schema "public" is up to date. No migration necessary.' ||
-	fail "Flyway did not report an up-to-date schema after restart"
-[ "$(app_exec 'cat /data/storage/smoke-probe.txt')" = "$PROBE_TEXT" ] || fail "probe file lost after restart"
-# 세션은 서버 메모리에 있으므로 재시작 후에는 무효여야 한다(실제로 새 프로세스인지 확인).
-http GET /api/auth/me
-expect_status 401 "GET /api/auth/me with the pre-restart session"
-login
-[ "$(download_sha)" = "$ORIGINAL_SHA" ] || fail "downloaded file differs after restart"
-check_non_root
-pass "restarted (${FIRST_STARTED_AT} -> ${SECOND_STARTED_AT}); schema up to date; probe file, DB rows and uploaded file preserved"
 
 log "backend container smoke test passed"
