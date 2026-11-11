@@ -20,6 +20,7 @@ public enum ErrorCode {
 	PROJECT_OWNER_NOT_REMOVABLE(HttpStatus.BAD_REQUEST, "프로젝트 Owner는 제거할 수 없습니다."),
 	DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다."),
 	DOCUMENT_STATUS_CONFLICT(HttpStatus.CONFLICT, "현재 문서 상태에서는 새 버전을 등록할 수 없습니다."),
+	DOCUMENT_ALREADY_FINALIZED(HttpStatus.CONFLICT, "이미 최종 확정된 문서입니다. 확정된 문서는 변경할 수 없습니다."),
 	DOCUMENT_VERSION_NOT_FOUND(HttpStatus.NOT_FOUND, "버전을 찾을 수 없습니다."),
 	DOCUMENT_FILE_UNAVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "파일을 불러올 수 없습니다. 관리자에게 문의해 주세요."),
 	DOCUMENT_PREVIEW_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "미리보기를 만들 수 없습니다. 원본 파일을 내려받아 확인해 주세요."),

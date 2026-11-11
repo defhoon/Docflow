@@ -3,29 +3,27 @@ package com.docflow.document.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * SPEC-04 §7.2 새 버전 등록 허용 상태 (결정 V4, AC-VER-05).
+ * SPEC-07 문서 협업 상태: ACTIVE만 새 버전·협업 허용, FINALIZED는 거부 (SPEC-04 §7.2를 SPEC-07 FR-6으로 갱신).
  */
 class DocumentStatusTest {
 
-	@ParameterizedTest
-	@EnumSource(value = DocumentStatus.class, names = { "DRAFT", "CHANGES_REQUESTED" })
-	void allowsNewVersionInDraftAndChangesRequested(DocumentStatus status) {
-		assertThat(status.allowsNewVersion()).isTrue();
+	@Test
+	void activeAllowsCollaboration() {
+		assertThat(DocumentStatus.ACTIVE.isCollaborationOpen()).isTrue();
+		assertThat(DocumentStatus.ACTIVE.allowsNewVersion()).isTrue();
 	}
 
-	@ParameterizedTest
-	@EnumSource(value = DocumentStatus.class, names = { "IN_REVIEW", "RE_REVIEW", "APPROVED" })
-	void rejectsNewVersionInReviewAndApproved(DocumentStatus status) {
-		assertThat(status.allowsNewVersion()).isFalse();
+	@Test
+	void finalizedRejectsCollaboration() {
+		assertThat(DocumentStatus.FINALIZED.isCollaborationOpen()).isFalse();
+		assertThat(DocumentStatus.FINALIZED.allowsNewVersion()).isFalse();
 	}
 
 	@Test
 	void coversEveryStatus() {
-		assertThat(DocumentStatus.values()).hasSize(5);
+		assertThat(DocumentStatus.values()).containsExactly(DocumentStatus.ACTIVE, DocumentStatus.FINALIZED);
 	}
 
 }

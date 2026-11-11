@@ -25,10 +25,11 @@ const detail = {
   id: 3,
   title: "요구사항 명세서",
   description: "1행\n2행",
-  status: "DRAFT",
+  status: "ACTIVE",
   createdBy: { id: 1, displayName: "Author" },
   createdAt: "2026-10-27T09:00:00Z",
   updatedAt: "2026-10-27T09:00:00Z",
+  finalization: null,
   latestVersion: {
     versionNumber: 1,
     originalFilename: "requirements.pdf",
@@ -51,7 +52,7 @@ describe("DocumentDetail (SPEC-03 §8.2, AC-DOC-26)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("불러오는 중...");
     expect(await screen.findByRole("heading", { name: "요구사항 명세서" })).toBeInTheDocument();
     expect(fetchDocumentMock).toHaveBeenCalledWith("7", "3");
-    expect(screen.getByText("초안")).toBeInTheDocument();
+    expect(screen.getByText("협업 중")).toBeInTheDocument();
     expect(screen.getByText("Author")).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByText("requirements.pdf")).toBeInTheDocument();

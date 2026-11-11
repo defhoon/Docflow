@@ -20,18 +20,20 @@ const documents = [
   {
     id: 2,
     title: "둘째 문서",
-    status: "DRAFT",
+    status: "ACTIVE",
     createdBy: { id: 2, displayName: "Member" },
     createdAt: "2026-10-27T10:00:00Z",
     latestVersionNumber: 2,
+    finalVersionNumber: null,
   },
   {
     id: 1,
     title: "첫째 문서",
-    status: "APPROVED",
+    status: "FINALIZED",
     createdBy: { id: 1, displayName: "Owner" },
     createdAt: "2026-10-27T09:00:00Z",
     latestVersionNumber: 1,
+    finalVersionNumber: null,
   },
 ];
 
@@ -51,9 +53,9 @@ describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
     expect(items).toHaveLength(2);
     expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/projects/7/documents/2");
     expect(items[0]).toHaveTextContent("둘째 문서");
-    expect(items[0]).toHaveTextContent("초안");
+    expect(items[0]).toHaveTextContent("협업 중");
     expect(items[0]).toHaveTextContent("Member · v2");
-    expect(items[1]).toHaveTextContent("승인");
+    expect(items[1]).toHaveTextContent("최종 확정");
     expect(screen.getByRole("link", { name: "문서 등록" })).toHaveAttribute("href", "/projects/7/documents/new");
   });
 

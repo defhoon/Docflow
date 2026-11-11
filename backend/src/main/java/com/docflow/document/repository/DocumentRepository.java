@@ -24,8 +24,8 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 	@Query("""
 			select new com.docflow.document.dto.DocumentSummaryResponse(
 			    d.id, d.title, d.status, u.id, u.displayName, d.createdAt,
-			    (select max(v.versionNumber) from DocumentVersion v where v.document = d))
-			from Document d join d.createdBy u
+			    (select max(v.versionNumber) from DocumentVersion v where v.document = d), fv.versionNumber)
+			from Document d join d.createdBy u left join d.finalVersion fv
 			where d.project.id = :projectId
 			order by d.createdAt desc, d.id desc""")
 	List<DocumentSummaryResponse> findSummariesByProjectId(@Param("projectId") Long projectId);

@@ -95,7 +95,7 @@ class DocumentApiIntegrationTest {
 		DocumentTestSupport.cleanStorage();
 	}
 
-	// AC-DOC-01, 02, 03, 18, 28: 4개 형식 등록, DRAFT, v1, 서버 판별 Content Type, 크기·SHA-256, 내부 정보 미노출
+	// AC-DOC-01, 02, 03, 18, 28: 4개 형식 등록, ACTIVE(SPEC-07 갱신), v1, 서버 판별 Content Type, 크기·SHA-256, 내부 정보 미노출
 	@ParameterizedTest
 	@EnumSource(DocumentFileType.class)
 	void ownerRegistersEachFormat(DocumentFileType type) throws Exception {
@@ -108,7 +108,7 @@ class DocumentApiIntegrationTest {
 			.andExpect(header().string("Location", matchesPattern("/api/projects/" + this.projectId + "/documents/\\d+")))
 			.andExpect(jsonPath("$.title").value("요구사항 명세서"))
 			.andExpect(jsonPath("$.description").value("1차 초안"))
-			.andExpect(jsonPath("$.status").value("DRAFT"))
+			.andExpect(jsonPath("$.status").value("ACTIVE"))
 			.andExpect(jsonPath("$.createdBy.id").value(this.owner.getId()))
 			.andExpect(jsonPath("$.createdBy.displayName").value("Owner"))
 			.andExpect(jsonPath("$.createdBy.*", hasSize(2)))
@@ -119,7 +119,8 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.latestVersion.sizeBytes").value(content.length))
 			.andExpect(jsonPath("$.latestVersion.uploadedAt").exists())
 			.andExpect(jsonPath("$.latestVersion.*", hasSize(4)))
-			.andExpect(jsonPath("$.*", hasSize(8)))
+			.andExpect(jsonPath("$.*", hasSize(9))) // SPEC-07: finalization(ACTIVE는 null) 추가
+			.andExpect(jsonPath("$.finalization").value(org.hamcrest.Matchers.nullValue()))
 			.andReturn()
 			.getResponse()
 			.getContentAsString();
@@ -127,7 +128,7 @@ class DocumentApiIntegrationTest {
 		Map<String, Object> row = this.jdbcTemplate.queryForMap(
 				"SELECT d.status, d.created_by, v.version_number, v.content_type, v.size_bytes, v.sha256, v.storage_key, v.uploaded_by, v.original_filename "
 						+ "FROM documents d JOIN document_versions v ON v.document_id = d.id");
-		assertThat(row.get("status")).isEqualTo("DRAFT");
+		assertThat(row.get("status")).isEqualTo("ACTIVE");
 		assertThat(row.get("created_by")).isEqualTo(this.owner.getId());
 		assertThat(row.get("uploaded_by")).isEqualTo(this.owner.getId());
 		assertThat(row.get("version_number")).isEqualTo(1);
@@ -162,7 +163,7 @@ class DocumentApiIntegrationTest {
 				"APPROVED", "versionNumber", "7"), pdfFile())
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.createdBy.id").value(this.member.getId()))
-			.andExpect(jsonPath("$.status").value("DRAFT"))
+			.andExpect(jsonPath("$.status").value("ACTIVE"))
 			.andExpect(jsonPath("$.latestVersion.versionNumber").value(1));
 	}
 
@@ -265,7 +266,7 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$[3].id").value(first))
 			.andExpect(jsonPath("$[3].latestVersionNumber").value(1))
 			.andExpect(jsonPath("$[4].id").value(third))
-			.andExpect(jsonPath("$[0].*", hasSize(6)))
+			.andExpect(jsonPath("$[0].*", hasSize(7))) // SPEC-07: finalVersionNumber 추가
 			.andExpect(jsonPath("$[0].createdBy.*", hasSize(2)));
 		// 접근 확인 1 + 목록 1
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);

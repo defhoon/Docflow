@@ -1,5 +1,7 @@
 package com.docflow.document.domain;
 
+import java.time.Instant;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +15,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import com.docflow.global.common.BaseTimeEntity;
+import com.docflow.global.error.BusinessException;
+import com.docflow.global.error.ErrorCode;
 import com.docflow.project.domain.Project;
 import com.docflow.user.domain.User;
 
@@ -46,6 +50,18 @@ public class Document extends BaseTimeEntity {
 	@JoinColumn(name = "created_by", nullable = false, updatable = false)
 	private User createdBy;
 
+	/** 최종 버전 (SPEC-07). ACTIVE이면 null. DB 복합 FK가 같은 문서의 버전만 허용한다. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "final_version_id")
+	private DocumentVersion finalVersion;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "finalized_by")
+	private User finalizedBy;
+
+	@Column(name = "finalized_at")
+	private Instant finalizedAt;
+
 	protected Document() {
 	}
 
@@ -53,11 +69,11 @@ public class Document extends BaseTimeEntity {
 		this.project = project;
 		this.title = title;
 		this.description = description;
-		this.status = DocumentStatus.DRAFT;
+		this.status = DocumentStatus.ACTIVE;
 		this.createdBy = createdBy;
 	}
 
-	/** 정규화·검증이 끝난 값으로 DRAFT 문서를 만든다. */
+	/** 정규화·검증이 끝난 값으로 ACTIVE 문서를 만든다. */
 	public static Document create(Project project, String title, String description, User createdBy) {
 		return new Document(project, title, description, createdBy);
 	}
@@ -67,6 +83,24 @@ public class Document extends BaseTimeEntity {
 	 * 결정 V2).
 	 */
 	public void markNewVersionAdded() {
+		markModified();
+	}
+
+	/**
+	 * 최종 버전을 확정한다 (SPEC-07 FR-4). 호출자는 문서 행을 잠근 트랜잭션 안에서 호출한다. 이미 확정된 문서는
+	 * {@link ErrorCode#DOCUMENT_ALREADY_FINALIZED}로 거부한다(FINALIZED → 어떤 상태로도 전이 불가).
+	 */
+	public void finalizeWith(DocumentVersion version, User user, Instant now) {
+		if (!this.status.isCollaborationOpen()) {
+			throw new BusinessException(ErrorCode.DOCUMENT_ALREADY_FINALIZED);
+		}
+		if (version.getDocument() != this) {
+			throw new IllegalArgumentException("Version does not belong to document: documentId=" + this.id);
+		}
+		this.status = DocumentStatus.FINALIZED;
+		this.finalVersion = version;
+		this.finalizedBy = user;
+		this.finalizedAt = now;
 		markModified();
 	}
 
@@ -92,6 +126,18 @@ public class Document extends BaseTimeEntity {
 
 	public User getCreatedBy() {
 		return this.createdBy;
+	}
+
+	public DocumentVersion getFinalVersion() {
+		return this.finalVersion;
+	}
+
+	public User getFinalizedBy() {
+		return this.finalizedBy;
+	}
+
+	public Instant getFinalizedAt() {
+		return this.finalizedAt;
 	}
 
 }

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +19,8 @@ import com.docflow.auth.security.AuthenticatedUser;
 import com.docflow.document.dto.CreateDocumentRequest;
 import com.docflow.document.dto.DocumentResponse;
 import com.docflow.document.dto.DocumentSummaryResponse;
+import com.docflow.document.dto.FinalizeDocumentRequest;
+import com.docflow.document.service.DocumentFinalizeService;
 import com.docflow.document.service.DocumentService;
 
 /**
@@ -29,8 +32,11 @@ public class DocumentController {
 
 	private final DocumentService documentService;
 
-	public DocumentController(DocumentService documentService) {
+	private final DocumentFinalizeService documentFinalizeService;
+
+	public DocumentController(DocumentService documentService, DocumentFinalizeService documentFinalizeService) {
 		this.documentService = documentService;
+		this.documentFinalizeService = documentFinalizeService;
 	}
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -51,6 +57,15 @@ public class DocumentController {
 	public DocumentResponse getDocument(@AuthenticationPrincipal AuthenticatedUser principal,
 			@PathVariable Long projectId, @PathVariable Long documentId) {
 		return this.documentService.getDocument(projectId, documentId, principal.getId());
+	}
+
+	/** 최종 버전 확정 (SPEC-07 §6). 오너 전용이며 FINALIZED는 영구 상태다. */
+	@PostMapping("/{documentId}/finalize")
+	public DocumentResponse finalizeDocument(@AuthenticationPrincipal AuthenticatedUser principal,
+			@PathVariable Long projectId, @PathVariable Long documentId,
+			@Valid @RequestBody FinalizeDocumentRequest request) {
+		return this.documentFinalizeService.finalizeDocument(projectId, documentId, principal.getId(),
+				request.versionNumber());
 	}
 
 }

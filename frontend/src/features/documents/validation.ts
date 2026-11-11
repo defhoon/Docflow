@@ -29,10 +29,10 @@ export const MESSAGES = {
 } as const;
 
 /**
- * 새 버전을 등록할 수 있는 문서 상태 (SPEC-04 §7.2, 결정 V4). 화면 사용성 보조이며 최종 판정은 Backend가 한다.
+ * 새 버전을 등록할 수 있는 문서 상태 (SPEC-07 FR-6: ACTIVE만). 화면 사용성 보조이며 최종 판정은 Backend가 한다.
  */
 export function canUploadNewVersion(status: DocumentStatus): boolean {
-  return status === "DRAFT" || status === "CHANGES_REQUESTED";
+  return status === "ACTIVE";
 }
 
 export type DocumentFieldErrors = Partial<Record<"title" | "description" | "file", string>>;

@@ -48,4 +48,11 @@ public class ProjectPermissionService {
 		}
 	}
 
+	/**
+	 * 최종 버전 확정 권한 (SPEC-07 §4). 프로젝트 Owner만 허용한다. 접근 확인을 통과한 프로젝트에만 사용한다.
+	 */
+	public void requireDocumentFinalizer(Project accessibleProject, Long userId) {
+		requireOwner(accessibleProject, userId);
+	}
+
 }

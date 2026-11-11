@@ -29,10 +29,11 @@ function updated(versionNumber: number): DocumentDetail {
     id: 3,
     title: "요구사항",
     description: null,
-    status: "DRAFT",
+    status: "ACTIVE",
     createdBy: { id: 1, displayName: "Author" },
     createdAt: "2026-10-27T09:00:00Z",
     updatedAt: "2026-11-04T09:00:00Z",
+    finalization: null,
     latestVersion: { versionNumber, originalFilename: "v.pdf", sizeBytes: 10, uploadedAt: "2026-11-04T09:00:00Z" },
   };
 }
@@ -43,7 +44,7 @@ function pdf(name = "v2.pdf", size = 10): File {
   return file;
 }
 
-function renderForm(status: DocumentStatus = "DRAFT") {
+function renderForm(status: DocumentStatus = "ACTIVE") {
   return render(
     <DocumentVersionUploadForm
       projectId="7"
@@ -141,7 +142,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     expect(submitButton()).toBeEnabled();
   });
 
-  it.each<[DocumentStatus]>([["DRAFT"], ["CHANGES_REQUESTED"]])("%s 상태에서는 등록 영역이 활성화된다", (status) => {
+  it.each<[DocumentStatus]>([["ACTIVE"]])("%s 상태에서는 등록 영역이 활성화된다", (status) => {
     renderForm(status);
 
     expect(fileInput()).toBeEnabled();
@@ -149,7 +150,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     expect(screen.queryByText(GUIDE)).not.toBeInTheDocument();
   });
 
-  it.each<[DocumentStatus]>([["IN_REVIEW"], ["RE_REVIEW"], ["APPROVED"]])(
+  it.each<[DocumentStatus]>([["FINALIZED"]])(
     "%s 상태에서는 파일 입력·버튼을 비활성화하고 안내 문구를 표시한다 (OQ-7)",
     (status) => {
       renderForm(status);
@@ -203,7 +204,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
 
     // 다시 조회한 상태가 반영되어도 오류 문구는 유지되고 등록 영역은 비활성화된다.
     view.rerender(
-      <DocumentVersionUploadForm projectId="7" documentId="3" status="IN_REVIEW" onUploaded={onUploaded} onConflict={onConflict} />,
+      <DocumentVersionUploadForm projectId="7" documentId="3" status="FINALIZED" onUploaded={onUploaded} onConflict={onConflict} />,
     );
     expect(screen.getByRole("alert")).toHaveTextContent("현재 문서 상태에서는 새 버전을 등록할 수 없습니다.");
     expect(screen.getByText(GUIDE)).toBeInTheDocument();
@@ -257,7 +258,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
 function Toggle({ visible }: { visible: boolean }) {
   return (
     <Activity mode={visible ? "visible" : "hidden"}>
-      <DocumentVersionUploadForm projectId="7" documentId="3" status="DRAFT" onUploaded={onUploaded} onConflict={onConflict} />
+      <DocumentVersionUploadForm projectId="7" documentId="3" status="ACTIVE" onUploaded={onUploaded} onConflict={onConflict} />
     </Activity>
   );
 }
