@@ -7,7 +7,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 마지막 갱신 | 2026-11-11 체크포인트 11 (#39 Windows Backend 전체 빌드 성공 기록) |
+| 마지막 갱신 | 2026-11-11 체크포인트 12 (Windows 전체 검증 성공, PR #39 생성, main 병합 승인 대기) |
 | 현재 브랜치 | `fix/39/windows-test-failures` (`feat/37` 위) |
 | 마지막 검증 완료 커밋 | #39 커밋 (클라우드 Backend 419 통과: `.env`에 `SESSION_COOKIE_SECURE=false`를 넣은 Windows 재현 조건과 원래 조건 모두) |
 | 기준 브랜치 | `feat/21/document-version-download` (`e22cad5`, CI run 79 green, main 미병합) |
@@ -19,9 +19,10 @@
 
 | 순서 | Issue | 브랜치 | 내용 | 상태 |
 | --- | --- | --- | --- | --- |
+| 2026-11-11 | Windows 로컬(사용자) 전체 | Backend `clean build` 성공, Frontend lint·test·tsc·build 성공, 관리자·초대 가입, 프로젝트·구성원, v1/v2 업로드, 버전별 피드백, 과거 버전 확정, FINALIZED 차단, PDF·Office 미리보기·다운로드, LibreOffice 프로세스 정리, 모바일·데스크톱 UI 모두 정상 (`docs/windows-verification.md` §7.1) |
 | #39 (2026-11-11) | Windows 로컬(사용자) | 실패했던 2건·설정 테스트 `BUILD SUCCESSFUL in 3m 42s`, `.\gradlew.bat clean build --rerun-tasks` `BUILD SUCCESSFUL in 11m 11s`. 조건: DB 접속 정보를 프로세스 환경 변수로 전달 |
 | #39 | 클라우드 / GitHub Actions | Backend 419 통과 / run 100 success(Backend·Frontend·Docker) |
-| 0 | #21 | `feat/21/document-version-download` | SPEC-05 버전 조회·다운로드·미리보기 | 구현·CI 완료, Windows 검증 대기, PR #29 |
+| 0 | #21 | `feat/21/document-version-download` | SPEC-05 버전 조회·다운로드·미리보기 | 구현·CI 완료, Windows 검증 완료(2026-11-11), PR #29 |
 | 1 | #22 | `docs/22/collaboration-workflow` | spec.md v0.5, SPEC 재구성, 이 문서 | 완료 (`44cb4fb`), PR #30 |
 | 2 | #23 | `feat/23/audit-log` | SPEC-06 활동 이력 | Backend 완료 (`de11cfc`, CI run 80 success), PR #31 |
 | 3 | #24 | `feat/24/document-finalize` | SPEC-07 ACTIVE/FINALIZED, 최종 확정 | Backend 완료 (`620e0f7`, CI run 81 success), PR #32 |
@@ -30,7 +31,7 @@
 | 6 | #27 | `feat/27/deployment-prep` | Dockerfile, 운영 설정, Office 변환 비활성화, 백업 | 완료(미배포), PR #35 |
 | 7 | #28 | `feat/28/ui-overhaul` | 디자인 시스템, App Shell, 협업 작업 공간 | 1차 완료, PR #36 |
 | 8 | #37 | `feat/37/pre-release-hardening` | 공개 전 보안 강화·통합 검증·Windows/배포 문서 | 완료, PR #38 |
-| 9 | #39 | `fix/39/windows-test-failures` | Windows 실패 2건: prod의 `.env` 로딩 차단·비보안 쿠키 기동 거부, 명령 테스트 경로 | Backend 수정 완료·Windows Backend 전체 빌드 성공, PR 미생성(지시에 따라) |
+| 9 | #39 | `fix/39/windows-test-failures` | Windows 실패 2건: prod의 `.env` 로딩 차단·비보안 쿠키 기동 거부, 명령 테스트 경로 | 완료, Windows 전체 검증 성공, PR(아래 기록) |
 
 ## 완료된 작업
 
@@ -48,6 +49,8 @@
 - CP10 (#39): Windows `clean build` 2건 실패 원인 수정. (1) `application.yml`의 `.env` import가 prod에도 적용되어 로컬 `SESSION_COOKIE_SECURE=false`가 prod 기본값을 덮어씀 → `!prod` 문서로 이동, prod에서 비보안 쿠키면 기동 거부(`ProductionCookieGuard`, 로컬 확인용 `DOCFLOW_ALLOW_INSECURE_COOKIES`만 예외). (2) 명령 테스트의 Linux 경로 리터럴 → 호스트 경로. 회귀 테스트 4개 추가
 
 - CP11 (#39): **Windows Backend 검증 성공(사용자)** — 기존 실패 2건·설정 테스트 `BUILD SUCCESSFUL in 3m 42s`, `.\gradlew.bat clean build --rerun-tasks` `BUILD SUCCESSFUL in 11m 11s`(9 actionable tasks executed). prod 프로파일 테스트의 DB 인증 오류는 `.env`의 DB 값을 프로세스 환경 변수로 전달해 해결(prod의 `.env` 격리는 의도된 동작) → `docs/windows-verification.md` §4.1에 절차 추가
+
+- CP12: 사용자 Windows 전체 검증 성공 기록(`docs/windows-verification.md` §7.1), #39 PR 생성. 다음: 사용자 main 병합 승인 → 병합 순서(아래)
 
 ## 진행 중
 
@@ -71,8 +74,7 @@
 
 ## 미해결 문제
 
-- SPEC-05 Windows: 자동 테스트는 Windows 전체 빌드로 통과. 실제 화면 LibreOffice 미리보기·프로세스 정리(§6-8·§6-14) 확인 대기 (AC-VDL-22 완료 처리 보류)
-- Windows Frontend 자동 검사(lint·test·tsc·build) 미실행
+- (해결 2026-11-11) SPEC-05 Windows 검증(AC-VDL-22)·Frontend 자동 검사·실제 미리보기·프로세스 정리: Windows 전체 검증으로 통과
 - 테스트 DB 설정 검토: prod 프로파일 테스트는 `.env` 격리 때문에 OS 환경 변수의 DB 정보가 필요. CI는 환경 변수로 주입하므로 문제없음. 코드 변경(테스트 전용 DB 속성 등)은 prod 기본 경로를 우회하게 되어 하지 않고 문서 절차로 해결
 - Docker 이미지 빌드는 클라우드에 Docker 데몬이 없어 CI job으로만 검증 예정
 - 백업·복구 절차는 Railway 환경에서 미실행
@@ -100,7 +102,6 @@ cd frontend && npm run lint && npx tsc --noEmit && npm test -- --run && npm run 
 
 ## 다음 작업 우선순위
 
-1. 사용자 Windows 남은 검증: Frontend 자동 검사(§5.1), 실제 LibreOffice 미리보기(§6-8·§6-14), 새 워크플로·UI 화면(§6) — Backend 테스트는 완료 → 결과 기록 → SPEC-05~08·#26 Done 판정
-2. 로그인 폭주 대응 방침 결정(수용·감시 / 앞단 제한)
-3. 사용자 승인 후 Railway 리소스 생성 → `docs/deployment.md` §9 체크리스트 1~14 → 결과 기록
-4. PR 병합(위 순서, 사용자 수행)
+1. 사용자 main 병합 승인 → 위 "병합 순서"대로 사용자가 병합(Merge commit), 단계마다 base 변경·CI 확인
+2. 병합 후 SPEC-05~08·#26 Done 판정과 `specs/README.md`·각 SPEC 검증 기록 갱신
+3. 로그인 폭주 대응 방침 결정 → Railway 리소스 생성 승인 → `docs/deployment.md` §9 체크리스트

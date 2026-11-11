@@ -160,6 +160,21 @@ npm run dev        # http://localhost:3000 (Backend가 8080에서 실행 중이�
 | 4.1 clean build (테스트 수·skip 수) | | |
 | 6-1 ~ 6-14 | | |
 
+### 7.1 검증 기록: 2026-11-11 Windows 전체 검증 (사용자, `fix/39/windows-test-failures`)
+
+| 항목 | 결과 | 비고 |
+| --- | --- | --- |
+| 4.1 실패했던 2건 + 설정 테스트(#39) | 통과 | `BUILD SUCCESSFUL in 3m 42s` |
+| 4.1 Backend 전체 `clean build --rerun-tasks` | 통과 | `BUILD SUCCESSFUL in 11m 11s`, 9 actionable tasks executed. DB 정보는 프로세스 환경 변수로 전달 |
+| 5.1 Frontend lint·test·tsc·build | 통과 | |
+| 6-1~4 관리자 로그인·초대코드 발급·가입 | 통과 | |
+| 6-5 프로젝트 생성·구성원 추가 | 통과 | |
+| 6-6~7 문서 v1/v2 업로드, 버전별 피드백·이력 유지 | 통과 | |
+| 6-8 PDF·Office 미리보기, 다운로드 | 통과 | LibreOffice 실제 변환 |
+| 6-9~11 오너의 과거 버전 최종 확정, FINALIZED 수정 차단 | 통과 | |
+| 6-13 모바일·데스크톱 UI | 통과 | |
+| 6-14 LibreOffice 프로세스 정리 | 통과 | |
+
 ## 8. 문제 발생 시 확인할 것
 
 | 증상 | 확인 위치 |
