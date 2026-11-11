@@ -1,14 +1,16 @@
 # DocFlow Specification
 
-Version: Draft v0.4
-Status: Development Environment Initialized
-Last Updated: 2026-10-22
+Version: Draft v0.5
+Status: Collaboration Workflow Redesigned
+Last Updated: 2026-11-10
 
 > v0.2 변경 요약: 6주차 초기화 결과에 맞춰 §11(확정 Stack·구조·개발 규칙·환경변수·Actuator 정책), §15(실제 명령어·검증 결과), §16(잠정 결정 3건 분리), §17(ADR-0001~0003 결정 추가)을 갱신하였다. §18의 v0.1 안내 문장을 삭제하였다. §1~§10, §12~§14는 v0.1과 동일하다.
 
 > v0.3 변경 요약: Backend Java 버전을 21에서 25 LTS로 변경하였다(ADR-0004). §11.1·§11.2, §15(JDK 조건, §15.2 Java 25 검증 결과), §17을 갱신하였다. Java 21 기준 기록(§15.1, §17 2026-10-14)은 보존한다.
 
 > v0.4 변경 요약: SPEC-AUTH(사용자 인증) 상세 SPEC([`specs/00-auth.md`](./specs/00-auth.md))을 추가하고 §9 SPEC 표에 등록하였다. §16.1에서 Session 인증과 Entity ID(BIGINT IDENTITY)를 확정하였다(ADR-0005). §11.1·§11.2·§11.6, §17을 갱신하였다. 인증 기능은 아직 구현되지 않았다.
+
+> v0.5 변경 요약 (2026-11-10, Issue #22): 핵심 Workflow를 Review 요청·단계별 승인에서 **구성원 공동 협업 + 프로젝트 오너의 최종 버전 확정**으로 변경하였다. §1.2, §3, §4.1, §5~§10, §13, §16.2, §17을 갱신하였다. 문서 상태는 `ACTIVE`/`FINALIZED` 두 가지이며 `FINALIZED`는 영구 종료 상태다. 기존 SPEC-06~13은 새 SPEC-06(활동 이력)·SPEC-07(최종 버전 확정)·SPEC-08(버전별 Feedback)으로 재구성하였고 대응표는 §9.1에 둔다. v0.4의 Review 중심 내용(§6~§10)은 Git 이력(v0.4)에 보존한다.
 
 ## 1. 프로젝트 개요
 
@@ -20,11 +22,11 @@ DocFlow
 
 DocFlow는 문서를 직접 작성하거나 공동 편집하는 도구가 아니라, 문서 작성 이후 발생하는
 
-문서 등록 → 검토 요청 → 피드백 → 수정 → 재검토 → 승인
+문서 등록 → 버전 업로드 ↔ 버전별 피드백(반복) → 오너의 최종 버전 확정
 
 과정을 하나의 Workflow에서 관리하기 위한 시스템이다.
 
-사용자가 문서의 현재 검토 상태와 피드백 처리 여부를 확인하고, 문서가 어떤 과정을 거쳐 최종 승인되었는지를 추적할 수 있도록 하는 것을 목표로 한다.
+프로젝트 구성원은 문서의 모든 버전과 버전별 피드백을 한곳에서 확인하고, 어떤 버전이 누구에 의해 언제 최종본으로 확정되었는지 추적할 수 있다.
 
 ## 2. 문제 정의 및 사용자 조사 근거
 
@@ -58,8 +60,8 @@ Interview Evidence → Finding → Requirement → Feature SPEC → Acceptance C
 | 분석 결과 | 도출된 요구사항 | 기능 SPEC | 출처 |
 | --- | --- | --- | --- |
 | F-01 피드백 반영 사실을 직접 전달 | 피드백을 검토 과정 안에서 기록 | Feedback 등록 | User Interview |
-| F-01 피드백 반영 사실을 직접 전달 | 피드백 처리 상태 확인 | Feedback 상태 관리 | User Interview 기반 가설 |
-| F-01 | 검토 과정 구조화 | Review Workflow | Solution Hypothesis |
+| F-01 피드백 반영 사실을 직접 전달 | 피드백이 어느 버전에 대한 것인지 연결 | 버전별 Feedback (SPEC-08) | User Interview 기반 가설 |
+| F-01 | 협업 종료 시점과 공식 최종본을 명확히 함 | 최종 버전 확정 (SPEC-07) | Solution Hypothesis (2026-11-10 변경) |
 | F-02, F-04 | 기존 문서를 유지하며 수정본 관리 | Document Version | User Interview |
 | F-03 | 누가 언제 어떤 작업을 했는지 확인 | Audit Log | User Interview |
 | F-02 + 프로젝트 요구 | 버전 간 주요 변경사항 확인 | Version Analysis | Interview + Project Requirement |
@@ -75,15 +77,13 @@ Interview Evidence → Finding → Requirement → Feature SPEC → Acceptance C
 - 프로젝트 생성 및 구성원 관리
 - 문서 등록
 - 문서 버전 관리
-- 검토자 지정 및 검토 요청
-- 피드백 등록
-- 피드백 반영 상태 관리
-- 수정 요청
-- 재검토
-- 문서 승인
-- 문서 Review 상태 관리
-- 주요 변경 이력 기록 및 조회
-- 전체 Review Workflow End-to-End 동작
+- 모든 구성원의 반복적인 새 버전 업로드
+- 버전별 피드백 작성·조회
+- 프로젝트 오너의 최종 버전 확정(최신 버전이 아니어도 됨)
+- 문서 협업 상태 관리(ACTIVE / FINALIZED, FINALIZED는 영구 읽기 전용)
+- 주요 변경 이력(활동 이력) 기록 및 조회
+- 초대코드 기반 회원가입 (공개 운영용, 2026-11-10 추가)
+- 전체 협업 Workflow End-to-End 동작
 
 ### 4.2 Post-MVP
 
@@ -91,8 +91,10 @@ Interview Evidence → Finding → Requirement → Feature SPEC → Acceptance C
 - 상세 버전 Diff
 - 검토 기한
 - 알림 및 리마인드
-- Dashboard
+- Dashboard(통계)
 - 검색
+- 피드백 상태 관리(OPEN/APPLIED/CONFIRMED), 답글, 페이지 좌표 피드백
+- 지정 Reviewer·Review 요청·할당
 - RAG 기반 문서 질의응답
 - AI Review Agent
 
@@ -113,135 +115,87 @@ DocFlow는 기존 문서 작성 도구를 대체하기보다 기존 도구에서
 
 ## 5. 핵심 사용자
 
-### Author
+역할은 프로젝트 단위로만 구분한다(SPEC-02의 `OWNER`/`MEMBER`). Author·Reviewer 고정 역할은 두지 않는다 (2026-11-10 결정).
 
-문서를 등록·수정하고 검토를 요청하는 사용자.
+### 프로젝트 구성원 (MEMBER, OWNER 포함)
 
-주요 행동:
+- 문서 등록, 새 버전 업로드(반복)
+- 문서의 모든 버전 조회·다운로드·미리보기
+- 각 버전에 피드백 작성, 피드백 조회
+- 활동 이력 조회
 
-- 문서 등록
-- 새로운 버전 등록
-- Reviewer 지정 및 검토 요청
-- Feedback 확인
-- Feedback 반영
-- 재검토 요청
+### 프로젝트 오너 (OWNER)
 
-### Reviewer
+- 구성원의 모든 행동
+- 구성원 관리(SPEC-02)
+- 문서의 버전 하나를 최종 버전으로 확정
 
-검토 요청을 받은 문서를 확인하고 피드백 및 검토 결과를 제공하는 사용자.
+| 기능 | 오너 | 일반 구성원 | 비구성원 |
+| --- | --- | --- | --- |
+| 문서 생성 | 허용 | 허용 | 거부 |
+| 새 버전 업로드 | 허용 | 허용 | 거부 |
+| 문서·버전 조회 | 허용 | 허용 | 거부 |
+| 피드백 작성·조회 | 허용 | 허용 | 거부 |
+| 최종 버전 확정 | 허용 | 거부 | 거부 |
 
-주요 행동:
-
-- 검토 문서 조회
-- Feedback 작성
-- 반영 결과 확인
-- 수정 요청
-- 최종 승인
-
-MVP에서 Author와 Reviewer를 고정된 Project Role로 관리할지 Review 단위 역할로 관리할지는 아직 결정하지 않는다.
+모든 권한은 Backend에서 강제한다. Frontend의 버튼 숨김은 사용성 보조다.
 
 ## 6. 핵심 Workflow
 
 ### 6.1 정상 Workflow
 
 ```text
-문서 등록
+문서 등록 (v1)                       ── ACTIVE
     ↓
-DRAFT
+┌──────────────────────────────┐
+│ 구성원: 새 버전 업로드 (v2, v3…) │  반복
+│ 구성원: 각 버전에 피드백 작성     │
+└──────────────────────────────┘
     ↓
-검토 요청
+프로젝트 오너: 버전 하나를 최종 버전으로 확정 (최신이 아니어도 됨)
     ↓
-IN_REVIEW
-    ↓
-검토
-    ↓
-┌───────────────────┐
-│                   │
-승인              수정 요청
-│                   │
-↓                   ↓
-APPROVED      CHANGES_REQUESTED
-                    ↓
-                문서 수정
-                    ↓
-              새 Version 등록
-                    ↓
-                재검토 요청
-                    ↓
-                RE_REVIEW
-                    ↓
-           승인 또는 추가 수정
+FINALIZED (영구 종료, 읽기 전용)
 ```
 
-재검토 과정에서 추가 수정이 필요한 경우 다음 과정이 반복될 수 있다.
-
-RE_REVIEW
-
-→ CHANGES_REQUESTED
-
-→ 새 Version
-
-→ RE_REVIEW
+- 확정 후 수정이 필요하면 새 문서를 등록한다. FINALIZED → ACTIVE 재개 기능은 제공하지 않는다.
+- 확정된 버전, 다른 버전, 피드백, 이력은 삭제하지 않고 보존한다.
 
 ## 7. 상태 정의
 
 ### 7.1 Document Status
 
-| 상태 | 의미 |
-| --- | --- |
-| DRAFT | 문서 작성 또는 수정 중 |
-| IN_REVIEW | 최초 검토 중 |
-| CHANGES_REQUESTED | Reviewer가 수정을 요청한 상태 |
-| RE_REVIEW | 수정본에 대한 재검토 중 |
-| APPROVED | 최종 승인 완료 |
+| 상태 | 의미 | 허용 행동 |
+| --- | --- | --- |
+| ACTIVE | 협업 중 | 조회, 새 버전 업로드, 피드백 작성·조회, 오너 최종 확정 |
+| FINALIZED | 최종 버전 확정으로 영구 종료 | 조회·다운로드·미리보기, 피드백·확정 정보 조회만 |
 
-허용되지 않은 상태 전이는 서버에서 거부한다.
+허용되는 전이는 `ACTIVE → FINALIZED` 하나뿐이다. 그 밖의 전이(FINALIZED → ACTIVE 포함)는 서버에서 거부한다.
 
-예를 들어 별도의 검토 과정 없이
+FINALIZED에서 금지: 새 버전 업로드, 피드백 작성·수정·삭제, 최종 버전 변경, 상태 변경, 협업 재개.
 
-DRAFT → APPROVED
+기존 값(`DRAFT`, `IN_REVIEW`, `CHANGES_REQUESTED`, `RE_REVIEW`, `APPROVED`)의 마이그레이션은 SPEC-07에서 정의한다.
 
-상태로 변경하는 것은 허용하지 않는다.
+### 7.2 Feedback
 
-### 7.2 Feedback Status
-
-| 상태 | 의미 |
-| --- | --- |
-| OPEN | 아직 반영되지 않은 Feedback |
-| APPLIED | Author가 수정사항을 반영했다고 표시 |
-| CONFIRMED | Reviewer가 반영 결과를 확인 |
-
-기본 상태 전이:
-
-OPEN → APPLIED → CONFIRMED
-
-MVP에서는 OPEN → CONFIRMED와 같은 상태 건너뛰기를 허용하지 않는 것을 초기 정책으로 한다.
+Feedback은 특정 DocumentVersion에 연결된 자유 의견이며 상태를 갖지 않는다 (2026-11-10 결정, 이전의 OPEN → APPLIED → CONFIRMED 상태 관리는 Post-MVP로 이동). 피드백이 남아 있어도 오너는 최종 확정할 수 있다.
 
 ## 8. 핵심 User Story
 
-### US-01 검토 요청
+### US-01 반복 버전 업로드
 
-Author로서 특정 문서 버전의 검토자를 지정하고 검토를 요청하고 싶다. 이를 통해 누가 어떤 문서를 검토해야 하는지 확인할 수 있다.
+프로젝트 구성원으로서 문서의 새 버전을 원하는 만큼 업로드하면서 이전 버전을 유지하고 싶다.
 
-### US-02 피드백 등록
+### US-02 버전별 피드백
 
-Reviewer로서 검토 과정에서 발견한 수정 요청이나 의견을 기록하고 싶다. 이를 통해 검토 의견을 문서 Workflow 안에서 관리할 수 있다.
+프로젝트 구성원으로서 특정 버전에 대한 의견을 그 버전에 남기고, 다른 구성원의 피드백을 버전별로 확인하고 싶다.
 
-### US-03 피드백 반영
+### US-03 최종 버전 확정
 
-Author로서 어떤 Feedback을 수정에 반영했는지 표시하고 싶다. 이를 통해 Reviewer가 별도의 전달 없이 반영 여부를 확인할 수 있다.
+프로젝트 오너로서 여러 버전 중 공식 최종본을 골라 확정하고, 이후 문서가 변경되지 않도록 하고 싶다.
 
-### US-04 피드백 확인
+### US-04 변경 이력 확인
 
-Reviewer로서 Feedback이 실제로 반영되었는지 확인하고 싶다.
-
-### US-05 문서 버전 관리
-
-Author로서 수정된 문서를 새로운 버전으로 등록하면서 이전 버전을 유지하고 싶다.
-
-### US-06 변경 이력 확인
-
-프로젝트 구성원으로서 누가 언제 주요 작업을 수행했는지 확인하고 싶다.
+프로젝트 구성원으로서 누가 언제 문서를 등록하고, 버전을 올리고, 피드백을 남기고, 최종 확정했는지 확인하고 싶다.
 
 ## 9. 기능 SPEC 구성
 
@@ -255,99 +209,30 @@ Author로서 수정된 문서를 새로운 버전으로 등록하면서 이전 �
 | SPEC-03 | Document 등록 | O |
 | SPEC-04 | Document Version 등록 | O |
 | SPEC-05 | Document Version 조회 | O |
-| SPEC-06 | Review 요청 | O |
-| SPEC-07 | Feedback 등록 | O |
-| SPEC-08 | Feedback 반영 (OPEN → APPLIED) | O |
-| SPEC-09 | Feedback 확인 (APPLIED → CONFIRMED) | O |
-| SPEC-10 | 수정 요청 | O |
-| SPEC-11 | 재검토 | O |
-| SPEC-12 | 승인 | O |
-| SPEC-13 | Audit Log | O |
+| SPEC-06 | 활동 이력 (Audit Log) | O |
+| SPEC-07 | 문서 협업 상태와 최종 버전 확정 | O |
+| SPEC-08 | 버전별 Feedback 작성·조회 | O |
+| SPEC-AUTH 확장 | 초대코드 기반 회원가입·로그인 시도 제한 | O (공개 운영) |
 | SPEC-14 | AI Version Summary | Post-MVP |
+
+### 9.1 기존 SPEC-06~13 대응표 (2026-11-10, Issue #22)
+
+| v0.4 SPEC | 새 처리 | 추적 |
+| --- | --- | --- |
+| SPEC-06 Review 요청 | 폐기. 구성원 공동 협업 구조로 대체(지정 Reviewer 없음). 업로드·조회 권한은 SPEC-03/04/05가 이미 모든 구성원에게 허용 | §5, SPEC-07 |
+| SPEC-07 Feedback 등록 | 새 SPEC-08 버전별 Feedback | US-02 |
+| SPEC-08 Feedback 반영 (OPEN→APPLIED) | 폐기(Post-MVP 후보) | §4.2 |
+| SPEC-09 Feedback 확인 (APPLIED→CONFIRMED) | 폐기(Post-MVP 후보) | §4.2 |
+| SPEC-10 수정 요청 | 폐기. 자유 피드백(SPEC-08)과 새 버전 업로드(SPEC-04)로 대체 | US-01, US-02 |
+| SPEC-11 재검토 | 폐기. ACTIVE 동안 업로드·피드백 반복(SPEC-04, SPEC-08) | US-01 |
+| SPEC-12 승인 | 새 SPEC-07 최종 버전 확정 | US-03 |
+| SPEC-13 Audit Log | 새 SPEC-06 활동 이력 | US-04 |
 
 각 기능은 실제 개발 전에 별도의 specs/*.md로 작성한다.
 
 ## 10. 대표 기능 상세 SPEC
 
-v0.1에서는 전체 기능의 상세 SPEC을 모두 확정하지 않고, 실제 개발 시 기능별로 상세화한다.
-
-현재 대표 기능으로 Review 요청의 초기 SPEC을 정의한다.
-
-### SPEC-06 Review 요청
-
-#### 10.1 배경 & 목적
-
-해결하려는 문제
-
-문서 검토 요청이 외부 메신저 등의 채널에서 이루어질 경우 시스템에서 누가 어떤 문서 버전을 검토해야 하는지 관리하기 어렵다.
-
-사용자가 할 수 있게 되는 것
-
-Author가 특정 DocumentVersion과 Reviewer를 지정하여 Review를 생성할 수 있다.
-
-#### 10.2 범위
-
-In Scope
-
-- 검토 대상 DocumentVersion 선택
-- Reviewer 선택
-- Review 생성
-- 요청자, Reviewer, 대상 Version, 요청 시간 기록
-- Review 생성 후 Document 상태 변경
-- Reviewer의 할당된 Review 조회
-
-Out of Scope
-
-- 다중 Reviewer
-- Review 기한
-- Email/Push 알림
-- Review 자동 할당
-- 순차/병렬 Review
-- AI Reviewer
-
-#### 10.3 정상 흐름
-
-1. Author가 검토할 DocumentVersion을 선택한다.
-2. Reviewer를 선택한다.
-3. 검토 요청을 제출한다.
-4. 시스템이 요청자의 프로젝트 접근 권한을 확인한다.
-5. 시스템이 Reviewer의 프로젝트 참여 여부를 확인한다.
-6. 대상 DocumentVersion의 존재 여부를 확인한다.
-7. Review를 생성한다.
-8. Document 상태를 IN_REVIEW로 변경한다.
-9. Reviewer가 할당된 Review를 조회할 수 있다.
-
-#### 10.4 예시
-
-| 상황 | 기대 결과 |
-| --- | --- |
-| 정상 Author + Version + Reviewer | Review 생성 |
-| Reviewer가 프로젝트 구성원이 아님 | 요청 거부 |
-| 존재하지 않는 Version | 요청 거부 |
-| 정상 Review 생성 | Document → IN_REVIEW |
-| Review 생성 과정 일부 실패 | 데이터 전체 Rollback |
-
-#### 10.5 실패 시나리오
-
-- 프로젝트 접근 권한 없음
-- Reviewer가 프로젝트 구성원이 아님
-- 존재하지 않는 DocumentVersion
-- Review 저장 실패
-- Document 상태 변경 실패
-- 동일 요청 중복 제출
-- 네트워크 실패
-
-#### 10.6 Acceptance Criteria
-
-- 권한이 있는 Author가 존재하는 DocumentVersion에 Review를 생성할 수 있다.
-- Reviewer는 동일 프로젝트의 구성원이어야 한다.
-- Review에는 요청자, Reviewer, 대상 Version, 요청 시간이 저장된다.
-- Review 생성 성공 후 Document 상태는 IN_REVIEW가 된다.
-- Review 생성과 Document 상태 변경 중 하나라도 실패하면 전체 변경사항이 저장되지 않는다.
-- 프로젝트 구성원이 아닌 사용자는 Review를 생성할 수 없다.
-- 존재하지 않는 DocumentVersion에는 Review를 생성할 수 없다.
-- Reviewer는 자신에게 할당된 Review를 조회할 수 있다.
-- 관련 Backend 자동화 테스트가 통과한다.
+v0.4의 대표 SPEC(Review 요청)은 워크플로 변경으로 폐기되었다(§9.1). 새 기능의 상세는 [`specs/06-audit-log.md`](./specs/06-audit-log.md), [`specs/07-document-finalize.md`](./specs/07-document-finalize.md), [`specs/08-version-feedback.md`](./specs/08-version-feedback.md)에 둔다.
 
 ## 11. 기술 컨텍스트
 
@@ -488,40 +373,31 @@ AI 기능에서는 추가로 다음을 검토한다.
 
 ## 13. MVP Acceptance Criteria
 
-다음 조건을 모두 만족했을 때 1차 MVP가 완료된 것으로 판단한다.
+다음 조건을 모두 만족했을 때 1차 MVP가 완료된 것으로 판단한다. (v0.5, 2026-11-10)
 
 - 사용자가 Project를 생성할 수 있다.
-- Project에 Document를 등록할 수 있다.
-- 최초 등록 시 DocumentVersion이 생성된다.
-- 기존 버전을 유지하면서 새로운 Version을 등록할 수 있다.
-- Reviewer를 지정하여 Review를 요청할 수 있다.
-- Reviewer가 Feedback을 등록할 수 있다.
-- 새로운 Feedback의 초기 상태가 OPEN이다.
-- Author가 Feedback을 OPEN → APPLIED로 변경할 수 있다.
-- Reviewer가 Feedback을 APPLIED → CONFIRMED로 변경할 수 있다.
-- Reviewer가 수정을 요청할 수 있다.
-- 수정된 문서를 새로운 Version으로 등록할 수 있다.
-- 새로운 Version을 대상으로 재검토할 수 있다.
-- Reviewer가 문서를 승인할 수 있다.
-- 승인된 Document의 상태가 APPROVED이다.
+- 모든 프로젝트 구성원이 Document를 등록할 수 있고, 최초 등록 시 DocumentVersion이 생성된다.
+- 모든 구성원이 기존 버전을 유지하면서 새로운 Version을 반복 등록할 수 있다.
+- 모든 구성원이 각 Version에 Feedback을 작성·조회할 수 있고, 새 Version이 등록되어도 이전 Feedback이 유지된다.
+- 프로젝트 오너만 문서의 Version 하나(최신이 아니어도 됨)를 최종 버전으로 확정할 수 있다.
+- 확정된 Document의 상태가 FINALIZED이며 확정 버전·확정자·확정 시각이 저장된다.
+- FINALIZED 문서는 새 Version·Feedback·재확정이 거부되고, 조회·다운로드는 유지된다.
 - 권한이 없는 사용자의 요청이 거부된다.
 - 허용되지 않은 상태 전이가 거부된다.
-- 주요 Workflow 이벤트가 AuditLog에 기록된다.
+- 문서 생성, 새 버전 등록, 피드백 작성, 최종 확정이 활동 이력에 기록된다.
 - 핵심 Workflow를 처음부터 끝까지 수행할 수 있다.
 
 최종 End-to-End Scenario:
 
 ```text
-Document 등록
-→ Review 요청
-→ Feedback 등록
-→ 수정 요청
-→ 새 Version 등록
-→ Feedback APPLIED
-→ 재검토
-→ Feedback CONFIRMED
-→ 승인
-→ APPROVED
+Document 등록 (v1)
+→ 구성원 Feedback (v1)
+→ 새 Version 등록 (v2)
+→ 구성원 Feedback (v2), v1 Feedback 유지
+→ 새 Version 등록 (v3)
+→ 오너가 v2를 최종 버전으로 확정
+→ FINALIZED, 업로드·Feedback 거부, 조회·다운로드 가능
+→ 활동 이력에서 전 과정 확인
 ```
 
 ## 14. 기능별 Definition of Done
@@ -660,17 +536,16 @@ npm run dev        # 개발 서버 (http://localhost:3000)
 
 다음 사항은 아직 결정되지 않았으며, 구현 전에 결정한다.
 
-- Author와 Reviewer를 Project의 고정 Role로 관리할 것인가, Review 단위 역할로 관리할 것인가?
-- 하나의 Review에 Reviewer를 1명만 허용할 것인가?
-- 여러 Reviewer가 존재한다면 승인 조건은 어떻게 정의할 것인가?
-- Feedback을 APPLIED로 변경하려면 반드시 새로운 DocumentVersion이 존재해야 하는가?
-- Feedback이 어떤 DocumentVersion에 반영되었는지를 저장할 것인가?
-- Feedback을 문서 전체 단위로 작성할 것인가, 특정 페이지/위치와 연결할 것인가?
-- 승인된 Document에 새로운 Version을 추가할 수 있는가? → **잠정 결정 (2026-11-04, SPEC-04 Draft v0.2):** `APPROVED` 문서의 새 버전 등록은 SPEC-04에서 잠정 거부(`409 DOCUMENT_STATUS_CONFLICT`)하며, SPEC-12(승인)에서 재검토한다.
-- 동일 Version에 중복 Review 요청을 허용할 것인가?
-- Document 파일 형식은 어디까지 지원할 것인가?
-- AuditLog의 기록 범위를 어디까지 설정할 것인가?
-- 삭제 기능을 MVP에 포함할 것인가?
+- ~~Author와 Reviewer를 고정 Role로 관리할 것인가~~ → **결정 (2026-11-10):** 고정 역할 없음. OWNER/MEMBER만 사용.
+- ~~Reviewer 수, 승인 조건~~ → **결정 (2026-11-10):** Reviewer 지정 없음. 오너의 최종 확정만 존재.
+- ~~Feedback APPLIED 조건, 반영 버전 저장~~ → **결정 (2026-11-10):** Feedback 상태 없음(Post-MVP).
+- ~~Feedback 단위~~ → **결정 (2026-11-10):** 특정 DocumentVersion 단위. 페이지/좌표 연결은 Post-MVP.
+- ~~승인된 Document에 새 Version 추가~~ → **결정 (2026-11-10):** FINALIZED 문서는 새 Version 거부(영구).
+- ~~동일 Version 중복 Review 요청~~ → 해당 없음(Review 요청 폐기).
+- Document 파일 형식은 어디까지 지원할 것인가? (현재 PDF/DOCX/XLSX/PPTX)
+- ~~AuditLog의 기록 범위~~ → **결정 (2026-11-10):** 문서 생성, 새 버전 등록, 피드백 작성, 최종 확정 (SPEC-06).
+- 삭제 기능을 MVP에 포함할 것인가? (미결정, 현재 미구현)
+- 피드백 수정·삭제를 ACTIVE 문서에서 허용할 것인가? (미결정, SPEC-08은 작성·조회만)
 
 ## 17. 결정 기록
 
@@ -737,6 +612,12 @@ Backend의 Java 버전을 21에서 25 LTS로 변경한다. Spring Boot 4.1.1, Gr
 이유: 동일 출처 웹 앱 하나에서는 서버 세션이 가장 단순하고, 로그아웃·계정 비활성화를 서버에서 즉시 반영할 수 있기 때문이다.
 
 상세: [ADR-0005](./docs/adr/0005-session-authentication.md), [`specs/00-auth.md`](./specs/00-auth.md)
+
+#### 2026-11-10 — 공동 협업 + 오너 최종 확정 Workflow로 변경 (Issue #22)
+
+- 결정: Review 요청·지정 Reviewer·단계별 승인을 폐기하고, 모든 구성원의 반복 업로드·버전별 피드백과 오너의 최종 버전 확정(FINALIZED, 영구 읽기 전용)으로 변경한다.
+- 이유: 사용자(프로젝트 책임자) 요구사항 변경. 역할·Reviewer 수·승인 조건 등 §16.2 미결정 항목이 단순화된다.
+- 영향: §1.2, §3~§10, §13, §16.2. SPEC-04의 상태별 업로드 규칙은 SPEC-07에서 ACTIVE/FINALIZED 기준으로 바뀐다.
 
 ## 18. 향후 SPEC 발전 방식
 
