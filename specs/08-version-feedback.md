@@ -1,7 +1,7 @@
 # SPEC-08 버전별 Feedback 작성·조회
 
 - Issue: #25 · 브랜치: `feat/25/version-feedback` (선행 `feat/24`)
-- 상태: Draft v0.1 (2026-11-10) — Backend 구현·자동 테스트 완료, 피드백 패널은 #28
+- 상태: **Done (2026-11-11, AC-FB-01~09 충족)**. main 병합 완료
 - 대체: v0.4 SPEC-07 Feedback 등록 (SPEC-08·09 상태 전환은 폐기, `spec.md` §9.1)
 
 ## 1. 목적
@@ -91,3 +91,14 @@
 | — | GitHub Actions | | 미확인 |
 
 구현 메모: 길이는 코드 포인트 기준(이모지 2,000자 허용)으로 PostgreSQL `VARCHAR(2000)`과 같게 판단한다.
+
+### Done 판정 (2026-11-11, Issue #41)
+
+| DoD (`spec.md` §14) | 근거 |
+| --- | --- |
+| AC 전부 충족 | AC-FB-01~09: 통합·단위 테스트(위 검증 기록) |
+| 권한·상태 전이 | `AccessControlRegressionIntegrationTest`(#37): 비로그인 401·비구성원 404·구성원 확정 403·FINALIZED 변경 409 |
+| Frontend 상태·연동 | 버전별 피드백 패널(#28). 클라우드 실제 브라우저와 Windows에서 버전별 작성·이력 유지·확정 후 작성 차단 확인 |
+| 자동 테스트 | main 기준 Backend 419·Frontend 244 통과(클라우드), GitHub Actions main run 113 (`d50f18f`): Backend·Frontend·Docker 성공 |
+| 수동 검증 | Windows 수동(사용자, 2026-11-11): `docs/windows-verification.md` §7.1 |
+

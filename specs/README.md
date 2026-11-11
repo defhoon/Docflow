@@ -35,16 +35,16 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-02 프로젝트 구성원 관리 | `02-project-members.md` | #13 | 구현·검증 완료, main 병합 완료 (PR #14) |
 | SPEC-03 문서 등록 | `03-document-create.md` | #15 | Done(2026-11-03, 변경된 완료 기준 기준), main 병합 완료 (PR #16, 2026-11-03). 후속: Windows 실환경 수동 E2E #17(미실행), D4 미해결 #18 |
 | SPEC-04 문서 버전 등록 | `04-document-version-create.md` | #19 | Done (2026-11-04, AC-VER-01~19 충족), main 병합 완료 (PR #20). 후속: Windows 실제 브라우저 수동 E2E(OQ-9, Issue 생성 별도 승인) |
-| SPEC-05 문서 버전 조회·다운로드·미리보기 | `05-document-version-download.md` | #21 | 구현·클라우드·CI 검증 완료 (2026-11-04, ADR-0006). Windows 검증(AC-VDL-22) 대기, PR 미생성 |
-| SPEC-06 활동 이력 (Audit Log) | `06-audit-log.md` | #23 | Backend 구현·자동 테스트·CI 통과, 화면 #28. 수동 검증 대기 |
-| SPEC-07 문서 협업 상태와 최종 버전 확정 | `07-document-finalize.md` | #24 | Backend 구현·자동 테스트·CI 통과, 화면 #28. 수동 검증 대기 |
-| SPEC-08 버전별 Feedback 작성·조회 | `08-version-feedback.md` | #25 | Backend 구현·자동 테스트 통과, 화면 #28. 수동 검증 대기 |
-| SPEC-AUTH 확장 초대코드 회원가입·로그인 제한 | `00-auth.md` §확장 | #26 | Backend·화면 구현, 자동 테스트 통과. 수동 검증 대기 |
-| (비 SPEC) 공개 배포 준비 | `docs/deployment.md`, ADR-0007 | #27 | 준비 완료, 미배포(승인 대기) |
-| (비 SPEC) UI/UX 전면 개선 | — | #28 | 1차 완료, 실제 브라우저 3개 뷰포트 확인 |
+| SPEC-05 문서 버전 조회·다운로드·미리보기 | `05-document-version-download.md` | #21 | **Done (2026-11-11, AC-VDL-01~23)**, main 병합 완료 (PR #29). 운영은 Office 변환 비활성화(ADR-0007) |
+| SPEC-06 활동 이력 (Audit Log) | `06-audit-log.md` | #23 | **Done (2026-11-11, AC-AUD-01~09)**, main 병합 완료 (PR #31) |
+| SPEC-07 문서 협업 상태와 최종 버전 확정 | `07-document-finalize.md` | #24 | **Done (2026-11-11, AC-FIN-01~12)**, main 병합 완료 (PR #32) |
+| SPEC-08 버전별 Feedback 작성·조회 | `08-version-feedback.md` | #25 | **Done (2026-11-11, AC-FB-01~09)**, main 병합 완료 (PR #33) |
+| SPEC-AUTH 확장 초대코드 회원가입·로그인 제한 | `00-auth.md` §확장 | #26 | **Done (2026-11-11, AC-INV-01~14, #37·#39 보완 포함)**, main 병합 완료 (PR #34, #38, #40) |
+| (비 SPEC) 공개 배포 준비 | `docs/deployment.md`, ADR-0007 | #27 | 준비 완료, main 병합 (PR #35). **미배포**(Railway 리소스 생성 승인 대기) |
+| (비 SPEC) UI/UX 전면 개선 | — | #28 | 완료, main 병합 (PR #36). 클라우드 3개 뷰포트·Windows 모바일/데스크톱 확인 |
 
 > 2026-11-10 워크플로 변경(Issue #22): v0.4의 SPEC-06~13(Review 중심)은 폐기·재구성되었다. 대응표는 `spec.md` §9.1.
-> 브랜치는 미병합 SPEC-05(`feat/21`) 위에 순서대로 쌓는다: `feat/21` → `docs/22` → `feat/23` → `feat/24` → `feat/25` → `feat/26` → `feat/27` → `feat/28`. 병합도 이 순서여야 한다.
+> 2026-11-11: 스택 PR #29~#36·#38(#37 보안 강화)·#40(#39 Windows 테스트 수정)을 순서대로 Merge commit으로 main에 병합했다(main `d50f18f`, CI run 113 성공). Done 근거는 각 SPEC의 Done 판정 절(Issue #41).
 
 ## 작성 원칙
 
