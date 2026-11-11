@@ -577,3 +577,64 @@ frontend/src
 - `LoginRequest`: 앞뒤 공백이 있는 이메일이 `@Email` 검증에서 거부되어, 검증 전에 공백을 제거하도록 수정 (§5.4와 일치)
 - 테스트 격리: `csrf()` 테스트 지원 기능이 공유 `CsrfFilter` 저장소를 교체하는 문제를 별도 테스트 클래스로 분리해 해결 (§13.2). 애플리케이션 동작과 보안 설정은 변경하지 않았다.
 - AC-AUTH-06은 쿠키 기반 CSRF(double-submit) 동작에 맞게 설계 단계에서 수정되었다(§6.4).
+
+---
+
+## 확장 (2026-11-10, Issue #26): 초대코드 회원가입·로그인 시도 제한·최초 운영 관리자
+
+> 공개 운영을 위해 사용자 승인으로 범위를 변경했다. 기존 "회원가입 Out of Scope"(§Out of Scope)는 이 절로 대체된다. 기존 로그인·로그아웃·세션·CSRF 규칙은 바뀌지 않는다.
+> 상태: Backend 구현·자동 테스트 완료 (클라우드). 가입·초대 관리 화면은 #28.
+
+### E.1 결정
+
+| ID | 결정 | 이유 / 대안 |
+| --- | --- | --- |
+| E1 | 가입은 관리자(ADMIN)가 발급한 일회용 초대코드로만 가능 | 공개 가입은 스팸·무단 사용 위험. 대안(이메일 인증)은 메일 인프라 필요 |
+| E2 | 코드: 128비트 난수, Crockford Base32 26자(4자 단위 하이픈). DB에는 SHA-256 해시만 저장 | 엔트로피가 높아 느린 해시 불필요. 원문은 발급 응답(`Cache-Control: no-store`)에서 1회만 제공 |
+| E3 | 유효 기간 1~336시간(기본 72), 사용·폐기·만료 시 사용 불가. 없음·만료·사용됨·폐기는 같은 응답 `400 INVITATION_INVALID` | 상태 추측 방지 |
+| E4 | 가입 트랜잭션: 코드 행 `FOR UPDATE` → 사용 가능 확인 → 이메일 중복 확인 → 계정 생성 → 코드 사용 처리. 같은 이메일 동시 가입은 `uk_users_email`이 최종 판정(409) | 동시 소비·중복 가입 방지. 실패 시 코드는 미사용 유지 |
+| E5 | 비밀번호 10~64자 + UTF-8 72바이트 이하, bcrypt(`{bcrypt}`) | bcrypt 입력 72바이트 제한 |
+| E6 | 가입 후 자동 로그인 없음 → 로그인 화면으로 이동 | 세션 생성 경로를 로그인 하나로 유지 |
+| E7 | 로그인 시도 제한: 이메일(정규화)별 15분 창에 실패 5회 → 창이 지날 때까지 `429 AUTH_TOO_MANY_ATTEMPTS` + `Retry-After`. 성공 시 초기화 | 무차별 대입 방지. 대가: 공격자가 특정 계정을 최대 15분 잠글 수 있음 |
+| E8 | 가입 시도 제한: 이메일별 15분 5회 + 인스턴스 전체 15분 100회 실패 | 초대코드 추측 추가 방어 |
+| E9 | IP 기준 제한은 두지 않음 | Backend는 Next.js 프록시 뒤 비공개 네트워크라 원격 주소가 모두 프록시이고 전달 헤더는 위조 가능 |
+| E10 | 시도 제한은 단일 인스턴스 메모리(키 최대 10,000개). 다중 인스턴스 확장 시 공유 저장소 필요 | Redis 등 인프라는 필요성이 확인되지 않아 도입하지 않음(CLAUDE.md §3) |
+| E11 | 최초 운영 관리자: 시작 시 사용자가 0명이면 관리자 권한을 주는 일회용 코드(24시간)를 발급해 서버 로그(WARN)에 1회 출력. 재시작 시 이전 미사용 관리자 코드는 폐기 후 재발급. 사용자가 생기면 발급하지 않음. `docflow.bootstrap.admin-invite-enabled=false`로 끌 수 있음 | 고정 비밀번호·기본 계정 없이 시작. 배포 로그는 운영자만 열람 가능해야 한다(배포 문서) |
+| E12 | `users.system_role` (`USER`/`ADMIN`). ADMIN은 초대코드 발급·조회·폐기만 가능하며 프로젝트 권한과 무관. 관리자 여부는 매 요청 DB에서 확인 | 최소 권한 |
+| E13 | 개발 Seeder는 `local` 프로파일 전용이며 운영 프로파일에서는 등록되지 않음(기존 `DevUserSeederDefaultProfileTest`) | 운영 테스트 계정 비노출 |
+
+### E.2 API
+
+| 메서드·경로 | 권한 | 응답 |
+| --- | --- | --- |
+| `POST /api/auth/signup` `{inviteCode, email, password, displayName}` | 비로그인 허용, CSRF 필요 | 201 `{id, email, displayName, admin}` / 400 `VALIDATION_FAILED`·`INVITATION_INVALID` / 409 `EMAIL_ALREADY_REGISTERED` / 429 |
+| `POST /api/admin/invitations` `{expiresInHours?, note?}` | ADMIN | 201 `{id, code, expiresAt}` (`no-store`) |
+| `GET /api/admin/invitations` | ADMIN | 최근 100건 `{id, note, status, grantsAdmin, createdAt, expiresAt, usedAt, usedByDisplayName}` (코드·해시 없음) |
+| `POST /api/admin/invitations/{id}/revoke` | ADMIN | 204 (사용됨·폐기됨은 변화 없음) |
+| `POST /api/auth/login`, `GET /api/auth/me` | 기존 | 응답에 `admin` 추가 |
+
+### E.3 데이터 (`V9__invitations_and_system_role.sql`)
+
+`users.system_role`(CHECK USER/ADMIN), `invitations(code_hash CHAR(64) UNIQUE, grants_admin, created_by, note, expires_at, used_at, used_by UNIQUE, revoked_at, created_at)`, CHECK: `used_at`·`used_by` 동시 설정, 사용·폐기 동시 불가.
+
+### E.4 Acceptance Criteria
+
+- AC-INV-01 유효 코드 가입 201, bcrypt 해시, 코드 사용 처리, 로그인 가능
+- AC-INV-02 사용된 코드 재사용 400
+- AC-INV-03 없음·만료·폐기 코드는 같은 400 본문, 계정 미생성
+- AC-INV-04 중복 이메일 409, 코드 미사용 유지
+- AC-INV-05 입력 검증(비밀번호 길이·72바이트, 이메일 형식, 이름), CSRF 필요
+- AC-INV-06 같은 코드 동시 가입 시 정확히 1건 성공
+- AC-INV-07 가입 실패 반복 시 429 + Retry-After
+- AC-INV-08 관리자만 발급·조회·폐기, 목록에 코드·해시 없음, 발급 응답 no-store
+- AC-INV-09 사용자 0명일 때만 최초 관리자 코드 발급, 그 코드로 가입하면 ADMIN
+- AC-INV-10 로그인 실패 5회 후 올바른 비밀번호도 429, 다른 계정 영향 없음, 성공 시 초기화
+- AC-INV-11 기존 SPEC-AUTH 테스트 전부 통과(로그인·로그아웃·CSRF·Seeder 프로파일)
+
+### E.5 검증 기록
+
+| 일자 | 환경 | 명령 | 결과 |
+| --- | --- | --- | --- |
+| 2026-11-10 | Claude Code 클라우드 | `./gradlew test --tests 'com.docflow.invitation.*' --tests 'com.docflow.auth.*'` | 통과 (SignupIntegrationTest 9, AttemptLimiterTest 3, 기존 auth 테스트) |
+| 2026-11-10 | 동일 | `./gradlew test` | 393 통과, 0 실패 |
+| — | GitHub Actions / 로컬 | | 미확인 |

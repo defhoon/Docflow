@@ -1,5 +1,6 @@
 package com.docflow.global.error;
 
+import com.docflow.auth.security.TooManyAttemptsException;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -33,6 +34,14 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessException.class)
 	ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex) {
 		return toResponse(ex.errorCode());
+	}
+
+	/** 인증 시도 제한 초과 (#26): 429와 {@code Retry-After}(초). */
+	@ExceptionHandler(TooManyAttemptsException.class)
+	ResponseEntity<ErrorResponse> handleTooManyAttempts(TooManyAttemptsException ex) {
+		return ResponseEntity.status(ErrorCode.AUTH_TOO_MANY_ATTEMPTS.status())
+			.header("Retry-After", String.valueOf(ex.retryAfter().toSeconds()))
+			.body(ErrorResponse.of(ErrorCode.AUTH_TOO_MANY_ATTEMPTS));
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)

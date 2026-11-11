@@ -46,7 +46,7 @@ public class SecurityConfig {
 		http.authorizeHttpRequests((authorize) -> authorize
 			.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 			.requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
-			.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/logout").permitAll()
+			.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/logout", "/api/auth/signup").permitAll()
 			// Controller 밖에서 발생한 오류의 내부 포워드. 응답에는 상세 정보가 포함되지 않는다.
 			.requestMatchers("/error").permitAll()
 			.requestMatchers("/api/**").authenticated()
