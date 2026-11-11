@@ -100,6 +100,43 @@ class LibreOfficePreviewConverterTest {
 					(ex) -> assertThat(ex.kind()).isEqualTo(PreviewConversionException.Kind.ENGINE));
 	}
 
+	// #27 운영 정책: 설정으로 끄면 LibreOffice를 실행하지 않는다
+	@Test
+	@EnabledOnOs({ OS.LINUX, OS.MAC })
+	void disabledByConfigurationNeverLaunchesEngine() throws Exception {
+		Path marker = this.workDir.resolve("launched");
+		Path soffice = script("soffice", "#!/bin/sh\ntouch '" + marker + "'\necho \"LibreOffice 0.0\"\n");
+		LibreOfficePreviewConverter converter = new LibreOfficePreviewConverter(new PreviewProperties(null, null, null,
+				null, soffice.toString(), List.of(), null, null, false, null));
+
+		assertThat(converter.status().available()).isFalse();
+		assertThat(converter.status().reason()).contains("disabled by configuration");
+		assertThatThrownBy(() -> converter.convertToPdf(this.workDir.resolve("input.docx"), DocumentFileType.DOCX,
+				this.workDir, Duration.ofSeconds(1)))
+			.isInstanceOfSatisfying(PreviewConversionException.class,
+					(ex) -> assertThat(ex.kind()).isEqualTo(PreviewConversionException.Kind.ENGINE));
+		assertThat(marker).doesNotExist();
+	}
+
+	// #27 운영 정책: 격리가 필수인데 래퍼가 없으면 실행하지 않고, 래퍼가 동작하면 사용한다
+	@Test
+	@EnabledOnOs({ OS.LINUX, OS.MAC })
+	void requiredIsolationWithoutLauncherDisablesEngine() throws Exception {
+		Path marker = this.workDir.resolve("launched");
+		Path soffice = script("soffice", "#!/bin/sh\ntouch '" + marker + "'\necho \"LibreOffice 0.0\"\n");
+
+		LibreOfficePreviewConverter withoutLauncher = new LibreOfficePreviewConverter(new PreviewProperties(null, null,
+				null, null, soffice.toString(), List.of(), null, null, true, true));
+		assertThat(withoutLauncher.status().available()).isFalse();
+		assertThat(withoutLauncher.status().reason()).contains("isolation launcher required");
+		assertThat(marker).doesNotExist();
+
+		LibreOfficePreviewConverter withLauncher = new LibreOfficePreviewConverter(new PreviewProperties(null, null,
+				null, null, soffice.toString(), List.of("env"), null, null, true, true));
+		assertThat(withLauncher.status().available()).isTrue();
+		assertThat(marker).exists();
+	}
+
 	// 격리 래퍼가 동작하지 않으면 격리 없이 실행하지 않는다 (ADR-0006 결정 3)
 	@Test
 	@EnabledOnOs({ OS.LINUX, OS.MAC })

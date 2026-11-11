@@ -1,0 +1,29 @@
+# 운영 프로파일 (#27, ADR-0007). SPRING_PROFILES_ACTIVE=prod 로 활성화한다.
+# 비밀값(DB_PASSWORD 등)은 이 파일에 쓰지 않고 배포 플랫폼의 환경 변수로만 주입한다.
+spring:
+  config:
+    # 운영에서는 저장소 루트 .env를 읽지 않는다(기본 설정의 optional import를 비운다).
+    import: ""
+
+docflow:
+  storage:
+    # 영속 볼륨 마운트 경로. 볼륨이 없으면 재배포 시 파일이 사라지므로 반드시 볼륨을 연결한다.
+    dir: ${DOCFLOW_STORAGE_DIR:/data/storage}
+  preview:
+    # 운영 정책: 안전한 격리가 검증되지 않으면 Office→PDF 변환을 끈다. PDF 미리보기와 원본 다운로드는 유지된다.
+    office-enabled: ${DOCFLOW_PREVIEW_OFFICE_ENABLED:false}
+    # 변환을 켜더라도 격리 래퍼(DOCFLOW_PREVIEW_LAUNCHER)가 없으면 실행하지 않는다.
+    require-isolation: true
+
+server:
+  servlet:
+    session:
+      cookie:
+        # HTTPS 전용 세션 쿠키. CSRF 쿠키도 같은 값을 따른다(SecurityConfig).
+        secure: ${SESSION_COOKIE_SECURE:true}
+  # 요청 처리 중 종료 신호를 받으면 진행 중인 요청을 마치고 종료한다(재배포 시 업로드 중단 최소화).
+  shutdown: graceful
+
+logging:
+  level:
+    root: INFO

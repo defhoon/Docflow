@@ -247,6 +247,15 @@ public class LibreOfficePreviewConverter implements DocumentPreviewConverter {
 	}
 
 	private EngineStatus check() {
+		// 운영 정책 (#27): 설정으로 끄거나, 격리가 필수인데 래퍼가 없으면 LibreOffice를 실행하지 않는다(격리 없이 대체 실행 금지).
+		if (!this.properties.officeEnabled()) {
+			log.warn("Office preview disabled by configuration (docflow.preview.office-enabled=false)");
+			return EngineStatus.unavailable("Office preview disabled by configuration");
+		}
+		if (this.properties.requireIsolation() && this.properties.launcher().isEmpty()) {
+			log.warn("Office preview disabled: isolation is required but docflow.preview.launcher is empty");
+			return EngineStatus.unavailable("isolation launcher required but not configured");
+		}
 		Path soffice = resolveExecutable();
 		if (soffice == null) {
 			String reason = (this.properties.sofficePath() != null)

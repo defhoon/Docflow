@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8080";
 
 const nextConfig: NextConfig = {
+  // 운영 이미지(frontend/Dockerfile)는 standalone 서버(node server.js)로 실행한다 (#27).
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
