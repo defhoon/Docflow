@@ -112,21 +112,40 @@
 
 ## 7. 백업·복구 (로컬 실제 실행 검증 완료, Railway 미실행)
 
-볼륨은 백업이 아니다. DB → 파일 순서로 같은 시점에 백업한다. 초기 권장 주기: 주 1회 + 마이그레이션 포함 배포 직전.
+볼륨은 백업이 아니다. **DB를 먼저, 파일 저장소를 나중에** 백업하고 두 파일을 한 쌍으로 관리한다(이유와 한계는 §7.2). 초기 권장 주기: 주 1회 + 마이그레이션 포함 배포 직전.
 
-```bash
-# railway ssh --service backend  (backend 컨테이너 셸)
-mkdir -p /data/backup
-PGPASSWORD="$DB_PASSWORD" pg_dump --format=custom --no-owner \
-  --host "$(echo "$DB_URL" | sed -E 's#jdbc:postgresql://([^:/]+).*#\1#')" \
-  --port "$(echo "$DB_URL" | sed -E 's#.*:([0-9]+)/.*#\1#')" \
-  --username "$DB_USERNAME" --dbname "$(echo "$DB_URL" | sed -E 's#.*/##')" \
-  --file /data/backup/docflow-$(date +%Y%m%d%H%M).dump
-tar -C /data -czf /data/backup/storage-$(date +%Y%m%d%H%M).tar.gz storage
+```sh
+# railway ssh --service backend  (backend 컨테이너 셸). 아래 전체를 붙여넣는다. 중간에 실패하면 멈춘다.
+sh -eu <<'BACKUP'
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)          # DB·파일 백업이 같은 이름을 쓰도록 한 번만 계산
+B=/data/backup/$STAMP
+mkdir -p "$B"
+DB_HOST=$(echo "$DB_URL" | sed -E 's#jdbc:postgresql://([^:/]+).*#\1#')
+DB_PORT=$(echo "$DB_URL" | sed -E 's#.*:([0-9]+)/.*#\1#')
+DB_NAME=$(echo "$DB_URL" | sed -E 's#.*/##')
+export PGPASSWORD="$DB_PASSWORD"
+# 1) DB 먼저
+pg_dump --format=custom --no-owner --host "$DB_HOST" --port "$DB_PORT" \
+  --username "$DB_USERNAME" --dbname "$DB_NAME" --file "$B/docflow.dump"
+# 2) 파일 저장소 나중 (업로드 임시 파일·미리보기 캐시 제외)
+tar -C /data -czf "$B/storage.tar.gz" --exclude=storage/tmp --exclude=storage/previews storage
+# 3) 한 쌍 검증: 덤프의 document_versions가 가리키는 파일이 모두 아카이브에 있는지
+pg_restore --data-only --table=document_versions --file - "$B/docflow.dump" | awk -F'\t' '
+  /^COPY public\.document_versions / { h=$0; sub(/^[^(]*\(/, "", h); sub(/\).*$/, "", h)
+    n=split(h, c, ", "); for (i=1; i<=n; i++) if (c[i]=="storage_key") k=i; on=1; next }
+  on && $0=="\\." { on=0; next }
+  on { print "storage/" $k }' | sort > "$B/referenced.txt"
+tar -tzf "$B/storage.tar.gz" | sort > "$B/archived.txt"
+MISSING=$(comm -23 "$B/referenced.txt" "$B/archived.txt")
+[ -z "$MISSING" ] || { echo "MISSING in archive:"; echo "$MISSING"; exit 1; }
+(cd "$B" && sha256sum docflow.dump storage.tar.gz > SHA256SUMS)
+echo "OK $STAMP: $(wc -l < "$B/referenced.txt") referenced files, all archived"
+BACKUP
 ```
 
-- 백업 파일은 안전한 외부 저장소로 옮긴 뒤 볼륨에서 삭제한다. 덤프는 사용자 정보가 들어 있는 비밀정보다.
-- 복구: 빈 DB에 `pg_restore --no-owner --dbname <대상>`, 파일은 `tar -C /data -xzf storage-….tar.gz` → backend 재시작 → `Successfully validated 9 migrations`, 최종본 다운로드 확인.
+- 결과물: `/data/backup/<STAMP>/` 아래 `docflow.dump`, `storage.tar.gz`, `SHA256SUMS`(+ 검증용 목록 2개). 이 디렉터리 하나가 백업 한 쌍이다.
+- 백업 디렉터리는 안전한 외부 저장소로 옮긴 뒤 볼륨에서 삭제한다(볼륨 5GB 상한을 같이 쓴다). 덤프는 사용자 정보가 들어 있는 비밀정보다.
+- 복구(빈 DB·빈 `/data/storage` 기준): `sha256sum -c SHA256SUMS` → `pg_restore --no-owner --exit-on-error --single-transaction --dbname <대상> docflow.dump` → `tar -C /data -xzf storage.tar.gz` → backend 재시작(`Successfully validated 9 migrations`) → §7.2-7 파일 검증 → 최종본 다운로드 확인. 제외한 `storage/tmp`·`storage/previews`는 backend가 필요할 때 다시 만든다.
 - 로컬 검증(2026-11-10): 확정 문서·피드백·2개 버전 데이터를 백업 → 새 DB·새 디렉터리로 복구 → Flyway 9개 검증 통과, FINALIZED·피드백 유지, 최종본 동일 바이트.
 - Railway 자체 Postgres 백업 기능의 요금제별 제공 여부는 콘솔에서 확인(미검증).
 
@@ -138,6 +157,94 @@ tar -C /data -czf /data/backup/storage-$(date +%Y%m%d%H%M).tar.gz storage
 - 수정 후 CI 확인 값(2026-11-17, run 44045682347): OS `Ubuntu 24.04.5 LTS`, Java `25.0.5`(Temurin), `pg_dump`·`pg_restore` `16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)`, 테스트 서버 PostgreSQL 16.16.
 - 수정 후 CI 백업·복원 결과: 위 §7 명령으로 덤프 → **별도의 빈 PostgreSQL 16 컨테이너**에 `pg_restore --no-owner --exit-on-error --single-transaction` → SQL 오류 없음, public 9개 테이블의 행 수·전체 행 해시와 시퀀스 8개 값이 원본과 동일. 파일 저장소는 `tar`로 따로 백업·복원해 저장 파일이 바이트 단위로 같고, 복원한 DB의 모든 `storage_key`에 파일이 있음을 확인했다.
 - 미검증: Railway 환경에서의 실제 백업·복원(`railway ssh` 접속, 백업 파일 반출), 대용량 데이터에서의 소요 시간.
+
+### 7.2 백업 일관성 (#47)
+
+DB 덤프와 파일 아카이브는 서로 다른 시점에 만들어진다(덤프는 시작 시점 스냅샷, `tar`는 그 뒤 파일을 차례로 읽는다). 아래 설명은 **현재 코드 동작**에 근거하며, 성립 조건(가정)과 한계를 구분한다.
+
+**1. 현재 파일 저장 → DB 커밋 순서** (`DocumentFileIntake`, `LocalFileStorage`, `StoredFileTransaction`)
+
+1. 업로드 본문을 `storage/tmp/upload-*.tmp`에 받으며 크기·SHA-256을 계산하고 형식을 검증한다.
+2. 새 UUID 저장 키(`documents/<UUID>`)로 `storage/documents/`에 복사하고 디스크에 동기화(`force`)한다. 같은 키가 있으면 덮어쓰지 않고 실패한다.
+3. 그다음 DB 트랜잭션에서 `document_versions` 행(`storage_key`, `size_bytes`, `sha256`)을 쓰고 커밋한다.
+4. 트랜잭션이 롤백되면 이 요청이 만든 파일만 지운다. 커밋 결과가 불명확하면 파일을 남긴다(고아 파일). 임시 파일은 요청이 끝나면 지운다.
+
+**가정 (현재 구조에서 성립)**
+
+- A1. 커밋된 버전 행이 가리키는 파일은 커밋 **전에** 이미 완전히 기록되어 있다.
+- A2. 커밋된 버전의 파일을 지우거나 바꾸는 기능이 없다(문서·버전 삭제 API, 파일 교체 API 없음. 확정 문서는 읽기 전용). 저장 키는 재사용하지 않는다.
+- A3. `storage/documents/` 밖의 `storage/tmp`(업로드 임시), `storage/previews`(미리보기 작업 공간·캐시, 용량 초과 시 자동 삭제)는 원본이 아니다.
+
+**2. DB를 먼저 백업하는 이유**
+
+A1·A2가 성립하면, 덤프 스냅샷에 들어간 모든 버전 행의 파일은 덤프 시작 전에 이미 기록되어 있고 이후 지워지지 않는다. 따라서 그 뒤에 만든 파일 아카이브에는 덤프가 가리키는 파일이 모두 들어간다. 순서를 반대로 하면(파일 → DB) 아카이브 이후에 커밋된 업로드가 덤프에만 남아, 복원 후 **DB에는 있는데 파일이 없는** 버전이 생긴다(다운로드 실패 = 데이터 유실).
+
+**3. 백업 중 업로드가 있을 때의 위험**
+
+| 상황 | 결과 | 영향 |
+| --- | --- | --- |
+| 덤프 이후·`tar` 이전에 커밋된 업로드 | 파일은 아카이브에 있고 DB 행은 없음 | 복원 후 고아 파일(용량만 차지, 화면에 안 보임). 그 업로드는 이 백업에서 빠짐 |
+| `tar`가 읽는 중에 저장 중인 파일 | 일부만 기록된 파일이 아카이브에 들어갈 수 있음 | 해당 행이 덤프에 없으므로 고아 파일. 또는 `tar`가 "file changed as we read it"로 실패 코드를 내며 위 스크립트가 멈춤 → 다시 실행(무시하지 않는다) |
+| 순서를 반대로 실행 | DB 행만 있고 파일 없음 | 데이터 유실 |
+| A2가 깨지는 기능 추가 후 | 덤프에 있는 파일이 `tar` 전에 지워짐 | 데이터 유실(8 참고) |
+
+즉 현재 구조에서 백업 중 업로드는 **유실이 아니라 "이번 백업에서 빠짐·고아 파일"** 로 나타난다. 그래도 백업 시점을 명확히 하려고 업로드를 멈추고 실행한다.
+
+**4. 소규모 테스트 환경의 백업 전 업로드 중단 절차**
+
+앱에는 점검(쓰기 중지) 모드가 없다. 비공개 테스트에서는 운영 절차로 멈춘다.
+
+1. 테스터에게 백업 시간(예: 10분)을 미리 공지하고 그동안 업로드·피드백을 하지 않도록 요청한다.
+2. 시작 직전 backend 로그에서 진행 중인 업로드가 없는지 확인한다(최근 `Document created`·`Document version created` 로그 이후 1~2분 대기. 로그는 진행 중인 요청을 보여 주지 않으므로 참고용이다).
+3. 참고 기록: 덤프 직전과 `tar` 직후에 `SELECT max(id) FROM audit_logs;`를 실행해 기록한다. 값이 같으면 **그 사이 커밋되어 기록된 활동이 없었다는 뜻일 뿐**이며 일관성을 보장하지 않는다(커밋 전 진행 중 요청, 실패한 요청, 활동 기록 대상이 아닌 변경은 드러나지 않는다). 일관성의 근거는 2의 순서와 A1·A2, 그리고 아래 3)·7)의 파일 검증이다.
+4. §7 스크립트를 실행한다. 값이 달라졌으면 그 업로드가 이번 백업에 빠졌을 수 있으니 필요하면 다시 실행한다.
+5. 완료를 공지한다.
+
+공개 서비스로 전환하면 공지 방식은 쓸 수 없다. 그때는 쓰기 중지 모드나 저장소 스냅샷 같은 기능이 필요하다(별도 검토·승인).
+
+**5. `storage/tmp` 제외와 tar 경로 검증**
+
+- 제외한다: `storage/tmp`(요청 중 임시 파일, 읽는 중 사라지면 `tar` 오류 원인), `storage/previews`(원본에서 다시 만드는 캐시·작업 공간). 원본은 `storage/documents/`에만 있다.
+- 경로: `tar -C /data ... storage` 이므로 아카이브 안 경로는 `storage/documents/<UUID>`다. GNU tar(1.35, 2026-11-17 로컬 확인)에서 `--exclude=storage/tmp --exclude=storage/previews`가 두 디렉터리를 빼고 `storage/documents/`는 남기는 것을 확인했다. 백업 이미지(Ubuntu 24.04)의 tar 버전은 실행 시 `tar --version`으로 확인한다(미확인).
+- 스크립트 3단계가 덤프의 모든 `storage_key`를 `storage/<key>` 형태로 아카이브 목록과 비교한다. 경로가 어긋나면(예: `-C` 누락으로 `data/storage/...`) 모든 파일이 MISSING으로 나와 실패한다.
+
+**6. 한 쌍 관리**
+
+- 같은 `STAMP` 디렉터리에 `docflow.dump`와 `storage.tar.gz`를 함께 만들고 `SHA256SUMS`로 묶는다. 두 파일은 항상 같이 옮기고, 같이 보관하고, 같이 지운다.
+- 복원은 반드시 같은 `STAMP`의 두 파일로 한다. 다른 시점의 아카이브를 섞으면 DB가 가리키는 파일이 없을 수 있다.
+- 외부 보관 시 `SHA256SUMS`도 함께 옮기고, 복원 전에 `sha256sum -c SHA256SUMS`로 손상 여부를 확인한다.
+
+**7. 복원 후 파일 존재·무결성 검증**
+
+DB에는 버전마다 `size_bytes`, `sha256`이 있다. 복원한 backend 컨테이너에서 실행한다.
+
+```sh
+sh -eu <<'VERIFY'
+DB_HOST=$(echo "$DB_URL" | sed -E 's#jdbc:postgresql://([^:/]+).*#\1#')
+DB_PORT=$(echo "$DB_URL" | sed -E 's#.*:([0-9]+)/.*#\1#')
+DB_NAME=$(echo "$DB_URL" | sed -E 's#.*/##')
+export PGPASSWORD="$DB_PASSWORD"
+psql --host "$DB_HOST" --port "$DB_PORT" --username "$DB_USERNAME" --dbname "$DB_NAME" -v ON_ERROR_STOP=1 -tA -F ' ' \
+  -c "SELECT storage_key, size_bytes, sha256 FROM document_versions ORDER BY id" > /tmp/docflow-verify.txt
+FAIL=0; N=0
+while read -r key size sha; do
+  N=$((N + 1)); f="/data/storage/$key"
+  if [ ! -f "$f" ]; then echo "MISSING $key"; FAIL=1; continue; fi
+  [ "$(wc -c < "$f" | tr -d ' ')" = "$size" ] || { echo "SIZE MISMATCH $key"; FAIL=1; }
+  [ "$(sha256sum "$f" | cut -d' ' -f1)" = "$sha" ] || { echo "SHA256 MISMATCH $key"; FAIL=1; }
+done < /tmp/docflow-verify.txt
+rm -f /tmp/docflow-verify.txt
+[ "$FAIL" = 0 ] && echo "OK: $N versions, all files present and identical" || { echo "FAILED"; exit 1; }
+VERIFY
+```
+
+- 실패가 하나라도 있으면 복원을 완료로 보지 않는다. 고아 파일(DB에 없는 파일)은 이 검사에서 실패로 보지 않는다.
+
+**검증 기록 (2026-11-17, Claude Code 클라우드, 로컬 PostgreSQL 16 임시 DB·임시 디렉터리)**: §7 스크립트와 위 검증 스크립트의 접속 부분만 로컬 값으로 바꿔 실행했다. 정상 데이터에서 통과, 파일 하나를 지우면 3단계 `MISSING`으로 실패, 복원 파일을 1바이트 바꾸면 `SIZE`·`SHA256 MISMATCH`로 실패했다. 탭이 들어간 원본 파일명도 `storage_key` 추출에 영향이 없었다. Docker 이미지·Railway에서는 이 스크립트를 실행하지 않았다(미검증). CI(#45, §13.3)는 같은 순서(덤프 → `tar`)와 `storage_key` 존재 확인을 실제 컨테이너에서 검증한다.
+
+**8. 파일 삭제·교체 기능 추가 시 재검토**
+
+다음 기능이 생기면 A2가 깨지므로 이 절차를 그대로 쓰면 안 된다: 문서·버전 삭제, 파일 교체(같은 키 덮어쓰기), 보관 기간 정리, 고아 파일 정리 작업, 저장소 이전. 그때는 기능 설계와 함께 백업 방식을 다시 정한다. 예: 논리 삭제 후 일정 기간 뒤 물리 삭제(백업 주기보다 길게), 백업 중 쓰기 중지, 볼륨 스냅샷 기능 사용(Railway 제공 여부 미검증).
 
 ## 8. 비용과 상한
 
