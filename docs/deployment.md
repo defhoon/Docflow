@@ -17,7 +17,7 @@
 
 | Railway 리소스 | 소스·빌드 | 공개 여부 | 연결 |
 | --- | --- | --- | --- |
-| `Postgres` | Railway PostgreSQL 템플릿, **주 버전 16으로 고정**(backend 이미지의 `pg_dump`가 16이라 서버가 17 이상이면 컨테이너 백업이 실패) | **TCP Proxy 끔** | backend가 참조 변수로 접속 |
+| `Postgres` | Railway PostgreSQL 템플릿, **주 버전 16으로 고정**(backend 이미지의 `pg_dump`·`pg_restore`가 16이다. 클라이언트보다 높은 서버는 백업할 수 없고, 더 높은 클라이언트로 만든 덤프는 16에 복원되지 않을 수 있다. §7.1) | **TCP Proxy 끔** | backend가 참조 변수로 접속 |
 | `backend` | GitHub 저장소, Root Directory `backend`, `backend/Dockerfile` | **Public Networking 없음** | `backend.railway.internal:8080` |
 | `frontend` | GitHub 저장소, Root Directory `frontend`, `frontend/Dockerfile` | 공개 도메인(HTTPS) | `BACKEND_URL`로 backend 호출 |
 | 볼륨 | backend에 연결, Mount path `/data` | — | Hobby 5GB/볼륨 상한 |
@@ -129,6 +129,15 @@ tar -C /data -czf /data/backup/storage-$(date +%Y%m%d%H%M).tar.gz storage
 - 복구: 빈 DB에 `pg_restore --no-owner --dbname <대상>`, 파일은 `tar -C /data -xzf storage-….tar.gz` → backend 재시작 → `Successfully validated 9 migrations`, 최종본 다운로드 확인.
 - 로컬 검증(2026-11-10): 확정 문서·피드백·2개 버전 데이터를 백업 → 새 DB·새 디렉터리로 복구 → Flyway 9개 검증 통과, FINALIZED·피드백 유지, 최종본 동일 바이트.
 - Railway 자체 Postgres 백업 기능의 요금제별 제공 여부는 콘솔에서 확인(미검증).
+
+### 7.1 백업 범위와 PostgreSQL 클라이언트 버전 (#45)
+
+- **DB 덤프와 파일 저장소는 별개다.** `pg_dump`에는 메타데이터(사용자·문서·버전·`storage_key`)만 있고 업로드 파일은 없다. DB만 복원하면 문서는 보이지만 다운로드가 실패한다. 항상 같은 시점의 `docflow-*.dump`와 `storage-*.tar.gz`를 한 쌍으로 보관·복원한다.
+- 클라이언트 버전 사고 기록(2026-11-11, CI 실제 컨테이너): 버전 없이 쓰던 `eclipse-temurin:25-jre`가 Ubuntu 26.04 기반으로 바뀌어 이미지 안 `pg_dump`·`pg_restore`가 **18.6**이었다. 그 덤프를 PostgreSQL 16에 복원하면 `ERROR: unrecognized configuration parameter "transaction_timeout"`(`SET transaction_timeout = 0;`)으로 실패했다(`--exit-on-error`).
+- 조치: 베이스 이미지를 Ubuntu 24.04 기반 `eclipse-temurin:25-jdk-noble` / `25-jre-noble`로 고정하고, 클라이언트를 `postgresql-client-16` 패키지 이름으로 설치한다. noble 태그도 보안 갱신으로 내용이 바뀌므로 영구 고정은 아니다. 주 버전은 CI 스모크 테스트가 매번 확인한다(16이 아니면 실패).
+- 수정 후 CI 확인 값(2026-11-17, run 44045682347): OS `Ubuntu 24.04.5 LTS`, Java `25.0.5`(Temurin), `pg_dump`·`pg_restore` `16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)`, 테스트 서버 PostgreSQL 16.16.
+- 수정 후 CI 백업·복원 결과: 위 §7 명령으로 덤프 → **별도의 빈 PostgreSQL 16 컨테이너**에 `pg_restore --no-owner --exit-on-error --single-transaction` → SQL 오류 없음, public 9개 테이블의 행 수·전체 행 해시와 시퀀스 8개 값이 원본과 동일. 파일 저장소는 `tar`로 따로 백업·복원해 저장 파일이 바이트 단위로 같고, 복원한 DB의 모든 `storage_key`에 파일이 있음을 확인했다.
+- 미검증: Railway 환경에서의 실제 백업·복원(`railway ssh` 접속, 백업 파일 반출), 대용량 데이터에서의 소요 시간.
 
 ## 8. 비용과 상한
 
@@ -248,7 +257,7 @@ Railway 공식 요금(2026-11 확인, [docs.railway.com/pricing](https://docs.ra
 
 ## 13. Backend 컨테이너 실행 검증 (#43)
 
-CI의 Docker job은 이미지 **빌드**와 비root·`.env` 미포함만 확인하고, 컨테이너를 **실행하지 않는다.** 실행 검증 현황은 다음과 같다.
+CI의 `Docker images` job은 이미지 빌드와 비root·`.env` 미포함만 확인한다. 컨테이너 실행은 #45에서 추가한 `Backend container run (smoke test)` job(`scripts/ci/backend-container-smoke.sh`)이 확인한다(13.3).
 
 ### 13.1 클라우드 entrypoint 시뮬레이션 (2026-11-11, Docker 아님)
 
@@ -263,7 +272,7 @@ Claude Code 클라우드에는 Docker daemon이 없어, 같은 Ubuntu 24.04 호�
 | `/data/storage` 쓰기·읽기 | API로 관리자 가입·프로젝트·PDF 업로드 → 저장 파일 docflow 소유, 다운로드 원본과 동일 |
 | 재시작 후 유지 | SIGTERM 후 재기동: `Schema "public" is up to date`, 재로그인 후 같은 파일 다운로드 동일, uid 999 유지 |
 
-한계: 실제 이미지(Temurin 25 JRE, 이미지 내부 사용자 생성)와 Docker 볼륨 마운트는 검증하지 않았다 → 13.2를 Docker 환경에서 실행한다.
+한계: 실제 이미지(Temurin 25 JRE, 이미지 내부 사용자 생성)와 Docker 볼륨 마운트는 검증하지 않았다 → 13.3 CI 실제 컨테이너 검증으로 보완했다. 이 시뮬레이션에서 본 `pg_dump` 16은 호스트 버전이었고, 당시 실제 이미지는 18.6이었다(§7.1).
 
 ### 13.2 Docker Desktop(Windows PowerShell) 실행 검증 명령
 
@@ -291,7 +300,7 @@ docker exec -u docflow docflow-smoke-backend sh -c "echo probe > /data/storage/p
 docker restart docflow-smoke-backend; Wait-Up                                  # 기대: UP
 docker exec docflow-smoke-backend cat /data/storage/probe.txt                  # 기대: probe (재시작 후 유지)
 docker logs docflow-smoke-backend 2>&1 | Select-String "up to date"            # 기대: Schema "public" is up to date
-docker exec docflow-smoke-backend sh -c "command -v pg_dump && pg_dump --version"  # 기대: 16.x
+docker exec docflow-smoke-backend sh -c "pg_dump --version && pg_restore --version"  # 기대: 둘 다 16.x (noble 기반 이미지)
 
 # 정리(테스트 전용 리소스만)
 docker rm -f docflow-smoke-backend docflow-smoke-db; docker volume rm docflow-smoke-data; docker network rm docflow-smoke
@@ -299,7 +308,21 @@ docker rm -f docflow-smoke-backend docflow-smoke-db; docker volume rm docflow-sm
 
 `--restart on-failure`는 DB보다 먼저 뜨면 재시도하도록 한 것이다(Railway Restart policy와 같은 역할). `DOCFLOW_ALLOW_INSECURE_COOKIES=true`는 로컬 HTTP 확인 전용이며 Railway에는 넣지 않는다.
 
-### 13.3 CI 실행 테스트 제안 (미적용, 승인 필요)
+### 13.3 CI 실제 컨테이너 검증 (#45)
 
-`.github/workflows/ci.yml`의 Docker job에 13.2와 같은 단계(PostgreSQL 16 컨테이너, root 소유 볼륨, backend 기동, health·uid·쓰기·재시작 유지 확인)를 추가한다. 예상 추가 시간 약 1~2분. CI 설정 변경이므로 별도 승인 후 진행한다.
+job `Backend container run (smoke test)`가 PR·push마다 실제 backend 이미지를 빌드해 실행한다. 이 실행 전용 네트워크·PostgreSQL 16 컨테이너 2개·볼륨만 만들고 끝나면 지운다. 운영 기본값(prod 프로파일, Secure 쿠키)을 그대로 쓴다.
 
+| 단계 | 확인 내용 | 결과 (2026-11-17, run 44045682347) |
+| --- | --- | --- |
+| 1 | 이미지 Java·OS·`pg_dump`/`pg_restore` 주 버전(16이어야 함) | Java 25.0.5, Ubuntu 24.04.5 LTS, 16.15 / 16.15 |
+| 2 | PostgreSQL 16 테스트 컨테이너 | 16.16 |
+| 3 | root 소유 볼륨 연결 | 통과 |
+| 4 | backend 기동 | 통과 |
+| 5 | Flyway | 9개 적용, 실패 0 |
+| 6 | health, 실행 Java, 부트스트랩 코드 비노출 | `UP`, `using Java 25.0.5 with PID 1 (... started by docflow ...)` |
+| 7 | 비root | PID 1 java, Uid 999(docflow), `/data` 전체 docflow 소유 |
+| 8 | 볼륨 쓰기·읽기, API 업로드·다운로드 | 통과(sha256 동일, 세션 쿠키 Secure) |
+| 9 | 재시작 후 유지 | `Schema "public" is up to date`, 파일·DB 유지, 이전 세션 401 |
+| 10 | §7 백업 → 별도 빈 PostgreSQL 16 복원 → 데이터 비교, 파일 저장소 백업·복원 | SQL 오류 없음, 9개 테이블·8개 시퀀스 동일, 파일 2개 동일 |
+
+수정 전(2026-11-11, run 120)에는 1~9단계가 통과하고 10단계가 18.6 클라이언트 때문에 실패했다(§7.1).

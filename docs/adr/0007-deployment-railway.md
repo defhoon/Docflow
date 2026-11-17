@@ -8,7 +8,7 @@
 1. Railway 한 프로젝트에 4개 리소스: Frontend(Next.js standalone, 공개 HTTPS 도메인), Backend(Spring Boot, **공개 도메인 없음**, 비공개 네트워크 전용), PostgreSQL 16(비공개, TCP Proxy 비활성), Backend 영속 볼륨(`/data`).
 2. 브라우저는 Frontend 도메인만 호출한다. `/api/*`는 Next.js rewrite가 비공개 네트워크(`http://<backend>.railway.internal:8080`)로 프록시한다. 같은 출처이므로 기존 세션 쿠키·`csrf.spa()` 구조와 CORS 미설정을 그대로 유지한다.
 3. Backend는 `SPRING_PROFILES_ACTIVE=prod`(`application-prod.yml`): Secure 쿠키, `.env` 미사용, 저장 경로 `/data/storage`, Office→PDF 변환 비활성화(`office-enabled=false`, `require-isolation=true`), graceful shutdown.
-4. 이미지: `backend/Dockerfile`(Temurin 25, 비root 실행, entrypoint가 볼륨 소유권만 정리, `pg_dump` 포함, LibreOffice 미포함), `frontend/Dockerfile`(Node 22 alpine, standalone, `node` 사용자, `BACKEND_URL` 빌드 인자 필수).
+4. 이미지: `backend/Dockerfile`(Temurin 25, 비root 실행, entrypoint가 볼륨 소유권만 정리, `pg_dump` 포함, LibreOffice 미포함; #45에서 베이스를 `eclipse-temurin:25-jdk-noble`/`25-jre-noble`로 고정하고 `postgresql-client-16` 설치. 이유: 태그 미고정 시 Ubuntu 26.04·클라이언트 18.6으로 바뀌어 PostgreSQL 16 복원 실패, 대안 PGDG 저장소 설치·복원 절차 완화는 외부 저장소 의존·오류 은폐 위험으로 제외. `docs/deployment.md` §7.1), `frontend/Dockerfile`(Node 22 alpine, standalone, `node` 사용자, `BACKEND_URL` 빌드 인자 필수).
 5. 최초 관리자는 사용자 0명일 때 로그에 1회 출력되는 일회용 관리자 초대코드로 가입한다(SPEC-AUTH 확장 E11). 고정 계정·비밀번호 없음.
 
 ## 고려한 대안
