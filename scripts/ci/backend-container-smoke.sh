@@ -3,7 +3,8 @@
 #
 # 실제 backend 이미지를 임시 PostgreSQL 16 컨테이너·임시 볼륨과 함께 실행해 다음을 확인한다.
 #   이미지 Java·pg_dump 버전 / root 소유 볼륨 연결 / 기동·Flyway·health / 비root 실행 /
-#   볼륨 쓰기·읽기(API 업로드·다운로드 포함) / 백업·복원(docs §7) / 재시작 후 데이터 유지
+#   볼륨 쓰기·읽기(API 업로드·다운로드 포함) / 재시작 후 데이터 유지 /
+#   DB 백업(pg_dump)→별도 빈 PostgreSQL 16 복원→데이터 비교, 파일 저장소 백업·복원 비교(docs §7)
 #
 # 운영 기본값(prod 프로파일, Secure 쿠키)을 그대로 쓴다. 쿠키 관련 완화 변수는 넣지 않는다.
 # 만드는 리소스는 이 실행 전용 이름(docflow-smoke-*)이며 종료 시 모두 삭제한다. 기존 DB·볼륨에는 접근하지 않는다.
@@ -23,6 +24,7 @@ BASE_URL="http://127.0.0.1:${PORT}"
 PREFIX="docflow-smoke-${GITHUB_RUN_ID:-local}-$$"
 NET="${PREFIX}-net"
 DB="${PREFIX}-db"
+RESTORE_DB="${PREFIX}-restore-db"
 APP="${PREFIX}-backend"
 VOL="${PREFIX}-data"
 
@@ -54,9 +56,11 @@ cleanup() {
 		docker logs "$APP" 2>&1 | tail -n 200 || echo "(no backend logs)"
 		echo "---- database container logs (tail) ----"
 		docker logs "$DB" 2>&1 | tail -n 50 || echo "(no database logs)"
+		echo "---- restore database container logs (tail) ----"
+		docker logs "$RESTORE_DB" 2>&1 | tail -n 50 || echo "(no restore database logs)"
 	fi
 	# 이 실행에서 만든 리소스만 지운다. 아직 만들지 않은 리소스는 없다는 메시지만 남기고 넘어간다.
-	docker rm -f "$APP" "$DB" >/dev/null 2>&1 || echo "cleanup: containers already absent"
+	docker rm -f "$APP" "$DB" "$RESTORE_DB" >/dev/null 2>&1 || echo "cleanup: containers already absent"
 	docker volume rm "$VOL" >/dev/null 2>&1 || echo "cleanup: volume already absent"
 	docker network rm "$NET" >/dev/null 2>&1 || echo "cleanup: network already absent"
 	rm -rf "$WORK"
@@ -80,7 +84,7 @@ wait_until() {
 }
 
 db_ready() {
-	docker exec "$DB" pg_isready -h 127.0.0.1 -U docflow -d docflow >/dev/null 2>&1
+	docker exec "${1:-$DB}" pg_isready -h 127.0.0.1 -U docflow -d docflow >/dev/null 2>&1
 }
 
 app_running() {
@@ -93,7 +97,20 @@ backend_healthy() {
 }
 
 psql_value() {
-	docker exec "$DB" psql -U docflow -d docflow -tAc "$1"
+	docker exec "$DB" psql -U docflow -d docflow -v ON_ERROR_STOP=1 -tAc "$1"
+}
+
+psql_value_on() {
+	docker exec "$1" psql -U docflow -d docflow -v ON_ERROR_STOP=1 -tAc "$2"
+}
+
+# public 스키마의 모든 테이블에 대해 "테이블:행 수:행 전체 해시", 모든 시퀀스의 현재 값을 출력한다(복원 비교용).
+db_fingerprint() {
+	local container="$1" table
+	for table in $(psql_value_on "$container" "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1"); do
+		echo "table ${table}:$(psql_value_on "$container" "SELECT count(*) || ':' || coalesce(md5(string_agg(t::text, '|' ORDER BY t::text)), 'empty') FROM public.\"${table}\" t")"
+	done
+	psql_value_on "$container" "SELECT 'sequence ' || sequencename || ':' || coalesce(last_value::text, 'unset') FROM pg_sequences WHERE schemaname = 'public' ORDER BY 1"
 }
 
 # docker logs | grep -q 는 grep이 먼저 끝나면 SIGPIPE로 pipefail에 걸릴 수 있어 파일로 받아 검사한다.
@@ -194,12 +211,18 @@ echo "$JAVA_VERSION_OUTPUT" | sed 's/^/    /'
 grep -qE "version \"${EXPECTED_JAVA_MAJOR}(\.|\")" <<<"$JAVA_VERSION_OUTPUT" ||
 	fail "image Java major version is not ${EXPECTED_JAVA_MAJOR}"
 pass "image Java ${EXPECTED_JAVA_MAJOR}"
-PG_DUMP_VERSION="$(docker run --rm --entrypoint pg_dump "$IMAGE" --version)"
-echo "    ${PG_DUMP_VERSION}"
-PG_DUMP_MAJOR="$(grep -oE '\) [0-9]+' <<<"$PG_DUMP_VERSION" | grep -oE '[0-9]+' || true)"
-[ -n "$PG_DUMP_MAJOR" ] || fail "cannot read the pg_dump major version"
-# pg_dump는 자신과 같거나 낮은 주 버전의 서버만 백업할 수 있다. 서버 버전과 비교는 2단계 이후, 실제 백업·복원은 8단계에서 확인한다.
-pass "image pg_dump major ${PG_DUMP_MAJOR}"
+OS_NAME="$(docker run --rm --entrypoint sh "$IMAGE" -c '. /etc/os-release && echo "$PRETTY_NAME"')"
+echo "    OS: ${OS_NAME}"
+# 클라이언트 주 버전을 서버(16)와 맞춘다. 더 높은 pg_dump/pg_restore는 16이 모르는 설정(예: transaction_timeout)을
+# 복원 스크립트에 넣어 복원이 실패한다(#45에서 18.6으로 확인). 실제 백업·복원은 10단계에서 확인한다.
+for tool in pg_dump pg_restore; do
+	version="$(docker run --rm --entrypoint "$tool" "$IMAGE" --version)"
+	echo "    ${version}"
+	major="$(grep -oE '\) [0-9]+' <<<"$version" | grep -oE '[0-9]+' || true)"
+	[ "$major" = "$EXPECTED_PG_MAJOR" ] ||
+		fail "image ${tool} major version is '${major}', expected ${EXPECTED_PG_MAJOR} (same as the PostgreSQL server)"
+done
+pass "image pg_dump/pg_restore major ${EXPECTED_PG_MAJOR}"
 
 # ---------------------------------------------------------------- 2. PostgreSQL 16
 
@@ -214,9 +237,6 @@ case "$SERVER_VERSION" in
 "${EXPECTED_PG_MAJOR}".*) pass "PostgreSQL server ${SERVER_VERSION}" ;;
 *) fail "unexpected PostgreSQL server version ${SERVER_VERSION}" ;;
 esac
-[ "$PG_DUMP_MAJOR" -ge "$EXPECTED_PG_MAJOR" ] ||
-	fail "image pg_dump ${PG_DUMP_MAJOR} is older than the PostgreSQL ${EXPECTED_PG_MAJOR} server; backups would fail"
-pass "image pg_dump ${PG_DUMP_MAJOR} >= server ${EXPECTED_PG_MAJOR}"
 
 # ---------------------------------------------------------------- 3. root-owned volume
 
@@ -333,25 +353,53 @@ pass "restarted (${FIRST_STARTED_AT} -> ${SECOND_STARTED_AT}); schema up to date
 
 # ---------------------------------------------------------------- 10. backup / restore
 
-# docs/deployment.md §7 백업 명령을 컨테이너 안에서 그대로 실행하고, 같은 임시 DB 서버의 새 DB로 복원해 비교한다.
-log "10. backup (docs §7) and restore with in-image pg_dump/pg_restore"
+# docs/deployment.md §7의 백업 명령을 컨테이너 안에서 그대로 실행한다. DB 덤프와 파일 저장소(/data/storage) 아카이브는
+# 별개다: DB 복원만으로 업로드 파일은 돌아오지 않으므로 둘을 따로 백업·복원·비교한다.
+log "10a. DB backup with in-image pg_dump (docs §7)"
 docker exec "$APP" sh -c 'set -e
 	PGPASSWORD="$DB_PASSWORD" pg_dump --format=custom --no-owner \
 	  --host "$(echo "$DB_URL" | sed -E "s#jdbc:postgresql://([^:/]+).*#\1#")" \
 	  --port "$(echo "$DB_URL" | sed -E "s#.*:([0-9]+)/.*#\1#")" \
 	  --username "$DB_USERNAME" --dbname "$(echo "$DB_URL" | sed -E "s#.*/##")" \
-	  --file /tmp/smoke-backup.dump' || fail "pg_dump (docs §7 command) failed inside the backend image"
-psql_value 'CREATE DATABASE docflow_restore_check' >/dev/null
+	  --file /tmp/smoke-backup.dump
+	test -s /tmp/smoke-backup.dump' || fail "pg_dump (docs §7 command) failed inside the backend image"
+pass "DB dump created ($(app_exec 'wc -c < /tmp/smoke-backup.dump' | tr -d ' ') bytes)"
+
+log "10b. restore into a separate, empty PostgreSQL ${EXPECTED_PG_MAJOR} server"
+docker run -d --name "$RESTORE_DB" --network "$NET" \
+	-e POSTGRES_DB=docflow -e POSTGRES_USER=docflow -e POSTGRES_PASSWORD="$DB_PASSWORD" \
+	"postgres:${EXPECTED_PG_MAJOR}" >/dev/null
+wait_until "restore PostgreSQL" "$DB_TIMEOUT_SECONDS" db_ready "$RESTORE_DB"
+[ "$(psql_value_on "$RESTORE_DB" "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")" = "0" ] ||
+	fail "restore target database is not empty"
+# --exit-on-error: SQL 오류가 하나라도 나면 실패로 본다(오류를 무시하지 않는다).
 docker exec -e PGPASSWORD="$DB_PASSWORD" "$APP" \
-	pg_restore --no-owner --exit-on-error --host "$DB" --username docflow --dbname docflow_restore_check /tmp/smoke-backup.dump ||
-	fail "pg_restore of the backup into an empty PostgreSQL ${EXPECTED_PG_MAJOR} database failed"
-COUNT_SQL="SELECT (SELECT count(*) FROM users) || '/' || (SELECT count(*) FROM projects) || '/' || (SELECT count(*) FROM documents) || '/' || (SELECT count(*) FROM document_versions) || '/' || (SELECT count(*) FROM audit_logs) || '/' || (SELECT count(*) FROM flyway_schema_history WHERE success)"
-SOURCE_COUNTS="$(psql_value "$COUNT_SQL")"
-RESTORED_COUNTS="$(docker exec "$DB" psql -U docflow -d docflow_restore_check -tAc "$COUNT_SQL")"
-echo "    users/projects/documents/versions/audit_logs/migrations: source ${SOURCE_COUNTS}, restored ${RESTORED_COUNTS}"
-[ "$SOURCE_COUNTS" = "$RESTORED_COUNTS" ] || fail "restored row counts differ from the source"
-psql_value 'DROP DATABASE docflow_restore_check' >/dev/null
-app_exec 'rm -f /tmp/smoke-backup.dump'
-pass "pg_dump ${PG_DUMP_MAJOR} backup of PostgreSQL ${EXPECTED_PG_MAJOR} restores with identical row counts"
+	pg_restore --no-owner --exit-on-error --single-transaction \
+	--host "$RESTORE_DB" --username docflow --dbname docflow /tmp/smoke-backup.dump ||
+	fail "pg_restore into an empty PostgreSQL ${EXPECTED_PG_MAJOR} database failed"
+pass "pg_restore finished without SQL errors on PostgreSQL $(psql_value_on "$RESTORE_DB" 'SHOW server_version' | cut -d' ' -f1)"
+
+log "10c. compare restored data with the source"
+db_fingerprint "$DB" >"$WORK/source.fp"
+db_fingerprint "$RESTORE_DB" >"$WORK/restored.fp"
+sed 's/^/    /' "$WORK/restored.fp"
+diff -u "$WORK/source.fp" "$WORK/restored.fp" || fail "restored data differs from the source"
+[ "$(grep -c '^table ' "$WORK/source.fp")" -ge 9 ] || fail "fingerprint covers too few tables"
+pass "all $(grep -c '^table ' "$WORK/source.fp") tables (row counts + full-row hashes) and $(grep -c '^sequence ' "$WORK/source.fp") sequences identical"
+
+log "10d. file storage backup/restore (separate from the DB dump)"
+docker exec "$APP" sh -c 'set -e
+	tar -C /data -czf /tmp/smoke-storage.tar.gz storage
+	rm -rf /tmp/storage-restore && mkdir -p /tmp/storage-restore
+	tar -C /tmp/storage-restore -xzf /tmp/smoke-storage.tar.gz' || fail "storage archive (docs §7 tar command) failed"
+app_exec 'cd /data && find storage -type f -exec sha256sum {} + | sort' >"$WORK/files.source"
+app_exec 'cd /tmp/storage-restore && find storage -type f -exec sha256sum {} + | sort' >"$WORK/files.restored"
+diff -u "$WORK/files.source" "$WORK/files.restored" || fail "restored storage files differ from /data/storage"
+# 복원한 DB가 가리키는 모든 파일이 복원한 파일 저장소에 있어야 한다.
+for key in $(psql_value_on "$RESTORE_DB" 'SELECT storage_key FROM document_versions ORDER BY id'); do
+	grep -qF " storage/${key}" "$WORK/files.restored" || fail "restored DB references ${key}, missing from the storage archive"
+done
+pass "$(wc -l <"$WORK/files.restored" | tr -d ' ') stored file(s) restored byte-identical; every storage_key in the restored DB has its file"
+app_exec 'rm -rf /tmp/smoke-backup.dump /tmp/smoke-storage.tar.gz /tmp/storage-restore'
 
 log "backend container smoke test passed"
