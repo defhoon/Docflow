@@ -11,7 +11,7 @@ export function EmptyState({ title, description, action, icon }: {
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
-      {icon && <div className="mb-1 text-ink-faint">{icon}</div>}
+      {icon && <div className="mb-1 text-ink-decor">{icon}</div>}
       <p className="text-sm font-medium text-ink">{title}</p>
       {description && <p className="max-w-sm text-sm text-ink-muted">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
