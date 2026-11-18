@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ApiError } from "@/lib/api-client";
 
 import { signup } from "../signup-api";
@@ -47,18 +48,23 @@ export function SignupForm() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const update = (name: FieldName) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setValues((current) => ({ ...current, [name]: event.target.value }));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submittingRef.current) {
+      return;
+    }
     setFormError(null);
     const next = validate(values);
     setErrors(next);
     if (Object.keys(next).length > 0) {
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await signup({
@@ -67,6 +73,8 @@ export function SignupForm() {
         password: values.password,
         displayName: values.displayName.trim(),
       });
+      // 이동 후에도 화면이 숨겨진 채 유지될 수 있으므로(cacheComponents) 입력한 비밀번호를 지운다.
+      setValues((current) => ({ ...current, password: "", passwordConfirm: "" }));
       router.replace("/login?signup=done");
     } catch (error) {
       if (error instanceof ApiError && error.code === "INVITATION_INVALID") {
@@ -90,6 +98,7 @@ export function SignupForm() {
         setFormError("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
       }
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -109,11 +118,11 @@ export function SignupForm() {
 
   return (
     <form onSubmit={(event) => void handleSubmit(event)} noValidate className="flex flex-col gap-4">
-      {field("inviteCode", "초대코드", <Input {...inputProps("inviteCode")} autoComplete="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX-…" />, "관리자에게 받은 일회용 코드입니다.")}
+      {field("inviteCode", "초대코드", <Input {...inputProps("inviteCode")} autoComplete="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX-…" />, "관리자에게 받은 일회용 코드입니다. 붙여 넣으면 됩니다(대소문자·하이픈·공백은 구분하지 않습니다).")}
       {field("email", "이메일", <Input {...inputProps("email")} type="email" autoComplete="email" />)}
       {field("displayName", "이름", <Input {...inputProps("displayName")} autoComplete="name" />, "구성원에게 표시되는 이름입니다.")}
-      {field("password", "비밀번호", <Input {...inputProps("password")} type="password" autoComplete="new-password" />, `${PASSWORD_MIN}~${PASSWORD_MAX}자`)}
-      {field("passwordConfirm", "비밀번호 확인", <Input {...inputProps("passwordConfirm")} type="password" autoComplete="new-password" />)}
+      {field("password", "비밀번호", <PasswordInput {...inputProps("password")} autoComplete="new-password" />, `${PASSWORD_MIN}~${PASSWORD_MAX}자`)}
+      {field("passwordConfirm", "비밀번호 확인", <PasswordInput {...inputProps("passwordConfirm")} autoComplete="new-password" />)}
       {formError && (
         <p role="alert" className="text-sm text-danger-700">
           {formError}

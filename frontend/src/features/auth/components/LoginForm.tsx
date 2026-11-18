@@ -1,7 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 import { ApiError } from "@/lib/api-client";
 
@@ -53,6 +57,7 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -62,6 +67,10 @@ export function LoginForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // 상태 반영 전 연속 제출(두 번 클릭·Enter)을 막는다.
+    if (submittingRef.current) {
+      return;
+    }
     setFormError(null);
     const errors = validate(email, password);
     setFieldErrors(errors);
@@ -69,6 +78,7 @@ export function LoginForm() {
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const user = await login(email.trim(), password);
@@ -87,65 +97,52 @@ export function LoginForm() {
         setFormError(messageFor(error));
       }
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" aria-busy={submitting}>
       {expired && (
-        <p role="status" className="rounded-lg bg-warning-50 px-3 py-2 text-sm text-warning-700">
+        <p role="status" className="rounded-[var(--radius-control)] border border-warning-700/20 bg-warning-50 px-3 py-2 text-sm text-warning-700">
           세션이 만료되었습니다. 다시 로그인해 주세요.
         </p>
       )}
-      <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
-        이메일
-        <input
+      <Field label="이메일" htmlFor="login-email" error={fieldErrors.email} errorId="email-error">
+        <Input
+          id="login-email"
           type="email"
           name="email"
           autoComplete="username"
+          inputMode="email"
           value={email}
+          disabled={submitting}
           onChange={(event) => setEmail(event.target.value)}
-          aria-invalid={Boolean(fieldErrors.email)}
+          invalid={Boolean(fieldErrors.email)}
           aria-describedby={fieldErrors.email ? "email-error" : undefined}
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
-        {fieldErrors.email && (
-          <span id="email-error" className="text-danger-700">
-            {fieldErrors.email}
-          </span>
-        )}
-      </label>
-      <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
-        비밀번호
-        <input
-          type="password"
+      </Field>
+      <Field label="비밀번호" htmlFor="login-password" error={fieldErrors.password} errorId="password-error">
+        <PasswordInput
+          id="login-password"
           name="password"
           autoComplete="current-password"
           value={password}
+          disabled={submitting}
           onChange={(event) => setPassword(event.target.value)}
-          aria-invalid={Boolean(fieldErrors.password)}
+          invalid={Boolean(fieldErrors.password)}
           aria-describedby={fieldErrors.password ? "password-error" : undefined}
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
-        {fieldErrors.password && (
-          <span id="password-error" className="text-danger-700">
-            {fieldErrors.password}
-          </span>
-        )}
-      </label>
+      </Field>
       {formError && (
-        <p role="alert" className="text-sm font-medium text-danger-700">
+        <p role="alert" className="rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
           {formError}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-      >
+      <Button type="submit" variant="primary" disabled={submitting} className="w-full">
         {submitting ? "로그인 중..." : "로그인"}
-      </button>
+      </Button>
     </form>
   );
 }
