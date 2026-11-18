@@ -10,6 +10,8 @@ export type DocumentAuthor = {
 export type DocumentSummary = {
   id: number;
   title: string;
+  /** 문서 설명 (SPEC-09). 없으면 null. 목록에서는 줄여서 표시한다. */
+  description: string | null;
   status: DocumentStatus;
   createdBy: DocumentAuthor;
   createdAt: string;
@@ -32,6 +34,8 @@ export type DocumentDetail = {
     originalFilename: string;
     sizeBytes: number;
     uploadedAt: string;
+    /** 버전 정보 (SPEC-09): v1은 초기 버전 내용, v2 이상은 변경사항. 없으면 null. */
+    versionNote: string | null;
   };
   /** 최종 확정 정보 (SPEC-07 FR-7). ACTIVE이면 null. */
   finalization: DocumentFinalization | null;
@@ -47,5 +51,7 @@ export type DocumentFinalization = {
 export type CreateDocumentInput = {
   title: string;
   description: string | null;
+  /** v1 초기 버전 내용 (SPEC-09, 선택) */
+  versionNote: string | null;
   file: File;
 };

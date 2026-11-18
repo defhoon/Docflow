@@ -32,6 +32,7 @@ function version(versionNumber: number, name = `v${versionNumber}.docx`): Docume
     sizeBytes: 10,
     uploadedBy: { id: 1, displayName: "Owner" },
     uploadedAt: "2026-11-04T09:00:00Z",
+    versionNote: null,
     latest: versionNumber === 2,
   };
 }

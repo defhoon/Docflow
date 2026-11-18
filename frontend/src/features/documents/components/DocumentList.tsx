@@ -130,9 +130,17 @@ function DocumentListBody({
                     href={`/projects/${projectId}/documents/${document.id}`}
                     className="flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-subtle/60 sm:flex-row sm:items-center sm:gap-4"
                   >
-                    <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                      <FileIcon className="size-4 shrink-0 text-ink-faint" />
-                      <span className="font-medium break-all text-ink">{document.title}</span>
+                    <span className="flex min-w-0 flex-1 items-start gap-2.5">
+                      <FileIcon className="mt-0.5 size-4 shrink-0 text-ink-faint" />
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="font-medium break-all text-ink">{document.title}</span>
+                        {document.description && (
+                          // SPEC-09: 설명을 한 줄로 줄여 표시한다(전체는 상세 화면).
+                          <span className="truncate text-xs text-ink-muted" title={document.description}>
+                            {document.description}
+                          </span>
+                        )}
+                      </span>
                     </span>
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
                       <StatusBadge status={document.status} />

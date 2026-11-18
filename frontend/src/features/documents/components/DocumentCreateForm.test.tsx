@@ -32,7 +32,7 @@ function pdf(name = "a.pdf", size = 10): File {
 function fill({ title = "요구사항", description, file = pdf() }: { title?: string; description?: string; file?: File | null }) {
   fireEvent.change(screen.getByLabelText("문서 제목"), { target: { value: title } });
   if (description !== undefined) {
-    fireEvent.change(screen.getByLabelText("설명 (선택)"), { target: { value: description } });
+    fireEvent.change(screen.getByLabelText("문서 설명 (선택)"), { target: { value: description } });
   }
   if (file) {
     fireEvent.change(fileInput(), { target: { files: [file] } });
@@ -67,7 +67,7 @@ describe("DocumentCreateForm (SPEC-03 §8.3, AC-DOC-24)", () => {
     fireEvent.click(submitButton());
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/projects/7/documents/11"));
-    expect(createDocumentMock).toHaveBeenCalledWith("7", { title: "요구사항", description: "1차", file });
+    expect(createDocumentMock).toHaveBeenCalledWith("7", { title: "요구사항", description: "1차", versionNote: null, file });
   });
 
   it("클라이언트 검증 실패 시 요청하지 않는다", () => {
@@ -232,7 +232,7 @@ describe("DocumentCreateForm — 경로 재방문 (Activity, AC-DOC-25)", () => 
 
     expect(submitButton()).toBeEnabled();
     expect(screen.getByLabelText("문서 제목")).toHaveValue("");
-    expect(screen.getByLabelText("설명 (선택)")).toHaveValue("");
+    expect(screen.getByLabelText("문서 설명 (선택)")).toHaveValue("");
     // 파일 입력은 다시 마운트되어 선택된 파일이 없다.
     expect(fileInput()).not.toBe(firstInput);
     expect(fileInput().files ?? []).toHaveLength(0);

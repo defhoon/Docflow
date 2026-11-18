@@ -7,7 +7,10 @@ import { isAllowedDescription, isAllowedName, trimEdges, trimEdgesToNull } from 
 import type { DocumentStatus } from "./types";
 
 export const TITLE_MAX_LENGTH = 200;
-export const DESCRIPTION_MAX_LENGTH = 1000;
+/** 문서 설명 최대 길이 (SPEC-09: 1,000 → 2,000자) */
+export const DESCRIPTION_MAX_LENGTH = 2000;
+/** 버전 정보(초기 버전 내용·변경사항) 최대 길이 (SPEC-09) */
+export const VERSION_NOTE_MAX_LENGTH = 1000;
 /** 20MiB = 20,971,520바이트 (SPEC-03 §5.6) */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 export const FILE_NAME_MAX_LENGTH = 255;
@@ -19,8 +22,11 @@ export const MESSAGES = {
   titleRequired: "문서 제목을 입력해 주세요.",
   titleTooLong: "문서 제목은 200자 이하로 입력해 주세요.",
   titleCharacters: "문서 제목에 사용할 수 없는 문자가 포함되어 있습니다.",
-  descriptionTooLong: "설명은 1000자 이하로 입력해 주세요.",
+  descriptionTooLong: "설명은 2000자 이하로 입력해 주세요.",
   descriptionCharacters: "설명에 사용할 수 없는 문자가 포함되어 있습니다.",
+  initialNoteTooLong: "초기 버전 내용은 1000자 이하로 입력해 주세요.",
+  changeNoteTooLong: "변경사항은 1000자 이하로 입력해 주세요.",
+  noteCharacters: "사용할 수 없는 문자가 포함되어 있습니다.",
   fileRequired: "파일을 선택해 주세요.",
   fileType: "PDF, DOCX, XLSX, PPTX 파일만 업로드할 수 있습니다.",
   fileEmpty: "빈 파일은 업로드할 수 없습니다.",
@@ -35,13 +41,46 @@ export function canUploadNewVersion(status: DocumentStatus): boolean {
   return status === "ACTIVE";
 }
 
-export type DocumentFieldErrors = Partial<Record<"title" | "description" | "file", string>>;
+export type DocumentFieldErrors = Partial<Record<"title" | "description" | "versionNote" | "file", string>>;
 
 export type DocumentInputValidation = {
-  /** 서버에 보낼 정규화된 제목·설명 */
-  value: { title: string; description: string | null };
+  /** 서버에 보낼 정규화된 제목·설명·초기 버전 내용 */
+  value: { title: string; description: string | null; versionNote: string | null };
   errors: DocumentFieldErrors;
 };
+
+/** 문서 설명 정규화·검증 (SPEC-09). 앞뒤 공백만 있으면 null(설명 없음). */
+export function validateDescription(description: string | null | undefined): {
+  value: string | null;
+  error?: string;
+} {
+  const value = trimEdgesToNull(description);
+  if (!isAllowedDescription(value)) {
+    return { value, error: MESSAGES.descriptionCharacters };
+  }
+  if (value !== null && value.length > DESCRIPTION_MAX_LENGTH) {
+    return { value, error: MESSAGES.descriptionTooLong };
+  }
+  return { value };
+}
+
+/**
+ * 버전 정보 정규화·검증 (SPEC-09). v1은 '초기 버전 내용', v2 이상은 '변경사항'으로 안내한다. 길이는 서버(@Size)와 같은
+ * UTF-16 code unit 기준이다.
+ */
+export function validateVersionNote(
+  note: string | null | undefined,
+  kind: "initial" | "change",
+): { value: string | null; error?: string } {
+  const value = trimEdgesToNull(note);
+  if (!isAllowedDescription(value)) {
+    return { value, error: MESSAGES.noteCharacters };
+  }
+  if (value !== null && value.length > VERSION_NOTE_MAX_LENGTH) {
+    return { value, error: kind === "initial" ? MESSAGES.initialNoteTooLong : MESSAGES.changeNoteTooLong };
+  }
+  return { value };
+}
 
 /** 마지막 확장자(소문자)가 허용 목록에 있는지. `report.pdf.exe`는 `exe`로 판단한다. */
 export function hasAllowedExtension(fileName: string): boolean {
@@ -77,9 +116,11 @@ export function validateDocumentInput(
   title: string | null | undefined,
   description: string | null | undefined,
   file: File | null,
+  versionNote: string | null | undefined = null,
 ): DocumentInputValidation {
   const normalizedTitle = trimEdges(title) ?? "";
-  const normalizedDescription = trimEdgesToNull(description);
+  const descriptionResult = validateDescription(description);
+  const noteResult = validateVersionNote(versionNote, "initial");
   const errors: DocumentFieldErrors = {};
 
   if (normalizedTitle.length === 0) {
@@ -90,10 +131,11 @@ export function validateDocumentInput(
     errors.title = MESSAGES.titleTooLong;
   }
 
-  if (!isAllowedDescription(normalizedDescription)) {
-    errors.description = MESSAGES.descriptionCharacters;
-  } else if (normalizedDescription !== null && normalizedDescription.length > DESCRIPTION_MAX_LENGTH) {
-    errors.description = MESSAGES.descriptionTooLong;
+  if (descriptionResult.error) {
+    errors.description = descriptionResult.error;
+  }
+  if (noteResult.error) {
+    errors.versionNote = noteResult.error;
   }
 
   const fileError = validateFile(file);
@@ -101,5 +143,8 @@ export function validateDocumentInput(
     errors.file = fileError;
   }
 
-  return { value: { title: normalizedTitle, description: normalizedDescription }, errors };
+  return {
+    value: { title: normalizedTitle, description: descriptionResult.value, versionNote: noteResult.value },
+    errors,
+  };
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createDocument, fetchDocument, fetchDocuments } from "./api";
+import { createDocument, createDocumentVersion, fetchDocument, fetchDocuments, updateDocumentDescription } from "./api";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -24,7 +24,7 @@ describe("문서 API (SPEC-03 §6)", () => {
     fetchMock.mockResolvedValueOnce(json({ id: 3 }, 201));
     const file = new File(["%PDF"], "a.pdf");
 
-    await createDocument("7", { title: "제목", description: "설명", file });
+    await createDocument("7", { title: "제목", description: "설명", versionNote: "초기 내용", file });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/projects/7/documents");
@@ -33,15 +33,43 @@ describe("문서 API (SPEC-03 §6)", () => {
     expect(body.get("title")).toBe("제목");
     expect(body.get("description")).toBe("설명");
     expect(body.get("file")).toBe(file);
-    expect([...body.keys()]).toEqual(["title", "description", "file"]);
+    expect(body.get("versionNote")).toBe("초기 내용");
+    expect([...body.keys()]).toEqual(["title", "description", "versionNote", "file"]);
   });
 
   it("설명이 없으면 description 파트를 보내지 않는다", async () => {
     fetchMock.mockResolvedValueOnce(json({ id: 3 }, 201));
 
-    await createDocument("7", { title: "제목", description: null, file: new File(["x"], "a.pdf") });
+    await createDocument("7", { title: "제목", description: null, versionNote: null, file: new File(["x"], "a.pdf") });
 
-    expect(((fetchMock.mock.calls[0][1] as RequestInit).body as FormData).has("description")).toBe(false);
+    const body = (fetchMock.mock.calls[0][1] as RequestInit).body as FormData;
+    expect(body.has("description")).toBe(false);
+    expect(body.has("versionNote")).toBe(false);
+  });
+
+  it("SPEC-09: 새 버전 변경사항은 versionNote 파트로, 없으면 보내지 않는다", async () => {
+    fetchMock.mockResolvedValueOnce(json({ id: 3 }, 201)).mockResolvedValueOnce(json({ id: 3 }, 201));
+    const file = new File(["%PDF"], "b.pdf");
+
+    await createDocumentVersion("7", "3", file, "3장 수정");
+    await createDocumentVersion("7", "3", file);
+
+    const withNote = (fetchMock.mock.calls[0][1] as RequestInit).body as FormData;
+    expect(withNote.get("versionNote")).toBe("3장 수정");
+    expect(((fetchMock.mock.calls[1][1] as RequestInit).body as FormData).has("versionNote")).toBe(false);
+  });
+
+  it("SPEC-09: 설명 변경은 JSON PATCH, null이면 설명을 지운다", async () => {
+    fetchMock.mockResolvedValueOnce(json({ id: 3 })).mockResolvedValueOnce(json({ id: 3 }));
+
+    await updateDocumentDescription("7", "3", "새 설명");
+    await updateDocumentDescription("7", "3", null);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/projects/7/documents/3");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ description: "새 설명" });
+    expect(JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)).toEqual({ description: null });
   });
 
   it("목록·상세 경로", async () => {

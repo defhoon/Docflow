@@ -41,6 +41,7 @@ function detail(overrides: Partial<DocumentDetailData> = {}, versionNumber = 1):
       originalFilename: `v${versionNumber}.pdf`,
       sizeBytes: 1024,
       uploadedAt: "2026-10-27T09:00:00Z",
+      versionNote: null,
     },
     ...overrides,
   };

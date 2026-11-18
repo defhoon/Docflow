@@ -4,23 +4,36 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
 
+import { CharCount } from "@/components/ui/CharCount";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
 
 import { createDocument } from "../api";
 import { uploadFailureMessage } from "../errors";
-import { type DocumentFieldErrors, FILE_ACCEPT, MESSAGES, validateDocumentInput, validateFile } from "../validation";
+import {
+  DESCRIPTION_MAX_LENGTH,
+  type DocumentFieldErrors,
+  FILE_ACCEPT,
+  MESSAGES,
+  validateDocumentInput,
+  validateFile,
+  VERSION_NOTE_MAX_LENGTH,
+} from "../validation";
 
-const FIELDS = ["title", "description", "file"] as const;
+const FIELDS = ["title", "description", "versionNote", "file"] as const;
 
-/** 문서 등록 폼 (SPEC-03 §8.3). 제목·설명·파일을 `FormData` 요청 하나로 보낸다. */
+/**
+ * 문서 등록 폼 (SPEC-03 §8.3, SPEC-09). 제목·설명(선택)·초기 버전 내용(선택)·파일을 `FormData` 요청 하나로 보낸다. 실패하면
+ * 입력값을 그대로 유지한다.
+ */
 export function DocumentCreateForm() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
   const { refresh } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [versionNote, setVersionNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   // 파일 입력은 코드로 값을 비울 수 없으므로 key를 바꿔 다시 마운트한다.
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -40,6 +53,7 @@ export function DocumentCreateForm() {
     setSubmitting(false);
     setTitle("");
     setDescription("");
+    setVersionNote("");
     setFile(null);
     setFileInputKey((current) => current + 1);
     setFieldErrors({});
@@ -70,7 +84,7 @@ export function DocumentCreateForm() {
       return;
     }
     setFormError(null);
-    const { value, errors } = validateDocumentInput(title, description, file);
+    const { value, errors } = validateDocumentInput(title, description, file, versionNote);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0 || !file) {
       return;
@@ -163,21 +177,54 @@ export function DocumentCreateForm() {
         )}
       </div>
       <div className="flex flex-col gap-1 text-sm">
-        <label htmlFor="document-description">설명 (선택)</label>
+        <div className="flex items-baseline justify-between gap-3">
+          <label htmlFor="document-description">문서 설명 (선택)</label>
+          <CharCount id="document-description-count" length={description.length} max={DESCRIPTION_MAX_LENGTH} />
+        </div>
         <textarea
           id="document-description"
           name="description"
           rows={4}
           value={description}
           disabled={submitting}
+          placeholder="문서의 목적과 주요 내용을 적어 주세요. 구성원이 파일을 열기 전에 확인할 수 있습니다."
           onChange={(event) => setDescription(event.target.value)}
           aria-invalid={Boolean(fieldErrors.description)}
-          aria-describedby={fieldErrors.description ? "document-description-error" : undefined}
+          aria-describedby={
+            fieldErrors.description ? "document-description-error document-description-count" : "document-description-count"
+          }
           className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         {fieldErrors.description && (
           <span id="document-description-error" className="text-danger-700">
             {fieldErrors.description}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 text-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <label htmlFor="document-version-note">초기 버전 내용 (선택)</label>
+          <CharCount id="document-version-note-count" length={versionNote.length} max={VERSION_NOTE_MAX_LENGTH} />
+        </div>
+        <textarea
+          id="document-version-note"
+          name="versionNote"
+          rows={3}
+          value={versionNote}
+          disabled={submitting}
+          placeholder="v1에 담긴 주요 내용을 적어 주세요."
+          onChange={(event) => setVersionNote(event.target.value)}
+          aria-invalid={Boolean(fieldErrors.versionNote)}
+          aria-describedby={
+            fieldErrors.versionNote
+              ? "document-version-note-error document-version-note-count"
+              : "document-version-note-count"
+          }
+          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        />
+        {fieldErrors.versionNote && (
+          <span id="document-version-note-error" className="text-danger-700">
+            {fieldErrors.versionNote}
           </span>
         )}
       </div>
