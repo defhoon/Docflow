@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { hasAllowedExtension, MAX_FILE_BYTES, MESSAGES, validateDocumentInput, validateFile } from "./validation";
+import {
+  hasAllowedExtension,
+  MAX_FILE_BYTES,
+  MESSAGES,
+  validateDescription,
+  validateDocumentInput,
+  validateFile,
+  validateVersionNote,
+} from "./validation";
 
 function fileOfSize(name: string, size: number): File {
   const file = new File(["x"], name);
@@ -12,7 +20,7 @@ describe("문서 입력 검증 (SPEC-03 §5.3, §8.3)", () => {
   it("제목·설명을 정규화한다", () => {
     const result = validateDocumentInput("  요구사항  ", "   ", fileOfSize("a.pdf", 1));
     expect(result.errors).toEqual({});
-    expect(result.value).toEqual({ title: "요구사항", description: null });
+    expect(result.value).toEqual({ title: "요구사항", description: null, versionNote: null });
   });
 
   it("제목 필수·문자·200자 경계", () => {
@@ -23,11 +31,27 @@ describe("문서 입력 검증 (SPEC-03 §5.3, §8.3)", () => {
     expect(validateDocumentInput("가".repeat(201), null, file).errors.title).toBe(MESSAGES.titleTooLong);
   });
 
-  it("설명 문자·1000자 경계", () => {
+  it("설명 문자·2000자 경계 (SPEC-09)", () => {
     const file = fileOfSize("a.pdf", 1);
     expect(validateDocumentInput("t", "a\u0007b", file).errors.description).toBe(MESSAGES.descriptionCharacters);
-    expect(validateDocumentInput("t", "가".repeat(1000), file).errors.description).toBeUndefined();
-    expect(validateDocumentInput("t", "가".repeat(1001), file).errors.description).toBe(MESSAGES.descriptionTooLong);
+    expect(validateDocumentInput("t", "가".repeat(2000), file).errors.description).toBeUndefined();
+    expect(validateDocumentInput("t", "가".repeat(2001), file).errors.description).toBe(MESSAGES.descriptionTooLong);
+  });
+
+  it("초기 버전 내용: 선택, 정규화, 1000자 경계 (SPEC-09)", () => {
+    const file = fileOfSize("a.pdf", 1);
+    expect(validateDocumentInput("t", null, file, "  v1 내용\n둘째 줄 ").value.versionNote).toBe("v1 내용\n둘째 줄");
+    expect(validateDocumentInput("t", null, file, " \t ").value.versionNote).toBeNull();
+    expect(validateDocumentInput("t", null, file, "가".repeat(1000)).errors.versionNote).toBeUndefined();
+    expect(validateDocumentInput("t", null, file, "가".repeat(1001)).errors.versionNote).toBe(MESSAGES.initialNoteTooLong);
+    expect(validateDocumentInput("t", null, file, "a\u0000b").errors.versionNote).toBe(MESSAGES.noteCharacters);
+  });
+
+  it("변경사항·설명 단독 검증 (SPEC-09)", () => {
+    expect(validateVersionNote("가".repeat(1001), "change").error).toBe(MESSAGES.changeNoteTooLong);
+    expect(validateVersionNote("  ", "change")).toEqual({ value: null });
+    expect(validateDescription(" 설명 ")).toEqual({ value: "설명" });
+    expect(validateDescription("가".repeat(2001)).error).toBe(MESSAGES.descriptionTooLong);
   });
 
   it("파일 필수", () => {

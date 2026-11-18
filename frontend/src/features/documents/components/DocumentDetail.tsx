@@ -22,8 +22,10 @@ import { ApiError } from "@/lib/api-client";
 
 import { fetchDocument } from "../api";
 import { formatFileSize } from "../format";
+import { versionNoteEmptyText, versionNoteLabel } from "../version-note";
 import type { DocumentDetail as DocumentDetailData } from "../types";
 import type { DocumentVersionSummary } from "../version-files";
+import { DocumentDescription } from "./DocumentDescription";
 import { DocumentVersionHistory } from "./DocumentVersionHistory";
 import { DocumentVersionPreview } from "./DocumentVersionPreview";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
@@ -134,6 +136,15 @@ export function DocumentDetail() {
     [requestKey, bumpActivity],
   );
 
+  // 설명 변경 성공: 응답(갱신된 상세)으로 바꾸고 활동 이력을 다시 불러온다 (SPEC-09).
+  const handleDescriptionUpdated = useCallback(
+    (document: DocumentDetailData) => {
+      setResult({ key: requestKey, value: { kind: "success", document } });
+      bumpActivity();
+    },
+    [requestKey, bumpActivity],
+  );
+
   // 최종 확정 성공: 응답으로 읽기 전용 화면으로 바꾼다.
   const handleFinalized = useCallback(
     (document: DocumentDetailData) => {
@@ -194,7 +205,6 @@ export function DocumentDetail() {
               { label: document.title },
             ]}
             title={document.title}
-            description={document.description ? <span className="whitespace-pre-wrap break-words">{document.description}</span> : undefined}
             meta={
               <>
                 <StatusBadge status={document.status} />
@@ -232,6 +242,19 @@ export function DocumentDetail() {
               </ButtonLink>
             </div>
           )}
+          <Card aria-labelledby="document-description-heading">
+            <CardHeader title="문서 설명" titleId="document-description-heading" />
+            <CardBody>
+              <DocumentDescription
+                projectId={projectId}
+                documentId={documentId}
+                description={document.description}
+                editable={!finalized}
+                onUpdated={handleDescriptionUpdated}
+                onFinalizedConflict={reloadInBackground}
+              />
+            </CardBody>
+          </Card>
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
             <div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
               <Card aria-labelledby="preview-heading">
@@ -240,7 +263,19 @@ export function DocumentDetail() {
                   titleId="preview-heading"
                   description={selectedSummary ? selectedSummary.originalFilename : undefined}
                 />
-                <CardBody>
+                <CardBody className="flex flex-col gap-4">
+                  {selectedSummary && (
+                    <div aria-label={`v${selected} ${versionNoteLabel(selected)}`} className="rounded-lg border border-line bg-subtle/40 px-4 py-3">
+                      <p className="text-xs font-medium text-ink-muted">
+                        v{selected} {versionNoteLabel(selected)}
+                      </p>
+                      {selectedSummary.versionNote ? (
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink">{selectedSummary.versionNote}</p>
+                      ) : (
+                        <p className="mt-1 text-sm text-ink-faint">{versionNoteEmptyText(selected)}</p>
+                      )}
+                    </div>
+                  )}
                   {previewVersion ? (
                     <DocumentVersionPreview
                       key={previewVersion.versionNumber}

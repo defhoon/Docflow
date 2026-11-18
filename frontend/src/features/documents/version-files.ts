@@ -8,6 +8,8 @@ export type DocumentVersionSummary = {
   uploadedBy: { id: number; displayName: string };
   uploadedAt: string;
   latest: boolean;
+  /** 버전 정보 (SPEC-09): v1은 초기 버전 내용, v2 이상은 직전 버전 대비 변경사항. 없으면 null. */
+  versionNote: string | null;
 };
 
 function versionsPath(projectId: string, documentId: string): string {

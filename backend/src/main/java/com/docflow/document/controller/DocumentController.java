@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +21,7 @@ import com.docflow.document.dto.CreateDocumentRequest;
 import com.docflow.document.dto.DocumentResponse;
 import com.docflow.document.dto.DocumentSummaryResponse;
 import com.docflow.document.dto.FinalizeDocumentRequest;
+import com.docflow.document.dto.UpdateDocumentDescriptionRequest;
 import com.docflow.document.service.DocumentFinalizeService;
 import com.docflow.document.service.DocumentService;
 
@@ -57,6 +59,14 @@ public class DocumentController {
 	public DocumentResponse getDocument(@AuthenticationPrincipal AuthenticatedUser principal,
 			@PathVariable Long projectId, @PathVariable Long documentId) {
 		return this.documentService.getDocument(projectId, documentId, principal.getId());
+	}
+
+	/** 문서 설명 변경 (SPEC-09 §6). ACTIVE 문서만, OWNER·MEMBER. 응답은 갱신된 문서 상세다. */
+	@PatchMapping(path = "/{documentId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	public DocumentResponse updateDescription(@AuthenticationPrincipal AuthenticatedUser principal,
+			@PathVariable Long projectId, @PathVariable Long documentId,
+			@Valid @RequestBody UpdateDocumentDescriptionRequest request) {
+		return this.documentService.updateDescription(projectId, documentId, principal.getId(), request.description());
 	}
 
 	/** 최종 버전 확정 (SPEC-07 §6). 오너 전용이며 FINALIZED는 영구 상태다. */

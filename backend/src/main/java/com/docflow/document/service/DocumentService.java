@@ -90,7 +90,7 @@ public class DocumentService {
 			Document document = this.documentRepository
 				.save(Document.create(project, request.title(), request.description(), user));
 			DocumentVersion version = this.documentVersionRepository
-				.save(DocumentVersion.first(document, storedFile, user));
+				.save(DocumentVersion.first(document, storedFile, request.versionNote(), user));
 			// 활동 이력은 같은 트랜잭션에서 기록한다 (SPEC-06 FR-2, AC-AUD-01).
 			this.auditLogService.record(projectId, sessionUserId, AuditAction.DOCUMENT_CREATED, AuditTargetType.DOCUMENT,
 					document.getId(), document.getId(), version.getVersionNumber());
@@ -99,6 +99,35 @@ public class DocumentService {
 		log.info("Document created: projectId={}, documentId={}, storageKey={}", projectId, response.id(),
 				storedFile.storageKey());
 		return response;
+	}
+
+	/**
+	 * 문서 설명을 바꾼다 (SPEC-09 §7). 문서 행을 {@code FOR UPDATE}로 잠가 새 버전 등록·피드백·최종 확정과 직렬화한다.
+	 * <ol>
+	 * <li>접근 확인(비구성원 404) → 변경 권한(OWNER·MEMBER)</li>
+	 * <li>문서 행 잠금 → ACTIVE 확인(FINALIZED면 409 {@code DOCUMENT_ALREADY_FINALIZED})</li>
+	 * <li>값이 같으면 저장·활동 이력 없이 현재 상태를 반환한다. 다르면 저장하고 {@code DOCUMENT_DESCRIPTION_UPDATED}를 같은
+	 * 트랜잭션에 기록한다.</li>
+	 * </ol>
+	 * 동시에 두 구성원이 고치면 잠금 순서대로 적용되어 나중 요청이 남는다(마지막 저장 우선, SPEC-09 결정 M4).
+	 */
+	@Transactional
+	public DocumentResponse updateDescription(Long projectId, Long documentId, Long sessionUserId, String description) {
+		Project project = this.projectService.getAccessibleProject(projectId, sessionUserId);
+		this.projectPermissionService.requireDocumentEditor(project, sessionUserId);
+		Document document = this.documentRepository.findByIdAndProjectIdForUpdate(documentId, projectId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND));
+		if (document.changeDescription(description)) {
+			this.auditLogService.record(projectId, sessionUserId, AuditAction.DOCUMENT_DESCRIPTION_UPDATED,
+					AuditTargetType.DOCUMENT, documentId, documentId, null);
+			// 응답의 updatedAt이 DB에 기록된 값과 같도록 트랜잭션 안에서 flush한다.
+			this.documentRepository.flush();
+			log.info("Document description updated: projectId={}, documentId={}", projectId, documentId);
+		}
+		DocumentVersion latest = this.documentVersionRepository
+			.findFirstByDocumentIdOrderByVersionNumberDesc(documentId)
+			.orElseThrow(() -> new IllegalStateException("Document has no version: documentId=" + documentId));
+		return DocumentResponse.from(document, latest);
 	}
 
 	@Transactional(readOnly = true)

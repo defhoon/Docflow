@@ -29,6 +29,7 @@ const versions: DocumentVersionSummary[] = [
     sizeBytes: 2048,
     uploadedBy: { id: 2, displayName: "Member" },
     uploadedAt: "2026-11-04T09:00:00Z",
+    versionNote: null,
     latest: true,
   },
   {
@@ -37,6 +38,7 @@ const versions: DocumentVersionSummary[] = [
     sizeBytes: 1_572_864,
     uploadedBy: { id: 1, displayName: "Owner" },
     uploadedAt: "2026-11-03T09:00:00Z",
+    versionNote: null,
     latest: false,
   },
 ];

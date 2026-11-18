@@ -17,6 +17,7 @@ const version = (versionNumber: number, latest: boolean) => ({
   sizeBytes: 10,
   uploadedBy: { id: 1, displayName: "Owner" },
   uploadedAt: "2026-11-10T09:00:00Z",
+  versionNote: null,
   latest,
 });
 

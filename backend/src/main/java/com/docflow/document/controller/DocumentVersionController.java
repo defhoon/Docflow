@@ -65,7 +65,7 @@ public class DocumentVersionController {
 			@PathVariable Long projectId, @PathVariable Long documentId,
 			@Valid @ModelAttribute CreateDocumentVersionRequest request) {
 		DocumentResponse updated = this.documentVersionService.create(projectId, documentId, principal.getId(),
-				request.file());
+				request.file(), request.versionNote());
 		return ResponseEntity.created(URI.create("/api/projects/" + projectId + "/documents/" + documentId))
 			.body(updated);
 	}

@@ -74,9 +74,11 @@ public class DocumentVersionService {
 	}
 
 	/**
-	 * 새 버전을 등록한다. 이 메서드에는 트랜잭션을 두지 않는다 (SPEC-04 §7.3).
+	 * 새 버전을 등록한다. 이 메서드에는 트랜잭션을 두지 않는다 (SPEC-04 §7.3). {@code versionNote}는 정규화가 끝난 변경사항이며
+	 * 없으면 {@code null} (SPEC-09).
 	 */
-	public DocumentResponse create(Long projectId, Long documentId, Long sessionUserId, MultipartFile file) {
+	public DocumentResponse create(Long projectId, Long documentId, Long sessionUserId, MultipartFile file,
+			String versionNote) {
 		Project project = this.projectService.getAccessibleProject(projectId, sessionUserId);
 		this.projectPermissionService.requireVersionUploader(project, sessionUserId);
 		// 사전 확인: 파일을 쓰기 전에 빠르게 실패한다. 최종 판정은 잠금 후 재검증이다.
@@ -93,7 +95,7 @@ public class DocumentVersionService {
 			requireAcceptsNewVersion(document);
 			int versionNumber = this.documentVersionRepository.findMaxVersionNumber(documentId) + 1;
 			User user = this.userAccountService.getReference(sessionUserId);
-			DocumentVersion version = insertVersion(projectId, document, versionNumber, storedFile, user);
+			DocumentVersion version = insertVersion(projectId, document, versionNumber, storedFile, versionNote, user);
 			document.markNewVersionAdded();
 			// 활동 이력은 같은 트랜잭션에서 기록한다 (SPEC-06 FR-2, AC-AUD-02).
 			this.auditLogService.record(projectId, sessionUserId, AuditAction.VERSION_CREATED,
@@ -108,9 +110,10 @@ public class DocumentVersionService {
 	}
 
 	private DocumentVersion insertVersion(Long projectId, Document document, int versionNumber,
-			StoredDocumentFile storedFile, User user) {
+			StoredDocumentFile storedFile, String versionNote, User user) {
 		try {
-			return this.documentVersionRepository.save(DocumentVersion.next(document, versionNumber, storedFile, user));
+			return this.documentVersionRepository
+				.save(DocumentVersion.next(document, versionNumber, storedFile, versionNote, user));
 		}
 		catch (DataIntegrityViolationException ex) {
 			// 문서 행 잠금으로 정상 경로에서는 발생하지 않는다. 잠금을 거치지 않은 쓰기 등 원인 분석을 위해 남긴다 (결정 V1).

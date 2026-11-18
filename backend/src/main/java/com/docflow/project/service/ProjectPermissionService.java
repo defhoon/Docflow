@@ -49,6 +49,14 @@ public class ProjectPermissionService {
 	}
 
 	/**
+	 * 문서 설명 변경 권한 (SPEC-09 §4). 문서·버전 등록 권한과 같게 OWNER·MEMBER 모두 허용하며, 문서 작성자가 아니어도
+	 * 된다. 접근 확인을 통과한 프로젝트에만 사용한다.
+	 */
+	public void requireDocumentEditor(Project accessibleProject, Long userId) {
+		requireVersionUploader(accessibleProject, userId);
+	}
+
+	/**
 	 * 최종 버전 확정 권한 (SPEC-07 §4). 프로젝트 Owner만 허용한다. 접근 확인을 통과한 프로젝트에만 사용한다.
 	 */
 	public void requireDocumentFinalizer(Project accessibleProject, Long userId) {

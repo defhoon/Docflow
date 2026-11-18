@@ -26,7 +26,7 @@ class DocumentVersionTest {
 
 	@Test
 	void nextMapsFileAndUploader() {
-		DocumentVersion version = DocumentVersion.next(this.document, 2, this.file, this.uploader);
+		DocumentVersion version = DocumentVersion.next(this.document, 2, this.file, null, this.uploader);
 
 		assertThat(version.getDocument()).isSameAs(this.document);
 		assertThat(version.getVersionNumber()).isEqualTo(2);
@@ -40,9 +40,9 @@ class DocumentVersionTest {
 
 	@Test
 	void nextRejectsFirstVersionNumberOrLower() {
-		assertThatThrownBy(() -> DocumentVersion.next(this.document, 1, this.file, this.uploader))
+		assertThatThrownBy(() -> DocumentVersion.next(this.document, 1, this.file, null, this.uploader))
 			.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> DocumentVersion.next(this.document, 0, this.file, this.uploader))
+		assertThatThrownBy(() -> DocumentVersion.next(this.document, 0, this.file, null, this.uploader))
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 

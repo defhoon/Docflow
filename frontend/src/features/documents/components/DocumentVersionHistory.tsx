@@ -9,6 +9,7 @@ import { formatDateTime } from "@/features/projects/format";
 import { fileFailureMessage } from "../errors";
 import { formatFileSize } from "../format";
 import { type DocumentVersionSummary, downloadVersionFile, fetchDocumentVersions, saveBlob } from "../version-files";
+import { versionNoteEmptyText, versionNoteLabel } from "../version-note";
 
 type Props = {
   projectId: string;
@@ -32,7 +33,10 @@ type ListState =
   | { kind: "error"; message: string }
   | { kind: "success"; versions: DocumentVersionSummary[] };
 
-/** 버전 히스토리 (SPEC-05 §9.1): 최신 먼저, 버전별 미리보기·원본 다운로드. */
+/**
+ * 버전 히스토리 (SPEC-05 §9.1): 최신 먼저, 버전별 미리보기·원본 다운로드, 버전 정보(SPEC-09: v1 초기 버전 내용, v2 이상
+ * 변경사항). 버전 정보는 텍스트로만 표시하며 줄바꿈을 유지한다.
+ */
 export function DocumentVersionHistory({
   projectId,
   documentId,
@@ -179,6 +183,14 @@ export function DocumentVersionHistory({
                   {downloading === version.versionNumber ? "다운로드 중..." : "다운로드"}
                 </button>
               </span>
+              <div className="basis-full pl-1.5 text-xs">
+                <span className="font-medium text-ink-muted">{versionNoteLabel(version.versionNumber)}</span>
+                {version.versionNote ? (
+                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-ink">{version.versionNote}</p>
+                ) : (
+                  <p className="mt-0.5 text-ink-faint">{versionNoteEmptyText(version.versionNumber)}</p>
+                )}
+              </div>
             </li>
           ))}
         </ul>

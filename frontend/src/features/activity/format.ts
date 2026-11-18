@@ -12,6 +12,8 @@ export function describeActivity(activity: Activity): string {
       return `${version}에 피드백을 남겼습니다`;
     case "DOCUMENT_FINALIZED":
       return `${version}을 최종 버전으로 확정했습니다`;
+    case "DOCUMENT_DESCRIPTION_UPDATED":
+      return "문서 설명을 수정했습니다";
   }
 }
 

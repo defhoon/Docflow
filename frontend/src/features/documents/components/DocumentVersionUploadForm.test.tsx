@@ -34,7 +34,7 @@ function updated(versionNumber: number): DocumentDetail {
     createdAt: "2026-10-27T09:00:00Z",
     updatedAt: "2026-11-04T09:00:00Z",
     finalization: null,
-    latestVersion: { versionNumber, originalFilename: "v.pdf", sizeBytes: 10, uploadedAt: "2026-11-04T09:00:00Z" },
+    latestVersion: { versionNumber, originalFilename: "v.pdf", sizeBytes: 10, uploadedAt: "2026-11-04T09:00:00Z", versionNote: null },
   };
 }
 
@@ -89,7 +89,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     fireEvent.click(submitButton());
 
     expect(await screen.findByText("새 버전을 등록했습니다. 최신 버전: v2")).toHaveAttribute("role", "status");
-    expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", file);
+    expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", file, null);
     expect(onUploaded).toHaveBeenCalledWith(updated(2));
     expect(fileInput().files).toHaveLength(0);
     expect(submitButton()).toBeEnabled();

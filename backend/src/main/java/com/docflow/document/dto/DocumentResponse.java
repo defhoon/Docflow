@@ -40,11 +40,13 @@ public record DocumentResponse(Long id, String title, String description, Docume
 
 	}
 
-	public record LatestVersion(int versionNumber, String originalFilename, long sizeBytes, Instant uploadedAt) {
+	/** 최신 버전 요약. {@code versionNote}는 SPEC-09 버전 정보이며 없으면 {@code null}. */
+	public record LatestVersion(int versionNumber, String originalFilename, long sizeBytes, Instant uploadedAt,
+			String versionNote) {
 
 		static LatestVersion from(DocumentVersion version) {
 			return new LatestVersion(version.getVersionNumber(), version.getOriginalFilename(), version.getSizeBytes(),
-					version.getCreatedAt());
+					version.getCreatedAt(), version.getVersionNote());
 		}
 
 	}

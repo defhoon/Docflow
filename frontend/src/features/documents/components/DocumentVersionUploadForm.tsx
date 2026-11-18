@@ -2,6 +2,7 @@
 
 import { type FormEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
 
+import { CharCount } from "@/components/ui/CharCount";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorCode, isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
@@ -9,7 +10,14 @@ import { ApiError } from "@/lib/api-client";
 import { createDocumentVersion } from "../api";
 import { VERSION_MESSAGES, versionUploadFailureMessage } from "../errors";
 import type { DocumentDetail, DocumentStatus } from "../types";
-import { canUploadNewVersion, FILE_ACCEPT, MESSAGES, validateFile } from "../validation";
+import {
+  canUploadNewVersion,
+  FILE_ACCEPT,
+  MESSAGES,
+  validateFile,
+  validateVersionNote,
+  VERSION_NOTE_MAX_LENGTH,
+} from "../validation";
 
 type Props = {
   projectId: string;
@@ -22,7 +30,8 @@ type Props = {
 };
 
 /**
- * 문서 상세의 새 버전 등록 영역 (SPEC-04 §9, 결정 OQ-6·OQ-7·OQ-8). 파일만 보낸다. 상태에 따른 비활성화는 사용성 보조이며
+ * 문서 상세의 새 버전 등록 영역 (SPEC-04 §9, 결정 OQ-6·OQ-7·OQ-8). 파일과 직전 버전 대비 변경사항(선택, SPEC-09)을
+ * 보낸다. 실패하면 파일과 변경사항을 그대로 유지하고, 성공하면 비운다. 상태에 따른 비활성화는 사용성 보조이며
  * Backend가 최종 판정한다. 네트워크 오류는 결과가 불명확하므로 자동으로 다시 보내지 않는다.
  */
 export function DocumentVersionUploadForm({ projectId, documentId, status, onUploaded, onConflict }: Props) {
@@ -31,6 +40,8 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   // 파일 입력은 코드로 값을 비울 수 없으므로 key를 바꿔 다시 마운트한다.
   const [fileInputKey, setFileInputKey] = useState(0);
   const [fileError, setFileError] = useState<string | undefined>(undefined);
+  const [versionNote, setVersionNote] = useState("");
+  const [noteError, setNoteError] = useState<string | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -47,6 +58,8 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
     setFile(null);
     setFileInputKey((current) => current + 1);
     setFileError(undefined);
+    setVersionNote("");
+    setNoteError(undefined);
     setFormError(null);
     setSuccess(null);
   }, []);
@@ -80,14 +93,16 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
     setSuccess(null);
     const error = validateFile(file);
     setFileError(error);
-    if (error || !file) {
+    const note = validateVersionNote(versionNote, "change");
+    setNoteError(note.error);
+    if (error || note.error || !file) {
       return;
     }
 
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const updated = await createDocumentVersion(projectId, documentId, file);
+      const updated = await createDocumentVersion(projectId, documentId, file, note.value);
       onUploaded(updated);
       settle(() => {
         resetForm();
@@ -122,8 +137,10 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
     }
     if (error instanceof ApiError && error.status === 400) {
       const message = error.fieldErrors.find((fieldError) => fieldError.field === "file")?.message;
-      if (message) {
+      const noteMessage = error.fieldErrors.find((fieldError) => fieldError.field === "versionNote")?.message;
+      if (message || noteMessage) {
         setFileError(message);
+        setNoteError(noteMessage);
         return;
       }
     }
@@ -164,6 +181,32 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
           {fileError && (
             <span id="document-version-file-error" className="text-danger-700">
               {fileError}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <label htmlFor="document-version-note">직전 버전 대비 변경사항 (선택)</label>
+            <CharCount id="document-version-note-count" length={versionNote.length} max={VERSION_NOTE_MAX_LENGTH} />
+          </div>
+          <textarea
+            id="document-version-note"
+            name="versionNote"
+            rows={3}
+            value={versionNote}
+            disabled={disabled}
+            placeholder="무엇이 달라졌는지 적어 주세요. 예: 3장 일정 수정, 표 2 추가"
+            onChange={(event) => {
+              setVersionNote(event.target.value);
+              setSuccess(null);
+            }}
+            aria-invalid={Boolean(noteError)}
+            aria-describedby={noteError ? "document-version-note-error document-version-note-count" : "document-version-note-count"}
+            className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-subtle"
+          />
+          {noteError && (
+            <span id="document-version-note-error" className="text-danger-700">
+              {noteError}
             </span>
           )}
         </div>

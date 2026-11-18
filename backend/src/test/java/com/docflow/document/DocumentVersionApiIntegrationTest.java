@@ -126,7 +126,8 @@ class DocumentVersionApiIntegrationTest {
 			.andExpect(jsonPath("$.latestVersion.originalFilename").value("요구사항-v2.docx"))
 			.andExpect(jsonPath("$.latestVersion.sizeBytes").value(v2Content.length))
 			.andExpect(jsonPath("$.latestVersion.uploadedAt").exists())
-			.andExpect(jsonPath("$.latestVersion.*", hasSize(4)))
+			.andExpect(jsonPath("$.latestVersion.versionNote").value(org.hamcrest.Matchers.nullValue()))
+			.andExpect(jsonPath("$.latestVersion.*", hasSize(5))) // SPEC-09: versionNote 추가
 			.andExpect(jsonPath("$.*", hasSize(9))) // SPEC-07: finalization 추가
 			.andReturn()
 			.getResponse()

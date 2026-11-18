@@ -168,7 +168,7 @@ class DocumentServiceTransactionTest {
 	}
 
 	private static CreateDocumentRequest request() {
-		return new CreateDocumentRequest("문서", null,
+		return new CreateDocumentRequest("문서", null, null,
 				new MockMultipartFile("file", "a.pdf", "application/pdf", DocumentTestFiles.pdf()));
 	}
 

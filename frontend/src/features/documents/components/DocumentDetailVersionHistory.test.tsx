@@ -41,7 +41,7 @@ function detail(versionNumber: number): DocumentDetailData {
     createdAt: "2026-10-27T09:00:00Z",
     updatedAt: "2026-10-27T09:00:00Z",
     finalization: null,
-    latestVersion: { versionNumber, originalFilename: `v${versionNumber}.pdf`, sizeBytes: 10, uploadedAt: "2026-10-27T09:00:00Z" },
+    latestVersion: { versionNumber, originalFilename: `v${versionNumber}.pdf`, sizeBytes: 10, uploadedAt: "2026-10-27T09:00:00Z", versionNote: null },
   };
 }
 
@@ -52,6 +52,7 @@ function summary(versionNumber: number, latest: boolean): DocumentVersionSummary
     sizeBytes: 10,
     uploadedBy: { id: 1, displayName: "Author" },
     uploadedAt: "2026-10-27T09:00:00Z",
+    versionNote: null,
     latest,
   };
 }
