@@ -32,6 +32,9 @@ public class DocumentVersion {
 
 	public static final int FIRST_VERSION = 1;
 
+	/** 버전 정보(v1 초기 버전 내용, v2 이상 변경사항) 최대 길이 (SPEC-09 FR-6). */
+	public static final int MAX_NOTE_LENGTH = 1000;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -59,6 +62,10 @@ public class DocumentVersion {
 	@Column(name = "sha256", nullable = false, length = 64, updatable = false)
 	private String sha256;
 
+	/** 업로더가 작성한 버전 정보. 선택 입력이며 등록 후 바꾸지 않는다 (SPEC-09 FR-6·FR-8). */
+	@Column(name = "version_note", length = MAX_NOTE_LENGTH, updatable = false)
+	private String versionNote;
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "uploaded_by", nullable = false, updatable = false)
 	private User uploadedBy;
@@ -70,7 +77,8 @@ public class DocumentVersion {
 	protected DocumentVersion() {
 	}
 
-	private DocumentVersion(Document document, int versionNumber, StoredDocumentFile file, User uploadedBy) {
+	private DocumentVersion(Document document, int versionNumber, StoredDocumentFile file, String versionNote,
+			User uploadedBy) {
 		this.document = document;
 		this.versionNumber = versionNumber;
 		this.originalFilename = file.originalFilename();
@@ -78,21 +86,23 @@ public class DocumentVersion {
 		this.sizeBytes = file.sizeBytes();
 		this.storageKey = file.storageKey();
 		this.sha256 = file.sha256();
+		this.versionNote = versionNote;
 		this.uploadedBy = uploadedBy;
 	}
 
-	/** 최초 등록 시 생성하는 버전 1. */
-	public static DocumentVersion first(Document document, StoredDocumentFile file, User uploadedBy) {
-		return new DocumentVersion(document, FIRST_VERSION, file, uploadedBy);
+	/** 최초 등록 시 생성하는 버전 1. {@code versionNote}는 정규화가 끝난 값이며 없으면 {@code null}. */
+	public static DocumentVersion first(Document document, StoredDocumentFile file, String versionNote,
+			User uploadedBy) {
+		return new DocumentVersion(document, FIRST_VERSION, file, versionNote, uploadedBy);
 	}
 
 	/** 기존 문서에 추가하는 새 버전 (SPEC-04 §5.4). 번호는 호출 측이 문서 행 잠금 후 계산한다. */
 	public static DocumentVersion next(Document document, int versionNumber, StoredDocumentFile file,
-			User uploadedBy) {
+			String versionNote, User uploadedBy) {
 		if (versionNumber <= FIRST_VERSION) {
 			throw new IllegalArgumentException("New version number must be greater than " + FIRST_VERSION);
 		}
-		return new DocumentVersion(document, versionNumber, file, uploadedBy);
+		return new DocumentVersion(document, versionNumber, file, versionNote, uploadedBy);
 	}
 
 	public Long getId() {
@@ -125,6 +135,10 @@ public class DocumentVersion {
 
 	public String getSha256() {
 		return this.sha256;
+	}
+
+	public String getVersionNote() {
+		return this.versionNote;
 	}
 
 	public User getUploadedBy() {

@@ -118,7 +118,8 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.latestVersion.originalFilename").value(filename))
 			.andExpect(jsonPath("$.latestVersion.sizeBytes").value(content.length))
 			.andExpect(jsonPath("$.latestVersion.uploadedAt").exists())
-			.andExpect(jsonPath("$.latestVersion.*", hasSize(4)))
+			.andExpect(jsonPath("$.latestVersion.versionNote").value(org.hamcrest.Matchers.nullValue()))
+			.andExpect(jsonPath("$.latestVersion.*", hasSize(5))) // SPEC-09: versionNote 추가
 			.andExpect(jsonPath("$.*", hasSize(9))) // SPEC-07: finalization(ACTIVE는 null) 추가
 			.andExpect(jsonPath("$.finalization").value(org.hamcrest.Matchers.nullValue()))
 			.andReturn()
@@ -266,7 +267,7 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$[3].id").value(first))
 			.andExpect(jsonPath("$[3].latestVersionNumber").value(1))
 			.andExpect(jsonPath("$[4].id").value(third))
-			.andExpect(jsonPath("$[0].*", hasSize(7))) // SPEC-07: finalVersionNumber 추가
+			.andExpect(jsonPath("$[0].*", hasSize(8))) // SPEC-07: finalVersionNumber, SPEC-09: description 추가
 			.andExpect(jsonPath("$[0].createdBy.*", hasSize(2)));
 		// 접근 확인 1 + 목록 1
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
@@ -289,8 +290,8 @@ class DocumentApiIntegrationTest {
 		expectFieldError(Map.of(), pdfFile(), "title", "문서 제목을 입력해 주세요.");
 		expectFieldError(Map.of("title", "가".repeat(201)), pdfFile(), "title", "문서 제목은 200자 이하로 입력해 주세요.");
 		expectFieldError(Map.of("title", "a‮b"), pdfFile(), "title", "문서 제목에 사용할 수 없는 문자가 포함되어 있습니다.");
-		expectFieldError(Map.of("title", "t", "description", "가".repeat(1001)), pdfFile(), "description",
-				"설명은 1000자 이하로 입력해 주세요.");
+		expectFieldError(Map.of("title", "t", "description", "가".repeat(2001)), pdfFile(), "description",
+				"설명은 2000자 이하로 입력해 주세요."); // SPEC-09: 1,000자 → 2,000자
 		expectFieldError(Map.of("title", "t", "description", "a\u0007b"), pdfFile(), "description",
 				"설명에 사용할 수 없는 문자가 포함되어 있습니다.");
 

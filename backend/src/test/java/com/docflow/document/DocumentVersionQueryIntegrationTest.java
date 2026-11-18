@@ -121,7 +121,8 @@ class DocumentVersionQueryIntegrationTest {
 			.andExpect(jsonPath("$[1].uploadedBy.displayName").value("Member"))
 			.andExpect(jsonPath("$[1].uploadedBy.*", hasSize(2)))
 			.andExpect(jsonPath("$[1].uploadedAt").exists())
-			.andExpect(jsonPath("$[1].*", hasSize(6)))
+			.andExpect(jsonPath("$[1].versionNote").value(org.hamcrest.Matchers.nullValue()))
+			.andExpect(jsonPath("$[1].*", hasSize(7))) // SPEC-09: versionNote 추가
 			.andExpect(jsonPath("$[2].versionNumber").value(1))
 			.andReturn()
 			.getResponse()

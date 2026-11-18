@@ -168,12 +168,15 @@ class AccessControlRegressionIntegrationTest {
 		assertThat(snapshot()).isEqualTo(before);
 	}
 
-	// 상태 변경·수정·삭제 API는 존재하지 않는다(FINALIZED → ACTIVE 경로 없음)
+	// 상태 변경·삭제 API는 존재하지 않는다(FINALIZED → ACTIVE 경로 없음). SPEC-09의 PATCH는 설명만 바꾸며,
+	// description 키가 없는 본문(상태만 보낸 요청)은 400으로 거부되어 아무것도 바뀌지 않는다.
 	@Test
 	void noUpdateOrDeleteEndpointsExist() throws Exception {
 		String doc = documentUrl(this.projectId, this.documentId);
+		int statusOnlyPatch = this.mockMvc.perform(patch(doc).with(as(this.owner)).with(csrf())
+			.contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\"}")).andReturn().getResponse().getStatus();
+		assertThat(statusOnlyPatch).isEqualTo(400);
 		List<RequestBuilder> attempts = List.of(put(doc).with(as(this.owner)).with(csrf()),
-				patch(doc).with(as(this.owner)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\"}"),
 				delete(doc).with(as(this.owner)).with(csrf()), delete(doc + "/versions/1").with(as(this.owner)).with(csrf()),
 				delete(doc + "/versions/1/feedbacks/1").with(as(this.owner)).with(csrf()),
 				post(doc + "/reopen").with(as(this.owner)).with(csrf()), post(doc + "/status").with(as(this.owner)).with(csrf()));
@@ -182,6 +185,28 @@ class AccessControlRegressionIntegrationTest {
 			assertThat(status).isIn(404, 405);
 		}
 		assertUnchanged();
+	}
+
+	// SPEC-09: 설명 PATCH에 상태·확정 필드를 섞어도 상태는 바뀌지 않고, FINALIZED 문서는 409로 거부된다
+	@Test
+	void descriptionPatchCannotChangeStatus() throws Exception {
+		String doc = documentUrl(this.projectId, this.documentId);
+		String body = "{\"description\":\"설명\",\"status\":\"FINALIZED\",\"finalVersionId\":1,\"createdBy\":999}";
+		this.mockMvc.perform(patch(doc).with(as(this.member)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("ACTIVE"));
+		assertThat(this.jdbcTemplate.queryForMap("SELECT status, final_version_id, created_by FROM documents"))
+			.containsEntry("status", "ACTIVE")
+			.containsEntry("final_version_id", null)
+			.containsEntry("created_by", this.member.getId());
+
+		DocumentTestSupport.finalizeDirectly(this.jdbcTemplate, this.documentId);
+		this.mockMvc.perform(patch(doc).with(as(this.owner)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+			.content("{\"description\":null,\"status\":\"ACTIVE\"}"))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("DOCUMENT_ALREADY_FINALIZED"));
+		assertThat(this.jdbcTemplate.queryForObject("SELECT status FROM documents", String.class)).isEqualTo("FINALIZED");
+		assertThat(this.jdbcTemplate.queryForObject("SELECT description FROM documents", String.class)).isEqualTo("설명");
 	}
 
 	// 파일은 저장 키가 아니라 (프로젝트, 문서, 버전 번호)로만 접근하며, 저장소 경로는 HTTP로 노출되지 않는다

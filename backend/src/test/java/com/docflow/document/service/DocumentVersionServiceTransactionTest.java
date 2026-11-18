@@ -103,7 +103,7 @@ class DocumentVersionServiceTransactionTest {
 
 	@Test
 	void commitAssignsMaxPlusOneKeepsFileAndRemovesTemp() throws IOException {
-		var response = this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file());
+		var response = this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null);
 
 		assertThat(response.id()).isEqualTo(DOCUMENT_ID);
 		assertThat(response.latestVersion().versionNumber()).isEqualTo(2);
@@ -119,7 +119,7 @@ class DocumentVersionServiceTransactionTest {
 		given(this.documentRepository.findByIdAndProjectId(DOCUMENT_ID, PROJECT_ID))
 			.willReturn(Optional.of(document(DocumentStatus.FINALIZED)));
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOfSatisfying(BusinessException.class,
 					(ex) -> assertThat(ex.errorCode()).isEqualTo(ErrorCode.DOCUMENT_STATUS_CONFLICT));
 
@@ -133,7 +133,7 @@ class DocumentVersionServiceTransactionTest {
 		given(this.documentRepository.findByIdAndProjectIdForUpdate(DOCUMENT_ID, PROJECT_ID))
 			.willReturn(Optional.of(document(DocumentStatus.FINALIZED)));
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOfSatisfying(BusinessException.class,
 					(ex) -> assertThat(ex.errorCode()).isEqualTo(ErrorCode.DOCUMENT_STATUS_CONFLICT));
 
@@ -148,7 +148,7 @@ class DocumentVersionServiceTransactionTest {
 		given(this.documentRepository.findByIdAndProjectIdForUpdate(DOCUMENT_ID, PROJECT_ID))
 			.willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOfSatisfying(BusinessException.class,
 					(ex) -> assertThat(ex.errorCode()).isEqualTo(ErrorCode.DOCUMENT_NOT_FOUND));
 
@@ -161,7 +161,7 @@ class DocumentVersionServiceTransactionTest {
 		given(this.versionRepository.save(any(DocumentVersion.class)))
 			.willThrow(new DataIntegrityViolationException("uk_document_versions_storage_key"));
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOf(DataIntegrityViolationException.class);
 
 		assertThat(this.transactionManager.rolledBack).isTrue();
@@ -176,7 +176,7 @@ class DocumentVersionServiceTransactionTest {
 						DocumentVersionService.VERSION_NUMBER_CONSTRAINT));
 		given(this.versionRepository.save(any(DocumentVersion.class))).willThrow(violation);
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file())).isSameAs(violation);
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null)).isSameAs(violation);
 
 		assertThat(output.getOut()).contains("Unexpected version number conflict: projectId=10, documentId=100, "
 				+ "versionNumber=2, constraint=uk_document_versions_document_version, storageKey=documents/fixed")
@@ -190,7 +190,7 @@ class DocumentVersionServiceTransactionTest {
 			.willThrow(new DataIntegrityViolationException("other", new ConstraintViolationException("dup",
 					new SQLException("23505"), "uk_document_versions_storage_key")));
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOf(DataIntegrityViolationException.class);
 
 		assertThat(output.getOut()).doesNotContain("Unexpected version number conflict");
@@ -201,7 +201,7 @@ class DocumentVersionServiceTransactionTest {
 	void commitOutcomeUnknownKeepsFile() throws IOException {
 		this.transactionManager.commitFailure = new TransactionSystemException("connection lost during commit");
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOf(TransactionSystemException.class);
 
 		assertThat(storedFiles()).containsExactly("fixed");
@@ -214,7 +214,7 @@ class DocumentVersionServiceTransactionTest {
 			.willThrow(new DataIntegrityViolationException("violation"));
 		this.transactionManager.rollbackFailure = new TransactionSystemException("rollback failed");
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOf(RuntimeException.class);
 
 		assertThat(storedFiles()).containsExactly("fixed");
@@ -225,7 +225,7 @@ class DocumentVersionServiceTransactionTest {
 	void transactionBeginFailureDeletesFile() {
 		this.transactionManager.beginFailure = new CannotCreateTransactionException("no connection");
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file()))
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null))
 			.isInstanceOf(CannotCreateTransactionException.class);
 
 		assertThat(this.root.resolve("documents/fixed")).doesNotExist();
@@ -238,7 +238,7 @@ class DocumentVersionServiceTransactionTest {
 		given(this.versionRepository.save(any(DocumentVersion.class))).willThrow(original);
 		willThrow(new IOException("disk gone")).given(this.fileStorage).delete(anyString());
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file())).isSameAs(original);
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null)).isSameAs(original);
 
 		assertThat(storedFiles()).containsExactly("fixed");
 	}
@@ -249,7 +249,7 @@ class DocumentVersionServiceTransactionTest {
 		this.transactionManager.beginFailure = original;
 		willThrow(new IOException("disk gone")).given(this.fileStorage).delete(anyString());
 
-		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file())).isSameAs(original);
+		assertThatThrownBy(() -> this.service.create(PROJECT_ID, DOCUMENT_ID, USER_ID, file(), null)).isSameAs(original);
 
 		assertThat(original.getSuppressed()).hasSize(1);
 	}

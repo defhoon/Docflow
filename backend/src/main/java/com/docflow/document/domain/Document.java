@@ -1,6 +1,7 @@
 package com.docflow.document.domain;
 
 import java.time.Instant;
+import java.util.Objects;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -28,6 +29,9 @@ import com.docflow.user.domain.User;
 @Table(name = "documents")
 public class Document extends BaseTimeEntity {
 
+	/** 문서 설명 최대 길이 (SPEC-09 FR-1). */
+	public static final int MAX_DESCRIPTION_LENGTH = 2000;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -39,7 +43,7 @@ public class Document extends BaseTimeEntity {
 	@Column(name = "title", nullable = false, length = 200)
 	private String title;
 
-	@Column(name = "description", length = 1000)
+	@Column(name = "description", length = MAX_DESCRIPTION_LENGTH)
 	private String description;
 
 	@Enumerated(EnumType.STRING)
@@ -102,6 +106,23 @@ public class Document extends BaseTimeEntity {
 		this.finalizedBy = user;
 		this.finalizedAt = now;
 		markModified();
+	}
+
+	/**
+	 * 문서 설명을 바꾼다 (SPEC-09 FR-4). 호출자는 문서 행을 잠근 트랜잭션 안에서 호출하고, 값은 정규화·검증이 끝난 상태여야
+	 * 한다({@code null}은 설명 없음). FINALIZED 문서는 {@link ErrorCode#DOCUMENT_ALREADY_FINALIZED}로 거부한다.
+	 * @return 값이 실제로 바뀌었으면 {@code true}
+	 */
+	public boolean changeDescription(String newDescription) {
+		if (!this.status.isCollaborationOpen()) {
+			throw new BusinessException(ErrorCode.DOCUMENT_ALREADY_FINALIZED);
+		}
+		if (Objects.equals(this.description, newDescription)) {
+			return false;
+		}
+		this.description = newDescription;
+		markModified();
+		return true;
 	}
 
 	public Long getId() {
