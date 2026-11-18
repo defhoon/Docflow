@@ -8,6 +8,8 @@ import { ApiError } from "@/lib/api-client";
 import { addMember } from "../api";
 import { errorCode, failureMessage, isUnauthenticated } from "../errors";
 import { validateMemberEmail } from "../validation";
+import { buttonClass } from "@/components/ui/Button";
+import { controlClass } from "@/components/ui/Field";
 
 type AddMemberFormProps = {
   projectId: string;
@@ -95,12 +97,12 @@ export function AddMemberForm({ projectId, onAdded, onProjectChanged }: AddMembe
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={Boolean(fieldError)}
           aria-describedby={fieldError ? "member-email-error" : undefined}
-          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          className={controlClass(false, "min-w-0 flex-1 py-2")}
         />
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className={buttonClass("primary", "md")}
         >
           {submitting ? "추가 중..." : "추가"}
         </button>

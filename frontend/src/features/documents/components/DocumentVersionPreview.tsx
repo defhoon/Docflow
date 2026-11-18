@@ -7,6 +7,7 @@ import { isUnauthenticated } from "@/features/projects/errors";
 
 import { FILE_MESSAGES, fileFailureMessage } from "../errors";
 import { type DocumentVersionSummary, downloadVersionFile, fetchVersionPreview, saveBlob } from "../version-files";
+import { buttonClass } from "@/components/ui/Button";
 
 /** 변환 대기 최대 시간 (SPEC-05 §8.3). */
 export const PREVIEW_MAX_WAIT_MS = 90_000;
@@ -112,7 +113,7 @@ export function DocumentVersionPreview({ projectId, documentId, version, onClose
         <h3 id="document-preview-heading" className="text-sm font-semibold text-ink-muted">
           미리보기 · v{versionNumber}
         </h3>
-        <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50">
+        <button type="button" onClick={onClose} className={buttonClass("secondary", "sm")}>
           미리보기 닫기
         </button>
       </div>
@@ -145,14 +146,14 @@ export function DocumentVersionPreview({ projectId, documentId, version, onClose
               type="button"
               onClick={() => void download()}
               disabled={downloading}
-              className="inline-flex h-8 items-center justify-center rounded-md bg-brand-600 px-3 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              className={buttonClass("primary", "sm")}
             >
               {downloading ? "다운로드 중..." : "원본 다운로드"}
             </button>
             <button
               type="button"
               onClick={() => setAttempt((current) => current + 1)}
-              className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
+              className={buttonClass("secondary", "sm")}
             >
               미리보기 다시 시도
             </button>

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { PlusIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ErrorState, LoadingBlock } from "@/components/ui/States";
 import { Badge } from "@/components/ui/StatusBadge";
@@ -99,6 +101,11 @@ export function ProjectDetail() {
             breadcrumb={[{ label: "프로젝트", href: "/projects" }, { label: project.name }]}
             title={project.name}
             description={project.description ? <span className="whitespace-pre-wrap break-words">{project.description}</span> : "설명이 없습니다."}
+            actions={
+              <ButtonLink href={`/projects/${projectId}/documents/new`} variant="primary">
+                <PlusIcon /> 새 문서 등록
+              </ButtonLink>
+            }
             meta={
               <>
                 <Badge tone={project.myRole === "OWNER" ? "brand" : "neutral"}>{project.myRole === "OWNER" ? "내가 오너" : "구성원"}</Badge>

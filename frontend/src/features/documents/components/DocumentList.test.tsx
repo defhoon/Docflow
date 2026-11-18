@@ -37,6 +37,29 @@ const documents = [
   },
 ];
 
+describe("DocumentList — 데스크톱 표·설명 (#50, SPEC-09)", () => {
+  beforeEach(() => {
+    refresh.mockReset();
+    fetchDocumentsMock.mockReset();
+  });
+
+  it("표에 열 머리글과 행을 두고, 문서명 아래에 설명을 한 줄로 표시한다", async () => {
+    fetchDocumentsMock.mockResolvedValue([
+      { ...documents[0], description: "1장 개요\n2장 범위" },
+      { ...documents[1], description: null },
+    ]);
+    render(<DocumentList projectId="7" />);
+
+    const table = await screen.findByRole("table", { name: "문서 목록" });
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["문서", "상태", "버전", "등록"]);
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByRole("link")).toHaveAttribute("href", "/projects/7/documents/2");
+    expect(within(rows[0]).getByTitle(/1장 개요/)).toHaveTextContent("1장 개요");
+    expect(rows[1]).toHaveTextContent("최종 v1");
+  });
+});
+
 describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
   beforeEach(() => {
     refresh.mockReset();

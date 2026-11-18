@@ -2,7 +2,10 @@
 
 import { type FormEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/Button";
 import { CharCount } from "@/components/ui/CharCount";
+import { Field, Textarea } from "@/components/ui/Field";
+import { FileDropzone } from "@/components/ui/FileDropzone";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorCode, isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
@@ -154,64 +157,57 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   }
 
   return (
-    <section aria-labelledby="document-version-heading" className="flex flex-col gap-3">
-      <h3 id="document-version-heading" className="text-sm font-semibold text-ink">
-        새 버전 등록
-      </h3>
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3" aria-busy={submitting}>
+    <section aria-labelledby="document-version-heading" className="flex flex-col gap-4">
+      <div>
+        <h3 id="document-version-heading" className="text-sm font-semibold text-ink">
+          새 버전 등록
+        </h3>
+        <p className="mt-0.5 text-xs text-ink-muted">새 파일은 다음 버전 번호로 추가되며 이전 버전과 피드백은 그대로 남습니다.</p>
+      </div>
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" aria-busy={submitting}>
         {!allowed && (
           <p id="document-version-guide" className="text-sm text-ink-muted">
             {VERSION_MESSAGES.statusGuide}
           </p>
         )}
-        <div className="flex flex-col gap-1 text-sm">
-          <label htmlFor="document-version-file">새 버전 파일 (PDF, DOCX, XLSX, PPTX · 20MB 이하)</label>
-          <input
-            key={fileInputKey}
-            id="document-version-file"
-            type="file"
-            name="file"
-            accept={FILE_ACCEPT}
-            disabled={disabled}
-            onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-            aria-invalid={Boolean(fileError)}
-            aria-describedby={fileError ? "document-version-file-error" : allowed ? undefined : "document-version-guide"}
-            className="text-sm file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-ink hover:file:bg-subtle"
-          />
-          {fileError && (
-            <span id="document-version-file-error" className="text-danger-700">
-              {fileError}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col gap-1 text-sm">
-          <div className="flex items-baseline justify-between gap-3">
-            <label htmlFor="document-version-note">직전 버전 대비 변경사항 (선택)</label>
-            <CharCount id="document-version-note-count" length={versionNote.length} max={VERSION_NOTE_MAX_LENGTH} />
-          </div>
-          <textarea
+        <FileDropzone
+          key={fileInputKey}
+          id="document-version-file"
+          label="새 버전 파일"
+          hint="PDF, DOCX, XLSX, PPTX · 20MB 이하"
+          accept={FILE_ACCEPT}
+          file={file}
+          disabled={disabled}
+          error={fileError}
+          errorId="document-version-file-error"
+          describedBy={allowed ? undefined : "document-version-guide"}
+          onFile={handleFileChange}
+        />
+        <Field
+          label="직전 버전 대비 변경사항"
+          optional
+          htmlFor="document-version-note"
+          error={noteError}
+          errorId="document-version-note-error"
+          aside={<CharCount id="document-version-note-count" length={versionNote.length} max={VERSION_NOTE_MAX_LENGTH} />}
+        >
+          <Textarea
             id="document-version-note"
             name="versionNote"
             rows={3}
             value={versionNote}
             disabled={disabled}
-            placeholder="무엇이 달라졌는지 적어 주세요. 예: 3장 일정 수정, 표 2 추가"
+            placeholder="예: 3장 일정 수정, 표 2 추가"
             onChange={(event) => {
               setVersionNote(event.target.value);
               setSuccess(null);
             }}
-            aria-invalid={Boolean(noteError)}
+            invalid={Boolean(noteError)}
             aria-describedby={noteError ? "document-version-note-error document-version-note-count" : "document-version-note-count"}
-            className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-subtle"
           />
-          {noteError && (
-            <span id="document-version-note-error" className="text-danger-700">
-              {noteError}
-            </span>
-          )}
-        </div>
+        </Field>
         {formError && (
-          <p role="alert" className="text-sm font-medium text-danger-700">
+          <p role="alert" className="rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
             {formError}
           </p>
         )}
@@ -221,17 +217,13 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
           </p>
         )}
         {success && (
-          <p role="status" className="text-sm text-success-700">
+          <p role="status" className="text-sm font-medium text-success-700">
             {success}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={disabled}
-          className="self-start inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={disabled} className="self-start">
           {submitting ? "등록 중..." : "새 버전 등록"}
-        </button>
+        </Button>
       </form>
     </section>
   );

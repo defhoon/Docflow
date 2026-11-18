@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
 
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { CharCount } from "@/components/ui/CharCount";
+import { Field, Input, Textarea } from "@/components/ui/Field";
+import { FileDropzone } from "@/components/ui/FileDropzone";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
@@ -156,100 +159,89 @@ export function DocumentCreateForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" aria-busy={submitting}>
-      <div className="flex flex-col gap-1 text-sm">
-        <label htmlFor="document-title">문서 제목</label>
-        <input
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6" aria-busy={submitting}>
+      <Field
+        label="문서 제목"
+        htmlFor="document-title"
+        error={fieldErrors.title}
+        errorId="document-title-error"
+      >
+        <Input
           id="document-title"
           type="text"
           name="title"
           value={title}
           disabled={submitting}
           onChange={(event) => setTitle(event.target.value)}
-          aria-invalid={Boolean(fieldErrors.title)}
+          invalid={Boolean(fieldErrors.title)}
           aria-describedby={fieldErrors.title ? "document-title-error" : undefined}
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          placeholder="예: 2026 상반기 서비스 기획서"
         />
-        {fieldErrors.title && (
-          <span id="document-title-error" className="text-danger-700">
-            {fieldErrors.title}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col gap-1 text-sm">
-        <div className="flex items-baseline justify-between gap-3">
-          <label htmlFor="document-description">문서 설명 (선택)</label>
-          <CharCount id="document-description-count" length={description.length} max={DESCRIPTION_MAX_LENGTH} />
-        </div>
-        <textarea
+      </Field>
+      <FileDropzone
+        key={fileInputKey}
+        id="document-file"
+        label="파일"
+        hint="PDF, DOCX, XLSX, PPTX · 20MB 이하"
+        accept={FILE_ACCEPT}
+        file={file}
+        disabled={submitting}
+        error={fieldErrors.file}
+        errorId="document-file-error"
+        onFile={handleFileChange}
+      />
+      <Field
+        label="문서 설명"
+        optional
+        htmlFor="document-description"
+        error={fieldErrors.description}
+        errorId="document-description-error"
+        hint="문서의 목적과 주요 내용을 적어 두면 구성원이 파일을 열기 전에 확인할 수 있습니다."
+        hintId="document-description-hint"
+        aside={<CharCount id="document-description-count" length={description.length} max={DESCRIPTION_MAX_LENGTH} />}
+      >
+        <Textarea
           id="document-description"
           name="description"
           rows={4}
           value={description}
           disabled={submitting}
-          placeholder="문서의 목적과 주요 내용을 적어 주세요. 구성원이 파일을 열기 전에 확인할 수 있습니다."
           onChange={(event) => setDescription(event.target.value)}
-          aria-invalid={Boolean(fieldErrors.description)}
+          invalid={Boolean(fieldErrors.description)}
           aria-describedby={
-            fieldErrors.description ? "document-description-error document-description-count" : "document-description-count"
+            fieldErrors.description
+              ? "document-description-error document-description-count"
+              : "document-description-hint document-description-count"
           }
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
-        {fieldErrors.description && (
-          <span id="document-description-error" className="text-danger-700">
-            {fieldErrors.description}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col gap-1 text-sm">
-        <div className="flex items-baseline justify-between gap-3">
-          <label htmlFor="document-version-note">초기 버전 내용 (선택)</label>
-          <CharCount id="document-version-note-count" length={versionNote.length} max={VERSION_NOTE_MAX_LENGTH} />
-        </div>
-        <textarea
+      </Field>
+      <Field
+        label="초기 버전 내용"
+        optional
+        htmlFor="document-version-note"
+        error={fieldErrors.versionNote}
+        errorId="document-version-note-error"
+        hint="v1에 담긴 주요 내용을 적어 주세요. 버전 히스토리에 '초기 버전 내용'으로 표시됩니다."
+        hintId="document-version-note-hint"
+        aside={<CharCount id="document-version-note-count" length={versionNote.length} max={VERSION_NOTE_MAX_LENGTH} />}
+      >
+        <Textarea
           id="document-version-note"
           name="versionNote"
           rows={3}
           value={versionNote}
           disabled={submitting}
-          placeholder="v1에 담긴 주요 내용을 적어 주세요."
           onChange={(event) => setVersionNote(event.target.value)}
-          aria-invalid={Boolean(fieldErrors.versionNote)}
+          invalid={Boolean(fieldErrors.versionNote)}
           aria-describedby={
             fieldErrors.versionNote
               ? "document-version-note-error document-version-note-count"
-              : "document-version-note-count"
+              : "document-version-note-hint document-version-note-count"
           }
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
-        {fieldErrors.versionNote && (
-          <span id="document-version-note-error" className="text-danger-700">
-            {fieldErrors.versionNote}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col gap-1 text-sm">
-        <label htmlFor="document-file">파일 (PDF, DOCX, XLSX, PPTX · 20MB 이하)</label>
-        <input
-          key={fileInputKey}
-          id="document-file"
-          type="file"
-          name="file"
-          accept={FILE_ACCEPT}
-          disabled={submitting}
-          onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-          aria-invalid={Boolean(fieldErrors.file)}
-          aria-describedby={fieldErrors.file ? "document-file-error" : undefined}
-          className="text-sm"
-        />
-        {fieldErrors.file && (
-          <span id="document-file-error" className="text-danger-700">
-            {fieldErrors.file}
-          </span>
-        )}
-      </div>
+      </Field>
       {formError && (
-        <p role="alert" className="text-sm font-medium text-danger-700">
+        <p role="alert" className="rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
           {formError}
         </p>
       )}
@@ -258,13 +250,12 @@ export function DocumentCreateForm() {
           파일을 업로드하는 중입니다. 화면을 닫지 마세요.
         </p>
       )}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-      >
-        {submitting ? "등록 중..." : "문서 등록"}
-      </button>
+      <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
+        <ButtonLink href={`/projects/${projectId}`}>취소</ButtonLink>
+        <Button type="submit" variant="primary" disabled={submitting}>
+          {submitting ? "등록 중..." : "문서 등록"}
+        </Button>
+      </div>
     </form>
   );
 }

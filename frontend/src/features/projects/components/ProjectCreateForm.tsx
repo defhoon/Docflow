@@ -9,6 +9,8 @@ import { ApiError } from "@/lib/api-client";
 import { createProject } from "../api";
 import { failureMessage, isUnauthenticated } from "../errors";
 import { type ProjectFieldErrors, validateProjectInput } from "../validation";
+import { buttonClass } from "@/components/ui/Button";
+import { controlClass } from "@/components/ui/Field";
 
 export function ProjectCreateForm() {
   const router = useRouter();
@@ -105,7 +107,7 @@ export function ProjectCreateForm() {
           onChange={(event) => setName(event.target.value)}
           aria-invalid={Boolean(fieldErrors.name)}
           aria-describedby={fieldErrors.name ? "project-name-error" : undefined}
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          className={controlClass(false, "py-2")}
         />
         {fieldErrors.name && (
           <span id="project-name-error" className="text-danger-700">
@@ -123,7 +125,7 @@ export function ProjectCreateForm() {
           onChange={(event) => setDescription(event.target.value)}
           aria-invalid={Boolean(fieldErrors.description)}
           aria-describedby={fieldErrors.description ? "project-description-error" : undefined}
-          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          className={controlClass(false, "py-2")}
         />
         {fieldErrors.description && (
           <span id="project-description-error" className="text-danger-700">
@@ -139,7 +141,7 @@ export function ProjectCreateForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        className={buttonClass("primary", "md")}
       >
         {submitting ? "생성 중..." : "프로젝트 생성"}
       </button>

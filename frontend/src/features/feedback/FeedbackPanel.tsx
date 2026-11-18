@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Field";
@@ -38,6 +38,7 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
   const state: ListState = result?.key === key ? result.value : { kind: "loading" };
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
   const length = feedbackLength(content);
   const tooLong = length > FEEDBACK_MAX_LENGTH;
@@ -63,7 +64,8 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) {
+    // 상태 반영 전 연속 제출(빠른 두 번 클릭·Enter)도 막는다.
+    if (submittingRef.current) {
       return;
     }
     if (length === 0) {
@@ -74,6 +76,7 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
       setFormError(`피드백은 ${FEEDBACK_MAX_LENGTH.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`);
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setFormError(null);
     try {
@@ -98,6 +101,7 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
         setFormError(failureMessage(error));
       }
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }

@@ -8,6 +8,7 @@ import { fetchMembers, removeMember } from "../api";
 import { errorCode, failureMessage, isUnauthenticated } from "../errors";
 import type { Member, ProjectRole } from "../types";
 import { AddMemberForm } from "./AddMemberForm";
+import { buttonClass } from "@/components/ui/Button";
 
 const ROLE_LABELS: Record<ProjectRole, string> = { OWNER: "오너", MEMBER: "구성원" };
 
@@ -124,7 +125,7 @@ export function ProjectMembers({ projectId, myRole, onProjectChanged }: ProjectM
         <div role="alert" className="flex flex-col items-start gap-2 text-sm text-danger-700">
           <p>구성원을 불러오지 못했습니다.</p>
           <p>{state.message}</p>
-          <button type="button" onClick={reload} className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50">
+          <button type="button" onClick={reload} className={buttonClass("secondary", "sm")}>
             다시 시도
           </button>
         </div>
@@ -143,7 +144,7 @@ export function ProjectMembers({ projectId, myRole, onProjectChanged }: ProjectM
                   onClick={() => void handleRemove(member)}
                   disabled={removingUserId !== null}
                   aria-label={`${member.displayName} 제거`}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
+                  className={buttonClass("secondary", "sm")}
                 >
                   제거
                 </button>

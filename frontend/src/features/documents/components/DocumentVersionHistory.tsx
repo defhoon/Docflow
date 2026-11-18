@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/Button";
+import { cn } from "@/components/ui/cn";
+import { DownloadIcon } from "@/components/ui/icons";
+import { Badge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { formatDateTime } from "@/features/projects/format";
@@ -26,6 +30,8 @@ type Props = {
   finalVersionNumber?: number | null;
   /** 제목을 숨긴다(카드 머리글이 대신할 때). */
   hideHeading?: boolean;
+  /** 좁은 측면 패널용: 선택하지 않은 버전의 버전 정보를 두 줄로 줄인다. */
+  compact?: boolean;
 };
 
 type ListState =
@@ -47,6 +53,7 @@ export function DocumentVersionHistory({
   onLoaded,
   finalVersionNumber = null,
   hideHeading = false,
+  compact = false,
 }: Props) {
   const { refresh } = useAuth();
   const [attempt, setAttempt] = useState(0);
@@ -117,82 +124,88 @@ export function DocumentVersionHistory({
         // 사용자 동작의 결과가 아닌 배경 조회 실패이므로 정중한 알림(status)으로 알린다. 다운로드 실패는 alert.
         <div role="status" className="flex flex-col items-start gap-2 text-sm text-danger-700">
           <p>버전 목록을 불러오지 못했습니다. {state.message}</p>
-          <button
-            type="button"
-            onClick={() => setAttempt((current) => current + 1)}
-            className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
-          >
+          <Button size="sm" onClick={() => setAttempt((current) => current + 1)}>
             목록 다시 불러오기
-          </button>
+          </Button>
         </div>
       )}
       {state.kind === "success" && (
-        <ul className="flex flex-col divide-y divide-line text-sm">
-          {state.versions.map((version) => (
-            <li
-              key={version.versionNumber}
-              aria-current={selectedVersion === version.versionNumber ? "true" : undefined}
-              className={
-                "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-2.5 " +
-                (selectedVersion === version.versionNumber ? "bg-brand-50/70" : "")
-              }
-            >
-              <span className="flex items-center gap-1.5 font-medium">
+        <ul className={cn("flex flex-col text-sm", compact ? "gap-1.5" : "gap-2")}>
+          {state.versions.map((version) => {
+            const isSelected = selectedVersion === version.versionNumber;
+            const isFinal = finalVersionNumber === version.versionNumber;
+            const heading = (
+              <>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-semibold text-ink">v{version.versionNumber}</span>
+                  {version.latest && <Badge>최신</Badge>}
+                  {isFinal && <Badge tone="success">최종</Badge>}
+                </span>
+                <span className="w-full truncate text-ink" title={version.originalFilename}>
+                  {version.originalFilename}
+                </span>
+                <span className="text-xs text-ink-muted">
+                  {version.uploadedBy.displayName} · <time dateTime={version.uploadedAt}>{formatDateTime(version.uploadedAt)}</time> ·{" "}
+                  <span title={`${version.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(version.sizeBytes)}</span>
+                </span>
+              </>
+            );
+            return (
+              <li
+                key={version.versionNumber}
+                aria-current={isSelected ? "true" : undefined}
+                className={cn(
+                  "flex flex-col gap-2 rounded-[var(--radius-control)] border px-3 py-2.5 transition-colors",
+                  isSelected ? "border-brand-600/40 bg-brand-50/60" : "border-transparent hover:bg-subtle/70",
+                )}
+              >
                 {onSelect ? (
                   <button
                     type="button"
                     onClick={() => onSelect(version)}
-                    aria-pressed={selectedVersion === version.versionNumber}
+                    aria-pressed={isSelected}
                     aria-label={`v${version.versionNumber} 선택`}
-                    className="rounded-md px-1.5 py-0.5 text-brand-700 hover:bg-brand-50"
+                    className="flex min-w-0 flex-col items-start gap-0.5 rounded-md text-left"
                   >
-                    v{version.versionNumber}
+                    {heading}
                   </button>
                 ) : (
-                  <>v{version.versionNumber}</>
+                  <div className="flex min-w-0 flex-col items-start gap-0.5">{heading}</div>
                 )}
-                {version.latest && <span className="rounded bg-subtle px-1.5 text-xs text-ink-muted">최신</span>}
-                {finalVersionNumber === version.versionNumber && (
-                  <span className="rounded bg-success-50 px-1.5 text-xs font-medium text-success-700">최종</span>
-                )}
-              </span>
-              <span className="min-w-[10rem] flex-1 break-all">{version.originalFilename}</span>
-              <span className="text-ink-muted">
-                {version.uploadedBy.displayName} ·{" "}
-                <time dateTime={version.uploadedAt}>{formatDateTime(version.uploadedAt)}</time> ·{" "}
-                <span title={`${version.sizeBytes.toLocaleString("ko-KR")} 바이트`}>
-                  {formatFileSize(version.sizeBytes)}
+                <div className="text-xs">
+                  <span className="font-medium text-ink-muted">{versionNoteLabel(version.versionNumber)}</span>
+                  {version.versionNote ? (
+                    <p
+                      className={cn("mt-0.5 whitespace-pre-wrap break-words text-sm text-ink", compact && !isSelected && "line-clamp-2")}
+                      title={compact ? version.versionNote : undefined}
+                    >
+                      {version.versionNote}
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-ink-muted">{versionNoteEmptyText(version.versionNumber)}</p>
+                  )}
+                </div>
+                <span className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => onPreview(version)}
+                    aria-label={`v${version.versionNumber} 미리보기`}
+                  >
+                    미리보기
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => void download(version)}
+                    disabled={downloading === version.versionNumber}
+                    aria-label={`v${version.versionNumber} 다운로드`}
+                  >
+                    <DownloadIcon className="size-3.5" />
+                    {downloading === version.versionNumber ? "다운로드 중..." : "다운로드"}
+                  </Button>
                 </span>
-              </span>
-              <span className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onPreview(version)}
-                  aria-label={`v${version.versionNumber} 미리보기`}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
-                >
-                  미리보기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void download(version)}
-                  disabled={downloading === version.versionNumber}
-                  aria-label={`v${version.versionNumber} 다운로드`}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
-                >
-                  {downloading === version.versionNumber ? "다운로드 중..." : "다운로드"}
-                </button>
-              </span>
-              <div className="basis-full pl-1.5 text-xs">
-                <span className="font-medium text-ink-muted">{versionNoteLabel(version.versionNumber)}</span>
-                {version.versionNote ? (
-                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-ink">{version.versionNote}</p>
-                ) : (
-                  <p className="mt-0.5 text-ink-faint">{versionNoteEmptyText(version.versionNumber)}</p>
-                )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
       {downloadError && (
