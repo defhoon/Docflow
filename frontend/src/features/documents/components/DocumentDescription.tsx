@@ -3,6 +3,7 @@
 import { type FormEvent, useRef, useState } from "react";
 
 import { CharCount } from "@/components/ui/CharCount";
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorCode, failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
@@ -10,6 +11,8 @@ import { ApiError } from "@/lib/api-client";
 import { updateDocumentDescription } from "../api";
 import type { DocumentDetail } from "../types";
 import { DESCRIPTION_MAX_LENGTH, validateDescription } from "../validation";
+import { buttonClass } from "@/components/ui/Button";
+import { controlClass } from "@/components/ui/Field";
 
 type Props = {
   projectId: string;
@@ -36,7 +39,7 @@ export function DocumentDescription({ projectId, documentId, description, editab
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const showEditor = editing && editable;
@@ -44,7 +47,6 @@ export function DocumentDescription({ projectId, documentId, description, editab
   function startEditing() {
     setDraft(description ?? "");
     setError(null);
-    setNotice(null);
     setEditing(true);
   }
 
@@ -65,7 +67,8 @@ export function DocumentDescription({ projectId, documentId, description, editab
       const updated = await updateDocumentDescription(projectId, documentId, value);
       onUpdated(updated);
       setEditing(false);
-      setNotice(DESCRIPTION_MESSAGES.saved);
+      // 성공은 바뀐 설명(화면 상태)과 토스트로 알린다 (#50).
+      toast(DESCRIPTION_MESSAGES.saved);
     } catch (failure) {
       if (isUnauthenticated(failure)) {
         void refresh();
@@ -101,7 +104,7 @@ export function DocumentDescription({ projectId, documentId, description, editab
           onChange={(event) => setDraft(event.target.value)}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? "document-description-edit-error document-description-edit-count" : "document-description-edit-count"}
-          className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-subtle"
+          className={controlClass(false, "w-full py-2")}
         />
         {error && (
           <p id="document-description-edit-error" role="alert" className="text-sm text-danger-700">
@@ -112,7 +115,7 @@ export function DocumentDescription({ projectId, documentId, description, editab
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex h-8 items-center justify-center rounded-md bg-brand-600 px-3 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            className={buttonClass("primary", "sm")}
           >
             {saving ? "저장 중..." : "저장"}
           </button>
@@ -123,7 +126,7 @@ export function DocumentDescription({ projectId, documentId, description, editab
               setEditing(false);
               setError(null);
             }}
-            className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle disabled:opacity-50"
+            className={buttonClass("secondary", "sm")}
           >
             취소
           </button>
@@ -146,16 +149,11 @@ export function DocumentDescription({ projectId, documentId, description, editab
           {error}
         </p>
       )}
-      {notice && (
-        <p role="status" className="text-sm text-success-700">
-          {notice}
-        </p>
-      )}
       {editable && (
         <button
           type="button"
           onClick={startEditing}
-          className="self-start inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle"
+          className={buttonClass("secondary", "sm", "self-start")}
         >
           {description ? "설명 수정" : "설명 추가"}
         </button>

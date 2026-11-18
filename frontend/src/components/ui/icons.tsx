@@ -23,3 +23,5 @@ export const UploadIcon = (p: IconProps) => <Svg {...p}><path d="M12 16V4m0 0-4.
 export const DownloadIcon = (p: IconProps) => <Svg {...p}><path d="M12 4v12m0 0 4.5-4.5M12 16l-4.5-4.5" /><path d="M4 16v3.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V16" /></Svg>;
 export const ActivityIcon = (p: IconProps) => <Svg {...p}><path d="M3 12h4l3-8 4 16 3-8h4" /></Svg>;
 export const UsersIcon = (p: IconProps) => <Svg {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></Svg>;
+export const EyeIcon = (p: IconProps) => <Svg {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></Svg>;
+export const EyeOffIcon = (p: IconProps) => <Svg {...p}><path d="M3 3l18 18" /><path d="M10.6 5.6A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.6 6.6C4 8.3 2.5 12 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4.2-1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></Svg>;

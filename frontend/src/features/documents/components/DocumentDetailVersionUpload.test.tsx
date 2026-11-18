@@ -1,13 +1,20 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ToastProvider } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api-client";
 
 import type { DocumentDetail as DocumentDetailData } from "../types";
 import { DocumentDetail } from "./DocumentDetail";
+
+
+/** 성공 알림은 토스트로 표시되므로(#50) 화면을 ToastProvider 안에서 렌더링한다. */
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(ui, { wrapper: ToastProvider });
+}
 
 const refresh = vi.fn();
 const fetchDocumentMock = vi.fn();
@@ -74,14 +81,14 @@ describe("DocumentDetail — 새 버전 등록 영역 (SPEC-04 §9.1, AC-VER-16)
     fetchDocumentMock.mockResolvedValue(detail());
     createDocumentVersionMock.mockResolvedValue(detail({ updatedAt: "2026-11-04T09:00:00Z" }, 2));
     render(<DocumentDetail />);
-    expect(await screen.findByText("v1")).toBeInTheDocument();
+    expect(await screen.findByText("최신 버전 파일 · v1")).toBeInTheDocument();
 
     choosePdf();
     fireEvent.click(screen.getByRole("button", { name: "새 버전 등록" }));
 
-    expect(await screen.findByText("v2")).toBeInTheDocument();
-    expect(screen.getByText("v2.pdf")).toBeInTheDocument();
-    expect(screen.getByText("새 버전을 등록했습니다. 최신 버전: v2")).toBeInTheDocument();
+    expect(await screen.findByText("최신 버전 파일 · v2")).toBeInTheDocument();
+    expect(screen.getByTitle("v2.pdf")).toBeInTheDocument();
+    expect(screen.getByText("새 버전을 등록했습니다. 최신 버전: v2")).toBeInTheDocument(); // 토스트 (#50)
     expect(screen.queryByText("불러오는 중...")).not.toBeInTheDocument();
     expect(fetchDocumentMock).toHaveBeenCalledTimes(1);
   });

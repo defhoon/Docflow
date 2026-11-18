@@ -102,7 +102,9 @@ export function HomeDashboard() {
                         <FolderIcon />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="truncate text-sm font-medium text-ink">{project.name}</span>
+                        <span className="truncate text-sm font-medium text-ink" title={project.name}>
+                          {project.name}
+                        </span>
                         <Badge tone={project.myRole === "OWNER" ? "brand" : "neutral"}>
                           {project.myRole === "OWNER" ? "오너" : "구성원"}
                         </Badge>

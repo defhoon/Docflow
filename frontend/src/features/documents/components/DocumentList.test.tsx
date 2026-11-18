@@ -37,6 +37,29 @@ const documents = [
   },
 ];
 
+describe("DocumentList — 데스크톱 표·설명 (#50, SPEC-09)", () => {
+  beforeEach(() => {
+    refresh.mockReset();
+    fetchDocumentsMock.mockReset();
+  });
+
+  it("표에 열 머리글과 행을 두고, 문서명 아래에 설명을 한 줄로 표시한다", async () => {
+    fetchDocumentsMock.mockResolvedValue([
+      { ...documents[0], description: "1장 개요\n2장 범위" },
+      { ...documents[1], description: null },
+    ]);
+    render(<DocumentList projectId="7" />);
+
+    const table = await screen.findByRole("table", { name: "문서 목록" });
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["문서", "상태", "버전", "등록"]);
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByRole("link")).toHaveAttribute("href", "/projects/7/documents/2");
+    expect(within(rows[0]).getByTitle(/1장 개요/)).toHaveTextContent("1장 개요");
+    expect(rows[1]).toHaveTextContent("최종 v1");
+  });
+});
+
 describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
   beforeEach(() => {
     refresh.mockReset();
@@ -57,18 +80,20 @@ describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
     expect(items[0]).toHaveTextContent("최신 v2");
     expect(items[0]).toHaveTextContent("Member");
     expect(items[1]).toHaveTextContent("최종 확정");
-    expect(screen.getByRole("link", { name: "문서 등록" })).toHaveAttribute("href", "/projects/7/documents/new");
+    // 문서 등록 버튼은 프로젝트 머리글 하나로 통일했다(#50). 목록 카드에는 없다.
+    expect(screen.queryByRole("link", { name: /문서 등록/ })).not.toBeInTheDocument();
     // 최종 확정 문서는 최종 버전 번호를 함께 표시한다 (SPEC-07)
     expect(items[1]).toHaveTextContent("최종 v1");
   });
 
-  it("문서가 없으면 빈 상태와 등록 링크를 표시한다", async () => {
+  it("문서가 없으면 빈 상태에서 머리글의 등록 버튼을 안내한다", async () => {
     fetchDocumentsMock.mockResolvedValue([]);
     render(<DocumentList projectId="7" />);
 
     expect(await screen.findByText("아직 등록된 문서가 없습니다.")).toBeInTheDocument();
-    // 카드 머리글과 빈 상태 안내에 모두 등록 링크가 있다 (#28).
-    expect(screen.getAllByRole("link", { name: "문서 등록" })).toHaveLength(2);
+    expect(screen.getByText(/새 문서 등록/)).toBeInTheDocument();
+    // 중복 CTA 없음(#50): 등록 링크는 프로젝트 머리글에만 있다.
+    expect(screen.queryByRole("link", { name: /문서 등록/ })).not.toBeInTheDocument();
   });
 
   it("실패하면 오류와 다시 시도를 표시하고 다시 요청한다", async () => {

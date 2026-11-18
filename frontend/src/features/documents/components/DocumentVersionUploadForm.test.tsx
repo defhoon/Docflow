@@ -1,11 +1,18 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import { Activity } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ToastProvider } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api-client";
 
 import type { DocumentDetail, DocumentStatus } from "../types";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
+
+
+/** 성공 알림은 토스트로 표시되므로(#50) 화면을 ToastProvider 안에서 렌더링한다. */
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(ui, { wrapper: ToastProvider });
+}
 
 const refresh = vi.fn();
 const createDocumentVersionMock = vi.fn();
@@ -88,7 +95,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     choose(file);
     fireEvent.click(submitButton());
 
-    expect(await screen.findByText("새 버전을 등록했습니다. 최신 버전: v2")).toHaveAttribute("role", "status");
+    expect(await screen.findByText("새 버전을 등록했습니다. 최신 버전: v2")).toBeInTheDocument(); // 토스트 (#50)
     expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", file, null);
     expect(onUploaded).toHaveBeenCalledWith(updated(2));
     expect(fileInput().files).toHaveLength(0);
@@ -269,7 +276,8 @@ describe("DocumentVersionUploadForm — 화면 재진입 (Activity, §9.2)", () 
     onUploaded.mockReset();
   });
 
-  it("성공 후 숨겼다가 다시 표시하면 입력·성공 문구가 초기화된다", async () => {
+  // 성공 문구는 화면 안이 아니라 토스트로 표시한다(#50). 다시 표시하면 입력이 초기화된다.
+  it("성공 후 숨겼다가 다시 표시하면 입력이 초기화된다", async () => {
     createDocumentVersionMock.mockResolvedValue(updated(2));
     const view = render(<Toggle visible />);
     choose(pdf());
@@ -279,7 +287,6 @@ describe("DocumentVersionUploadForm — 화면 재진입 (Activity, §9.2)", () 
     view.rerender(<Toggle visible={false} />);
     view.rerender(<Toggle visible />);
 
-    expect(screen.queryByText(/새 버전을 등록했습니다/)).not.toBeInTheDocument();
     expect(fileInput().files).toHaveLength(0);
     expect(submitButton()).toBeEnabled();
   });

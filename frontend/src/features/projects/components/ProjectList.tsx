@@ -118,7 +118,9 @@ function ProjectGrid({ projects }: { projects: ProjectSummary[] }) {
                     <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
                       <FolderIcon />
                     </span>
-                    <span className="font-medium break-all text-ink">{project.name}</span>
+                    <span className="line-clamp-2 font-medium break-words text-ink" title={project.name}>
+                      {project.name}
+                    </span>
                   </span>
                   <Badge tone={project.myRole === "OWNER" ? "brand" : "neutral"}>
                     {project.myRole === "OWNER" ? "오너" : "구성원"}

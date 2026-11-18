@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink, buttonClass } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { CheckCircleIcon, LockIcon } from "@/components/ui/icons";
+import { CheckCircleIcon, FileIcon, LockIcon, UploadIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ErrorState, LoadingBlock } from "@/components/ui/States";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Badge, StatusBadge } from "@/components/ui/StatusBadge";
 import { fetchDocumentActivities } from "@/features/activity/api";
 import { ActivityFeed } from "@/features/activity/components/ActivityFeed";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -97,8 +97,9 @@ export function DocumentDetail() {
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
   // 버전 히스토리 갱신 신호와 미리보기 중인 버전 (SPEC-05 §9.2).
   const [versionsReloadKey, setVersionsReloadKey] = useState(0);
-  const [previewVersion, setPreviewVersion] = useState<DocumentVersionSummary | null>(null);
-  const closePreview = useCallback(() => setPreviewVersion(null), []);
+  // 미리보기는 선택한 버전을 보여 준다. 열지 않으면 파일을 내려받지 않는다(불필요한 전송량 방지).
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const closePreview = useCallback(() => setPreviewOpen(false), []);
   // 피드백 대상 버전(기본: 최신)과 선택 가능한 버전 목록 (#28).
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const [versions, setVersions] = useState<DocumentVersionSummary[]>([]);
@@ -196,6 +197,7 @@ export function DocumentDetail() {
       const selected = selectedNumber ?? finalization?.versionNumber ?? latest.versionNumber;
       const selectedSummary = versions.find((version) => version.versionNumber === selected) ?? null;
       const isOwner = projectInfo?.myRole === "OWNER";
+      const isFinalVersion = finalization?.versionNumber === selected;
       return (
         <>
           <PageHeader
@@ -223,6 +225,13 @@ export function DocumentDetail() {
                 )}
               </>
             }
+            actions={
+              !finalized ? (
+                <a href="#new-version" className={buttonClass("primary", "md")}>
+                  <UploadIcon /> 새 버전 올리기
+                </a>
+              ) : undefined
+            }
           />
           {finalized && finalization && (
             <div role="status" className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-success-600/25 bg-success-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -244,7 +253,7 @@ export function DocumentDetail() {
           )}
           <Card aria-labelledby="document-description-heading">
             <CardHeader title="문서 설명" titleId="document-description-heading" />
-            <CardBody>
+            <CardBody className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_16rem]">
               <DocumentDescription
                 projectId={projectId}
                 documentId={documentId}
@@ -253,77 +262,111 @@ export function DocumentDetail() {
                 onUpdated={handleDescriptionUpdated}
                 onFinalizedConflict={reloadInBackground}
               />
+              {/* 최신 버전 파일 정보. 아래 '선택한 버전'과 구분되도록 이름에 '최신'을 명시한다. */}
+              <section aria-labelledby="document-info-heading" className="border-t border-line pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-5">
+                <h3 id="document-info-heading" className="text-xs font-medium text-ink-muted">
+                  최신 버전 파일 · v{latest.versionNumber}
+                </h3>
+                <dl className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+                  <dt className="text-ink-muted">파일</dt>
+                  <dd className="truncate" title={latest.originalFilename}>
+                    {latest.originalFilename}
+                  </dd>
+                  <dt className="text-ink-muted">크기</dt>
+                  <dd title={`${latest.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(latest.sizeBytes)}</dd>
+                  <dt className="text-ink-muted">업로드</dt>
+                  <dd>
+                    <time dateTime={latest.uploadedAt}>{formatDateTime(latest.uploadedAt)}</time>
+                  </dd>
+                </dl>
+              </section>
             </CardBody>
           </Card>
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-            <div className="flex min-w-0 flex-col gap-6 lg:col-span-7">
-              <Card aria-labelledby="preview-heading">
-                <CardHeader
-                  title={`미리보기 · v${selected}`}
-                  titleId="preview-heading"
-                  description={selectedSummary ? selectedSummary.originalFilename : undefined}
-                />
-                <CardBody className="flex flex-col gap-4">
-                  {selectedSummary && (
-                    <div aria-label={`v${selected} ${versionNoteLabel(selected)}`} className="rounded-lg border border-line bg-subtle/40 px-4 py-3">
-                      <p className="text-xs font-medium text-ink-muted">
-                        v{selected} {versionNoteLabel(selected)}
-                      </p>
-                      {selectedSummary.versionNote ? (
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink">{selectedSummary.versionNote}</p>
-                      ) : (
-                        <p className="mt-1 text-sm text-ink-faint">{versionNoteEmptyText(selected)}</p>
-                      )}
-                    </div>
-                  )}
-                  {previewVersion ? (
-                    <DocumentVersionPreview
-                      key={previewVersion.versionNumber}
-                      projectId={projectId}
-                      documentId={documentId}
-                      version={previewVersion}
-                      onClose={closePreview}
-                    />
+          {/* 작업 공간: 데스크톱은 [선택한 버전(변경사항·미리보기) | 버전 목록·피드백] 2열, 모바일은 같은 순서로 세로 배치한다. */}
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
+            <Card aria-labelledby="preview-heading" className="min-w-0 lg:col-start-1 lg:row-start-1">
+              <CardHeader
+                title={
+                  <span className="flex flex-wrap items-center gap-2">
+                    선택한 버전 · v{selected}
+                    {selectedSummary?.latest && <Badge>최신</Badge>}
+                    {isFinalVersion && <Badge tone="success">최종본</Badge>}
+                  </span>
+                }
+                titleId="preview-heading"
+                description={
+                  selectedSummary ? (
+                    <span className="flex min-w-0 flex-wrap gap-x-1.5">
+                      <span className="max-w-full truncate" title={selectedSummary.originalFilename}>
+                        {selectedSummary.originalFilename}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {selectedSummary.uploadedBy.displayName} ·{" "}
+                        <time dateTime={selectedSummary.uploadedAt}>{formatDateTime(selectedSummary.uploadedAt)}</time>
+                      </span>
+                    </span>
+                  ) : undefined
+                }
+              />
+              <CardBody className="flex flex-col gap-4">
+                <section aria-labelledby="selected-version-heading">
+                  <h3 id="selected-version-heading" className="text-xs font-medium text-ink-muted">
+                    {versionNoteLabel(selected)}
+                  </h3>
+                  {selectedSummary?.versionNote ? (
+                    <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
+                      {selectedSummary.versionNote}
+                    </p>
                   ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line-strong bg-subtle/50 px-6 py-12 text-center">
-                      <p className="text-sm text-ink-muted">
-                        버전 목록에서 &lsquo;미리보기&rsquo;를 누르면 여기에 표시됩니다. Office 문서는 환경에 따라 미리보기가 제공되지 않을 수
-                        있으며 원본을 내려받아 확인할 수 있습니다.
-                      </p>
-                      {selectedSummary && (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewVersion(selectedSummary)}
-                          className="inline-flex h-8 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink hover:bg-subtle"
-                        >
-                          v{selected} 미리보기 열기
-                        </button>
-                      )}
-                    </div>
+                    <p className="mt-1 text-sm text-ink-muted">{selectedSummary ? versionNoteEmptyText(selected) : "버전 정보를 불러오는 중..."}</p>
                   )}
-                </CardBody>
-              </Card>
+                </section>
+                {previewOpen && selectedSummary ? (
+                  <DocumentVersionPreview
+                    key={selectedSummary.versionNumber}
+                    projectId={projectId}
+                    documentId={documentId}
+                    version={selectedSummary}
+                    onClose={closePreview}
+                  />
+                ) : (
+                  // 열기 전에는 파일을 받지 않는다(전송량 절약). 빈 영역을 크게 두지 않고 한 줄 안내와 버튼만 둔다.
+                  <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-dashed border-line-strong bg-subtle/50 px-4 py-4 sm:flex-row sm:items-center">
+                    <FileIcon className="hidden size-6 shrink-0 text-ink-decor sm:block" />
+                    <p className="flex-1 text-sm text-ink-muted">
+                      미리보기를 열면 이 화면에서 문서를 확인할 수 있습니다. 연 상태에서 다른 버전을 고르면 그 버전으로 바뀝니다.
+                    </p>
+                    {selectedSummary && (
+                      <Button size="sm" variant="primary" onClick={() => setPreviewOpen(true)} className="self-start sm:self-auto">
+                        v{selected} 미리보기 열기
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+            <aside aria-label="버전과 피드백" className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
               <Card aria-labelledby="versions-card-heading">
-                <CardHeader title="버전" titleId="versions-card-heading" description="버전 번호를 누르면 그 버전의 피드백을 보고 남길 수 있습니다." />
-                <CardBody className="py-2">
+                <CardHeader title="버전" titleId="versions-card-heading" description="버전을 고르면 변경사항·미리보기·피드백이 그 버전으로 바뀝니다." />
+                <CardBody className="px-3 py-2">
                   <DocumentVersionHistory
                     projectId={projectId}
                     documentId={documentId}
                     reloadKey={versionsReloadKey}
                     selectedVersion={selected}
                     hideHeading
+                    compact
                     finalVersionNumber={finalization?.versionNumber ?? null}
                     onLoaded={setVersions}
                     onSelect={(version) => setSelectedNumber(version.versionNumber)}
                     onPreview={(version) => {
                       setSelectedNumber(version.versionNumber);
-                      setPreviewVersion(version);
+                      setPreviewOpen(true);
                     }}
                   />
                 </CardBody>
               </Card>
-            </div>
-            <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
               <Card aria-labelledby="feedback-heading">
                 <CardHeader
                   title={`피드백 · v${selected}`}
@@ -341,16 +384,20 @@ export function DocumentDetail() {
                   />
                 </CardBody>
               </Card>
+            </aside>
+            <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-2">
               {!finalized && (
                 <Card>
                   <CardBody>
-                    <DocumentVersionUploadForm
-                      projectId={projectId}
-                      documentId={documentId}
-                      status={document.status}
-                      onUploaded={handleVersionUploaded}
-                      onConflict={reloadInBackground}
-                    />
+                    <div id="new-version" className="scroll-mt-24">
+                      <DocumentVersionUploadForm
+                        projectId={projectId}
+                        documentId={documentId}
+                        status={document.status}
+                        onUploaded={handleVersionUploaded}
+                        onConflict={reloadInBackground}
+                      />
+                    </div>
                   </CardBody>
                 </Card>
               )}
@@ -373,23 +420,6 @@ export function DocumentDetail() {
                   <LockIcon /> 새 버전 업로드와 피드백 작성이 종료되었습니다.
                 </p>
               )}
-              <Card aria-labelledby="document-info-heading">
-                <CardHeader title="최신 버전 정보" titleId="document-info-heading" />
-                <CardBody>
-                  <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
-                    <dt className="text-ink-muted">최신 버전</dt>
-                    <dd>v{latest.versionNumber}</dd>
-                    <dt className="text-ink-muted">파일</dt>
-                    <dd className="break-all">{latest.originalFilename}</dd>
-                    <dt className="text-ink-muted">크기</dt>
-                    <dd title={`${latest.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(latest.sizeBytes)}</dd>
-                    <dt className="text-ink-muted">업로드</dt>
-                    <dd>
-                      <time dateTime={latest.uploadedAt}>{formatDateTime(latest.uploadedAt)}</time>
-                    </dd>
-                  </dl>
-                </CardBody>
-              </Card>
               <Card aria-labelledby="document-activity-heading">
                 <CardHeader title="활동 이력" titleId="document-activity-heading" />
                 <CardBody className="py-1">
