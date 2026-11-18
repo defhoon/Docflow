@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { FileIcon } from "@/components/ui/icons";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { failureMessage, isUnauthenticated } from "@/features/projects/errors";
@@ -68,30 +69,30 @@ export function ActivityFeed({ load, loadKey, showProject = false, showDocument 
             {activity.actor.displayName.slice(0, 1)}
           </span>
           <div className="min-w-0 flex-1 text-sm">
+            {/* 행동을 먼저, 대상 문서는 한 줄로 줄여 따로 보여 준다(긴 제목 반복으로 읽기 어려워지지 않게, #50). */}
             <p className="break-words text-ink">
-              <span className="font-medium">{activity.actor.displayName}</span>님이{" "}
-              {showDocument && activity.document && (
-                <>
-                  <Link
-                    href={`/projects/${activity.project.id}/documents/${activity.document.id}`}
-                    className="font-medium text-brand-700 hover:underline"
-                  >
-                    {activity.document.title}
-                  </Link>{" "}
-                </>
-              )}
-              {describeActivity(activity)}
+              <span className="font-medium">{activity.actor.displayName}</span>님이 {describeActivity(activity)}
             </p>
-            <p className="mt-0.5 text-xs text-ink-faint">
+            {showDocument && activity.document && (
+              <Link
+                href={`/projects/${activity.project.id}/documents/${activity.document.id}`}
+                title={activity.document.title}
+                className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
+              >
+                <FileIcon className="size-3.5 shrink-0" />
+                <span className="truncate">{activity.document.title}</span>
+              </Link>
+            )}
+            <p className="mt-0.5 flex min-w-0 text-xs text-ink-faint">
               {showProject && (
                 <>
-                  <Link href={`/projects/${activity.project.id}`} className="hover:text-ink">
+                  <Link href={`/projects/${activity.project.id}`} title={activity.project.name} className="truncate hover:text-ink">
                     {activity.project.name}
-                  </Link>{" "}
-                  ·{" "}
+                  </Link>
+                  <span aria-hidden="true" className="shrink-0 px-1">·</span>
                 </>
               )}
-              <time dateTime={activity.createdAt} title={formatDateTime(activity.createdAt)}>
+              <time dateTime={activity.createdAt} title={formatDateTime(activity.createdAt)} className="shrink-0">
                 {relativeTime(activity.createdAt)}
               </time>
             </p>

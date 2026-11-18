@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { cn } from "@/components/ui/cn";
-import { FileIcon, PlusIcon } from "@/components/ui/icons";
+import { FileIcon } from "@/components/ui/icons";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -20,7 +19,10 @@ type ListResult = { kind: "error"; message: string } | { kind: "success"; docume
 
 type ListState = { kind: "loading" } | ListResult;
 
-/** 프로젝트 상세의 문서 섹션 (SPEC-03 §8.1, §8.2). 접근 확인은 상위 프로젝트 상세 조회가 이미 수행했다. */
+/**
+ * 프로젝트 상세의 문서 섹션 (SPEC-03 §8.1, §8.2). 접근 확인은 상위 프로젝트 상세 조회가 이미 수행했다.
+ * 문서 등록 버튼은 프로젝트 머리글 하나로 통일한다(#50).
+ */
 export function DocumentList({ projectId }: { projectId: string }) {
   const { refresh } = useAuth();
   const [attempt, setAttempt] = useState(0);
@@ -56,7 +58,7 @@ export function DocumentList({ projectId }: { projectId: string }) {
 
   return (
     <Card aria-labelledby="documents-heading">
-      <CardHeader title="문서" titleId="documents-heading" description="모든 구성원이 문서를 등록하고 새 버전을 올릴 수 있습니다." actions={<NewDocumentLink projectId={projectId} />} />
+      <CardHeader title="문서" titleId="documents-heading" description="모든 구성원이 문서를 등록하고 새 버전을 올릴 수 있습니다." />
       <CardBody>
         <DocumentListBody state={state} projectId={projectId} onRetry={retry} />
       </CardBody>
@@ -93,8 +95,7 @@ function DocumentListBody({
           <EmptyState
             icon={<FileIcon className="size-6" />}
             title="아직 등록된 문서가 없습니다."
-            description="PDF, DOCX, XLSX, PPTX 파일을 등록하고 구성원과 버전별 피드백을 주고받으세요."
-            action={<NewDocumentLink projectId={projectId} />}
+            description="위의 '새 문서 등록'으로 PDF, DOCX, XLSX, PPTX 파일을 등록하고 구성원과 버전별 피드백을 주고받으세요."
           />
         );
       }
@@ -146,7 +147,9 @@ function DocumentListBody({
                           >
                             <FileIcon className="mt-0.5 size-4 shrink-0 text-ink-decor" />
                             <span className="flex min-w-0 flex-col gap-0.5">
-                              <span className="line-clamp-2 font-medium break-words text-ink hover:text-brand-700">{document.title}</span>
+                              <span className="line-clamp-2 font-medium break-words text-ink hover:text-brand-700" title={document.title}>
+                                {document.title}
+                              </span>
                               {document.description && (
                                 // SPEC-09: 설명을 한 줄로 줄여 표시한다(전체는 상세 화면).
                                 <span className="truncate text-xs text-ink-muted" title={document.description}>
@@ -185,7 +188,9 @@ function DocumentListBody({
                       <span className="flex min-w-0 items-start gap-2.5">
                         <FileIcon className="mt-0.5 size-4 shrink-0 text-ink-decor" />
                         <span className="flex min-w-0 flex-col gap-0.5">
-                          <span className="font-medium break-words text-ink">{document.title}</span>
+                          <span className="line-clamp-3 font-medium break-words text-ink" title={document.title}>
+                            {document.title}
+                          </span>
                           {document.description && (
                             <span className="line-clamp-2 text-xs text-ink-muted">{document.description}</span>
                           )}
@@ -212,12 +217,4 @@ function DocumentListBody({
       );
     }
   }
-}
-
-function NewDocumentLink({ projectId }: { projectId: string }) {
-  return (
-    <ButtonLink href={`/projects/${projectId}/documents/new`} variant="primary" size="sm">
-      <PlusIcon /> 문서 등록
-    </ButtonLink>
-  );
 }

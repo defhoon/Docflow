@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Field, Input } from "./Field";
+import { Breadcrumb } from "./PageHeader";
 import { FileDropzone } from "./FileDropzone";
 import { PasswordInput } from "./PasswordInput";
 
@@ -61,5 +62,17 @@ describe("Field (#50)", () => {
     );
     expect(screen.getByLabelText("문서 설명 (선택)")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("너무 깁니다")).toHaveAttribute("id", "d-err");
+  });
+});
+
+describe("Breadcrumb (#50)", () => {
+  it("긴 이름은 말줄임하되 전체 이름을 title로 제공하고, 마지막 항목은 현재 위치로 표시한다", () => {
+    const long = "요구사항 명세서 — 아주 긴 문서 제목이 들어가도 한 줄에서 말줄임되는지 확인하는 테스트".repeat(2);
+    render(<Breadcrumb items={[{ label: "프로젝트", href: "/projects" }, { label: long }]} />);
+    const current = screen.getByText(long);
+    expect(current).toHaveAttribute("title", long);
+    expect(current).toHaveAttribute("aria-current", "page");
+    expect(current.className).toContain("truncate");
+    expect(screen.getByRole("link", { name: "프로젝트" })).toHaveAttribute("title", "프로젝트");
   });
 });

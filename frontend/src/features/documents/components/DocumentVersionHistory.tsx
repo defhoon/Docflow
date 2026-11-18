@@ -172,11 +172,13 @@ export function DocumentVersionHistory({
                 ) : (
                   <div className="flex min-w-0 flex-col items-start gap-0.5">{heading}</div>
                 )}
+                {/* 측면 패널(compact)에서는 선택한 버전의 정보를 본문 카드가 보여 주므로 반복하지 않는다. */}
+                {!(compact && isSelected) && (
                 <div className="text-xs">
                   <span className="font-medium text-ink-muted">{versionNoteLabel(version.versionNumber)}</span>
                   {version.versionNote ? (
                     <p
-                      className={cn("mt-0.5 whitespace-pre-wrap break-words text-sm text-ink", compact && !isSelected && "line-clamp-2")}
+                      className={cn("mt-0.5 break-words text-sm text-ink", compact ? "line-clamp-1" : "whitespace-pre-wrap")}
                       title={compact ? version.versionNote : undefined}
                     >
                       {version.versionNote}
@@ -185,6 +187,7 @@ export function DocumentVersionHistory({
                     <p className="mt-0.5 text-ink-muted">{versionNoteEmptyText(version.versionNumber)}</p>
                   )}
                 </div>
+                )}
                 <span className="flex gap-2">
                   <Button
                     size="sm"

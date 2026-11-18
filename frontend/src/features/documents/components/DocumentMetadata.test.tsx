@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { describeActivity } from "@/features/activity/format";
+import { ToastProvider } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api-client";
 
 import type { DocumentDetail } from "../types";
@@ -10,6 +11,12 @@ import { DocumentCreateForm } from "./DocumentCreateForm";
 import { DocumentDescription } from "./DocumentDescription";
 import { DocumentVersionHistory } from "./DocumentVersionHistory";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
+
+
+/** 성공 알림은 토스트로 표시되므로(#50) 화면을 ToastProvider 안에서 렌더링한다. */
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(ui, { wrapper: ToastProvider });
+}
 
 const push = vi.fn();
 const refresh = vi.fn();

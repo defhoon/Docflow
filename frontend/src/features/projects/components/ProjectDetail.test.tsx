@@ -60,6 +60,8 @@ describe("ProjectDetail", () => {
     // #28: 목록 링크는 빵부스러기의 "프로젝트"로 제공한다.
     expect(screen.getByRole("link", { name: "프로젝트" })).toHaveAttribute("href", "/projects");
     expect(screen.getByRole("region", { name: "문서" })).toHaveTextContent("문서 섹션 7");
+    // 주요 CTA는 머리글의 '새 문서 등록' 하나다(#50).
+    expect(screen.getAllByRole("link", { name: /문서 등록/ }).map((link) => link.getAttribute("href"))).toEqual(["/projects/7/documents/new"]);
   });
 
   it("설명이 없으면 안내 문구를 표시한다", async () => {

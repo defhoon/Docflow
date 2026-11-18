@@ -108,11 +108,13 @@ export function DocumentVersionPreview({ projectId, documentId, version, onClose
   }, [projectId, documentId, versionNumber, version.originalFilename, requestKey, refresh]);
 
   return (
-    <section aria-labelledby="document-preview-heading" className="flex flex-col gap-2 border-t border-line pt-4">
-      <div className="flex items-center justify-between gap-2">
-        <h3 id="document-preview-heading" className="text-sm font-semibold text-ink-muted">
+    <section aria-labelledby="document-preview-heading" className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* 카드 제목이 버전·파일명을 보여 주므로 화면에는 안내만, 스크린리더에는 영역 이름을 둔다. */}
+        <h3 id="document-preview-heading" className="sr-only">
           미리보기 · v{versionNumber}
         </h3>
+        <p className="text-xs text-ink-muted">미리보기는 참고용이며 원본 파일이 기준입니다.</p>
         <button type="button" onClick={onClose} className={buttonClass("secondary", "sm")}>
           미리보기 닫기
         </button>
@@ -129,13 +131,24 @@ export function DocumentVersionPreview({ projectId, documentId, version, onClose
       )}
       {state.kind === "ready" && (
         <>
-          <p className="text-xs text-ink-muted">미리보기는 참고용이며 원본 파일이 기준입니다.</p>
           <iframe
             title={`v${versionNumber} 미리보기`}
             src={`${state.url}${PREVIEW_VIEWER_FRAGMENT}`}
             {...(PREVIEW_IFRAME_SANDBOX === null ? {} : { sandbox: PREVIEW_IFRAME_SANDBOX })}
-            className="h-[80vh] w-full rounded border border-line"
+            className="h-[70vh] min-h-[420px] w-full rounded-[var(--radius-control)] border border-line lg:h-[80vh]"
           />
+          {/* 일부 브라우저(모바일 등)는 페이지 안에 PDF를 표시하지 않는다. */}
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+            문서가 보이지 않으면 브라우저가 페이지 안 PDF 표시를 지원하지 않는 경우입니다.
+            <button
+              type="button"
+              onClick={() => void download()}
+              disabled={downloading}
+              className="font-medium text-brand-700 underline-offset-2 hover:underline disabled:text-ink-muted"
+            >
+              {downloading ? "다운로드 중..." : "원본 파일 받기"}
+            </button>
+          </p>
         </>
       )}
       {state.kind === "failed" && (

@@ -3,24 +3,32 @@ import type { ReactNode } from "react";
 
 export type Crumb = { label: string; href?: string };
 
+/**
+ * 현재 위치. 긴 이름은 한 줄에서 말줄임하고(마지막 항목에 가장 넓은 폭), 전체 이름은 `title`로 확인할 수 있다. 페이지의 전체
+ * 제목은 항상 h1에 그대로 표시한다(#50).
+ */
 export function Breadcrumb({ items }: { items: Crumb[] }) {
   return (
     <nav aria-label="현재 위치" className="min-w-0">
-      <ol className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-ink-muted">
-        {items.map((item, index) => (
-          <li key={`${item.label}-${index}`} className="flex min-w-0 items-center gap-1">
-            {index > 0 && <span aria-hidden="true" className="text-ink-faint">/</span>}
-            {item.href ? (
-              <Link href={item.href} className="truncate hover:text-ink">
-                {item.label}
-              </Link>
-            ) : (
-              <span aria-current="page" className="truncate text-ink">
-                {item.label}
-              </span>
-            )}
-          </li>
-        ))}
+      <ol className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-ink-muted">
+        {items.map((item, index) => {
+          const last = index === items.length - 1;
+          const width = last ? "max-w-[14rem] sm:max-w-[28rem]" : "max-w-[8rem] sm:max-w-[14rem]";
+          return (
+            <li key={`${item.label}-${index}`} className={`flex min-w-0 items-center gap-1 ${last ? "shrink" : "shrink-0"}`}>
+              {index > 0 && <span aria-hidden="true" className="text-ink-decor">/</span>}
+              {item.href ? (
+                <Link href={item.href} title={item.label} className={`block truncate hover:text-ink ${width}`}>
+                  {item.label}
+                </Link>
+              ) : (
+                <span aria-current="page" title={item.label} className={`block truncate text-ink ${width}`}>
+                  {item.label}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </nav>
   );

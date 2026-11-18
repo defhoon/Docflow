@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { CharCount } from "@/components/ui/CharCount";
 import { Field, Textarea } from "@/components/ui/Field";
 import { FileDropzone } from "@/components/ui/FileDropzone";
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorCode, isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
@@ -46,7 +47,8 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   const [versionNote, setVersionNote] = useState("");
   const [noteError, setNoteError] = useState<string | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  // 성공은 화면 상태(새 버전이 목록·미리보기에 반영됨)와 짧은 토스트로 알린다. 화면 안 성공 문구는 두지 않는다 (#50).
+  const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
   // 상태 반영 전 연속 제출도 막는다 (결정 V7).
   const submittingRef = useRef(false);
@@ -64,7 +66,6 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
     setVersionNote("");
     setNoteError(undefined);
     setFormError(null);
-    setSuccess(null);
   }, []);
 
   useLayoutEffect(() => {
@@ -81,7 +82,6 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
 
   function handleFileChange(selected: File | null) {
     setFile(selected);
-    setSuccess(null);
     setFormError(null);
     // 선택 즉시 크기·형식을 알려 20MB 초과 파일을 보내지 않게 한다.
     setFileError(selected ? validateFile(selected) : undefined);
@@ -93,7 +93,6 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
       return;
     }
     setFormError(null);
-    setSuccess(null);
     const error = validateFile(file);
     setFileError(error);
     const note = validateVersionNote(versionNote, "change");
@@ -109,7 +108,7 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
       onUploaded(updated);
       settle(() => {
         resetForm();
-        setSuccess(`새 버전을 등록했습니다. 최신 버전: v${updated.latestVersion.versionNumber}`);
+        toast(`새 버전을 등록했습니다. 최신 버전: v${updated.latestVersion.versionNumber}`);
       });
     } catch (failure) {
       settle(() => handleFailure(failure));
@@ -198,10 +197,7 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
             value={versionNote}
             disabled={disabled}
             placeholder="예: 3장 일정 수정, 표 2 추가"
-            onChange={(event) => {
-              setVersionNote(event.target.value);
-              setSuccess(null);
-            }}
+            onChange={(event) => setVersionNote(event.target.value)}
             invalid={Boolean(noteError)}
             aria-describedby={noteError ? "document-version-note-error document-version-note-count" : "document-version-note-count"}
           />
@@ -214,11 +210,6 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
         {submitting && (
           <p role="status" className="text-sm text-ink-muted">
             파일을 업로드하는 중입니다. 화면을 닫지 마세요.
-          </p>
-        )}
-        {success && (
-          <p role="status" className="text-sm font-medium text-success-700">
-            {success}
           </p>
         )}
         <Button type="submit" variant="primary" disabled={disabled} className="self-start">

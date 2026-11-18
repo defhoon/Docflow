@@ -3,6 +3,7 @@
 import { type FormEvent, useRef, useState } from "react";
 
 import { CharCount } from "@/components/ui/CharCount";
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorCode, failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { ApiError } from "@/lib/api-client";
@@ -38,7 +39,7 @@ export function DocumentDescription({ projectId, documentId, description, editab
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const showEditor = editing && editable;
@@ -46,7 +47,6 @@ export function DocumentDescription({ projectId, documentId, description, editab
   function startEditing() {
     setDraft(description ?? "");
     setError(null);
-    setNotice(null);
     setEditing(true);
   }
 
@@ -67,7 +67,8 @@ export function DocumentDescription({ projectId, documentId, description, editab
       const updated = await updateDocumentDescription(projectId, documentId, value);
       onUpdated(updated);
       setEditing(false);
-      setNotice(DESCRIPTION_MESSAGES.saved);
+      // 성공은 바뀐 설명(화면 상태)과 토스트로 알린다 (#50).
+      toast(DESCRIPTION_MESSAGES.saved);
     } catch (failure) {
       if (isUnauthenticated(failure)) {
         void refresh();
@@ -146,11 +147,6 @@ export function DocumentDescription({ projectId, documentId, description, editab
       {error && !showEditor && (
         <p role="alert" className="text-sm text-danger-700">
           {error}
-        </p>
-      )}
-      {notice && (
-        <p role="status" className="text-sm text-success-700">
-          {notice}
         </p>
       )}
       {editable && (
