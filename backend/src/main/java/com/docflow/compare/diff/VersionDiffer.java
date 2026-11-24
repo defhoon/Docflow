@@ -158,18 +158,21 @@ public class VersionDiffer {
 				targetSegments.add("EQUAL", bChunk, null);
 			}
 			else {
-				ChangeType type = aWords.isEmpty() ? ChangeType.ADDED
-						: bWords.isEmpty() ? ChangeType.DELETED : ChangeType.MODIFIED;
-				int id = this.changes.size();
-				this.changes.add(new Change(id, type, aWords.isEmpty() ? Side.EMPTY : side(aWords, this.baseText),
-						bWords.isEmpty() ? Side.EMPTY : side(bWords, this.targetText)));
-				String op = switch (type) {
-					case ADDED -> "INSERT";
-					case DELETED -> "DELETE";
-					case MODIFIED -> "MODIFY";
-				};
-				baseSegments.add(op, aChunk, id);
-				targetSegments.add(op, bChunk, id);
+				// 한 변경 구간이 문단 구분을 넘으면 문단별로 나눠 짝지은다(예: 수정 + 새 문단 추가).
+				List<List<Token>> aGroups = splitByBreak(aChunk);
+				List<List<Token>> bGroups = splitByBreak(bChunk);
+				int groups = Math.max(aGroups.size(), bGroups.size());
+				for (int g = 0; g < groups; g++) {
+					List<Token> aPart = (g < aGroups.size()) ? aGroups.get(g) : List.of();
+					List<Token> bPart = (g < bGroups.size()) ? bGroups.get(g) : List.of();
+					if (g > 0 && g < aGroups.size()) {
+						baseSegments.add("EQUAL", List.of(BREAK_TOKEN), null);
+					}
+					if (g > 0 && g < bGroups.size()) {
+						targetSegments.add("EQUAL", List.of(BREAK_TOKEN), null);
+					}
+					addChange(aPart, bPart, baseSegments, targetSegments);
+				}
 			}
 			aPos = aStart + delta.getSource().size();
 			bPos = bStart + delta.getTarget().size();
@@ -177,6 +180,46 @@ public class VersionDiffer {
 		baseSegments.add("EQUAL", a.subList(aPos, a.size()), null);
 		targetSegments.add("EQUAL", b.subList(bPos, b.size()), null);
 		this.blocks.add(new Block("CHANGED", paragraphCount, null, null, baseSegments.build(), targetSegments.build()));
+	}
+
+	private static final Token BREAK_TOKEN = new Token(BREAK, new int[0]);
+
+	private void addChange(List<Token> aPart, List<Token> bPart, SegmentBuilder baseSegments,
+			SegmentBuilder targetSegments) {
+		if (aPart.isEmpty() && bPart.isEmpty()) {
+			return;
+		}
+		ChangeType type = aPart.isEmpty() ? ChangeType.ADDED : bPart.isEmpty() ? ChangeType.DELETED : ChangeType.MODIFIED;
+		int id = this.changes.size();
+		this.changes.add(new Change(id, type, aPart.isEmpty() ? Side.EMPTY : side(aPart, this.baseText),
+				bPart.isEmpty() ? Side.EMPTY : side(bPart, this.targetText)));
+		String op = switch (type) {
+			case ADDED -> "INSERT";
+			case DELETED -> "DELETE";
+			case MODIFIED -> "MODIFY";
+		};
+		baseSegments.add(op, aPart, id);
+		targetSegments.add(op, bPart, id);
+	}
+
+	/** 문단 구분으로 나눈 단어 묶음(빈 묶음 제외). 앞뒤 구분은 버린다(호출 측이 같은 구간으로 둠). */
+	private static List<List<Token>> splitByBreak(List<Token> tokens) {
+		List<List<Token>> groups = new ArrayList<>();
+		List<Token> current = new ArrayList<>();
+		for (Token token : tokens) {
+			if (BREAK.equals(token.text())) {
+				if (!current.isEmpty()) {
+					groups.add(current);
+					current = new ArrayList<>();
+				}
+				continue;
+			}
+			current.add(token);
+		}
+		if (!current.isEmpty()) {
+			groups.add(current);
+		}
+		return groups;
 	}
 
 	private static List<Token> withBreaks(List<Paragraph> paragraphs) {
@@ -253,6 +296,25 @@ public class VersionDiffer {
 		private final List<Segment> segments = new ArrayList<>();
 
 		void add(String op, List<Token> tokens, Integer changeId) {
+			if (!"EQUAL".equals(op)) {
+				// 변경 구간 앞뒤의 문단 구분은 변경이 아니므로 떼어 같은 구간으로 둔다(강조가 빈 줄까지 번지지 않게).
+				int start = 0;
+				int end = tokens.size();
+				while (start < end && BREAK.equals(tokens.get(start).text())) {
+					start++;
+				}
+				while (end > start && BREAK.equals(tokens.get(end - 1).text())) {
+					end--;
+				}
+				add("EQUAL", tokens.subList(0, start), null);
+				addRaw(op, tokens.subList(start, end), changeId);
+				add("EQUAL", tokens.subList(end, tokens.size()), null);
+				return;
+			}
+			addRaw(op, tokens, changeId);
+		}
+
+		private void addRaw(String op, List<Token> tokens, Integer changeId) {
 			if (tokens.isEmpty()) {
 				return;
 			}
@@ -260,10 +322,12 @@ public class VersionDiffer {
 			if (!this.segments.isEmpty()) {
 				Segment last = this.segments.getLast();
 				if ("EQUAL".equals(op) && "EQUAL".equals(last.op())) {
-					this.segments.set(this.segments.size() - 1, new Segment("EQUAL", join(last.text(), text), null));
+					this.segments.set(this.segments.size() - 1,
+							new Segment("EQUAL", join(last.text(), text, startsWithBreak(tokens)), null));
 					return;
 				}
-				text = (startsWithBreak(tokens) ? "" : " ") + text;
+				boolean afterBreak = last.text().endsWith("\n");
+				text = (startsWithBreak(tokens) || afterBreak ? "" : " ") + text;
 			}
 			this.segments.add(new Segment(op, text, changeId));
 		}
@@ -272,8 +336,8 @@ public class VersionDiffer {
 			return BREAK.equals(tokens.getFirst().text());
 		}
 
-		private static String join(String left, String right) {
-			return (left.endsWith("\n") || right.startsWith("\n")) ? left + right : left + " " + right;
+		private static String join(String left, String right, boolean rightStartsWithBreak) {
+			return (left.endsWith("\n") || rightStartsWithBreak) ? left + right : left + " " + right;
 		}
 
 		List<Segment> build() {

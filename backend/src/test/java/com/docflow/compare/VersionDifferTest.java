@@ -126,6 +126,18 @@ class VersionDifferTest {
 		assertThat(result.identical()).isTrue();
 	}
 
+	// AC-CMP-03: 문단 묶음 안에 추가된 문단은 앞뒤 문단 구분 없이 강조한다
+	@Test
+	void insertedParagraphSegmentExcludesBreaks() {
+		CompareResult result = VersionDiffer.compare(text("머리 문단 A", "", "예산 100", "", "끝 문단"),
+				text("머리 문단 A", "", "예산 200", "", "새 문단 추가", "", "끝 문단"));
+		CompareResult.Block block = result.blocks().stream().filter((b) -> b.type().equals("CHANGED")).findFirst().orElseThrow();
+		assertThat(block.target()).filteredOn((s) -> s.changeId() != null)
+			.allMatch((s) -> !s.text().contains("\n"));
+		String joined = block.target().stream().map(CompareResult.Segment::text).reduce("", String::concat);
+		assertThat(joined).isEqualTo("예산 200\n\n새 문단 추가");
+	}
+
 	// AC-CMP-06: 같은 줄의 이어진 단어 상자는 하나로 합친다
 	@Test
 	void adjacentBoxesOnSameLineAreMerged() {
