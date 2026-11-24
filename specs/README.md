@@ -43,6 +43,7 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-10 PDF 텍스트·좌표 추출 | `10-pdf-text-extraction.md` | #53 | 구현 완료, PR 리뷰 대기 (`feat/53/pdf-text-extraction`) |
 | SPEC-11 AI 문서 자동 요약 | `11-ai-document-summary.md` | #54 | 구현 완료, PR 리뷰 대기 (`feat/54/ai-document-summary`, #53 위 stacked). 실제 API 호출 미실행 |
 | SPEC-12 문서 버전 변경 비교 | `12-version-compare.md` | #55 | 구현 완료, PR 리뷰 대기 (`feat/55/version-compare`, #54 위 stacked) |
+| SPEC-13 PDF 변경사항 하이라이트 | `13-pdf-change-highlight.md` | #56 | 구현 완료, PR 리뷰 대기 (`feat/56/pdf-change-highlight`, #55 위 stacked) |
 | SPEC-AUTH 확장 초대코드 회원가입·로그인 제한 | `00-auth.md` §확장 | #26 | **Done (2026-11-11, AC-INV-01~14, #37·#39 보완 포함)**, main 병합 완료 (PR #34, #38, #40) |
 | (비 SPEC) 공개 배포 준비 | `docs/deployment.md`, ADR-0007 | #27 | 준비 완료, main 병합 (PR #35). **미배포**(Railway 리소스 생성 승인 대기) |
 | (비 SPEC) UI/UX 전면 개선 | — | #28 | 완료, main 병합 (PR #36). 클라우드 3개 뷰포트·Windows 모바일/데스크톱 확인 |
