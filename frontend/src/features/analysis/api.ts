@@ -1,6 +1,6 @@
 import { apiRequest } from "@/lib/api-client";
 
-import type { AiSettings, AnalysisState, SummaryResult } from "./types";
+import type { AiSettings, AnalysisState, ChangeSummaryResult, SummaryResult } from "./types";
 
 function projectPath(projectId: string): string {
   return `/api/projects/${encodeURIComponent(projectId)}`;
@@ -26,4 +26,17 @@ export function fetchVersionSummary(projectId: string, documentId: string, versi
 /** 요약 요청·재시도. 이미 대기·진행·완료 중이면 현재 상태를 그대로 돌려준다(중복 호출 없음). */
 export function requestVersionSummary(projectId: string, documentId: string, versionNumber: number): Promise<AnalysisState<SummaryResult>> {
   return apiRequest<AnalysisState<SummaryResult>>(summaryPath(projectId, documentId, versionNumber), { method: "POST" });
+}
+
+function changeSummaryPath(projectId: string, documentId: string, base: number, target: number): string {
+  return `${projectPath(projectId)}/documents/${encodeURIComponent(documentId)}/compare/summary?base=${base}&target=${target}`;
+}
+
+export function fetchChangeSummary(projectId: string, documentId: string, base: number, target: number): Promise<AnalysisState<ChangeSummaryResult>> {
+  return apiRequest<AnalysisState<ChangeSummaryResult>>(changeSummaryPath(projectId, documentId, base, target));
+}
+
+/** AI 변경 요약 요청(SPEC-14). 같은 버전 조합은 한 번만 만든다. */
+export function requestChangeSummary(projectId: string, documentId: string, base: number, target: number): Promise<AnalysisState<ChangeSummaryResult>> {
+  return apiRequest<AnalysisState<ChangeSummaryResult>>(changeSummaryPath(projectId, documentId, base, target), { method: "POST" });
 }
