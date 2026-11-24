@@ -39,11 +39,12 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-06 활동 이력 (Audit Log) | `06-audit-log.md` | #23 | **Done (2026-11-11, AC-AUD-01~09)**, main 병합 완료 (PR #31) |
 | SPEC-07 문서 협업 상태와 최종 버전 확정 | `07-document-finalize.md` | #24 | **Done (2026-11-11, AC-FIN-01~12)**, main 병합 완료 (PR #32) |
 | SPEC-08 버전별 Feedback 작성·조회 | `08-version-feedback.md` | #25 | **Done (2026-11-11, AC-FB-01~09)**, main 병합 완료 (PR #33) |
-| SPEC-09 문서 설명·버전별 변경사항 | `09-document-metadata.md` | #49 | 구현 완료, PR 리뷰 대기 (`feat/49/document-metadata`) |
+| SPEC-09 문서 설명·버전별 변경사항 | `09-document-metadata.md` | #49 | 구현 완료, main 병합 완료 (PR #51) |
+| SPEC-10 PDF 텍스트·좌표 추출 | `10-pdf-text-extraction.md` | #53 | 구현 완료, PR 리뷰 대기 (`feat/53/pdf-text-extraction`) |
 | SPEC-AUTH 확장 초대코드 회원가입·로그인 제한 | `00-auth.md` §확장 | #26 | **Done (2026-11-11, AC-INV-01~14, #37·#39 보완 포함)**, main 병합 완료 (PR #34, #38, #40) |
 | (비 SPEC) 공개 배포 준비 | `docs/deployment.md`, ADR-0007 | #27 | 준비 완료, main 병합 (PR #35). **미배포**(Railway 리소스 생성 승인 대기) |
 | (비 SPEC) UI/UX 전면 개선 | — | #28 | 완료, main 병합 (PR #36). 클라우드 3개 뷰포트·Windows 모바일/데스크톱 확인 |
-| (비 SPEC) UI/UX 전반 개선 2차 (디자인 토큰·문서 작업 공간) | — | #50 | 구현 완료, PR 리뷰 대기 (`feat/50/ui-ux-improvements`, #49 위 stacked) |
+| (비 SPEC) UI/UX 전반 개선 2차 (디자인 토큰·문서 작업 공간) | — | #50 | 완료, main 병합 (PR #52) |
 
 > 2026-11-10 워크플로 변경(Issue #22): v0.4의 SPEC-06~13(Review 중심)은 폐기·재구성되었다. 대응표는 `spec.md` §9.1.
 > 2026-11-11: 스택 PR #29~#36·#38(#37 보안 강화)·#40(#39 Windows 테스트 수정)을 순서대로 Merge commit으로 main에 병합했다(main `d50f18f`, CI run 113 성공). Done 근거는 각 SPEC의 Done 판정 절(Issue #41).

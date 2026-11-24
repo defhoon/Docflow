@@ -213,7 +213,14 @@ Feedback은 특정 DocumentVersion에 연결된 자유 의견이며 상태를 �
 | SPEC-07 | 문서 협업 상태와 최종 버전 확정 | O |
 | SPEC-08 | 버전별 Feedback 작성·조회 | O |
 | SPEC-AUTH 확장 | 초대코드 기반 회원가입·로그인 시도 제한 | O (공개 운영) |
-| SPEC-14 | AI Version Summary | Post-MVP |
+| SPEC-09 | 문서 설명·버전별 변경사항 | O |
+| SPEC-10 | PDF 텍스트·좌표 추출 공통 모듈 | 확장 (2026-11-24 우선 개발) |
+| SPEC-11 | AI 문서 자동 요약 | 확장 |
+| SPEC-12 | 문서 버전 변경 비교 | 확장 |
+| SPEC-13 | PDF 변경사항 하이라이트 | 확장 |
+| SPEC-14 | AI Version Summary (AI 버전 변경사항 요약) | 확장 |
+
+> 2026-11-24: SPEC-10~13 번호는 폐기된 v0.4 SPEC(§9.1)과 별개인 새 확장 기능에 다시 쓴다. SPEC-14는 기존 AI Version Summary를 구체화한다.
 
 ### 9.1 기존 SPEC-06~13 대응표 (2026-11-10, Issue #22)
 
