@@ -57,6 +57,29 @@ docflow:
     max-words: ${DOCFLOW_EXTRACTION_MAX_WORDS:200000}
     timeout: ${DOCFLOW_EXTRACTION_TIMEOUT:60s}
     concurrency: 2
+  # AI 문서 분석 (SPEC-11·14, ADR-0009). 기본 꺼짐. 켜도 프로젝트 Owner가 동의하고 켠 프로젝트에서만 동작한다.
+  ai:
+    enabled: ${DOCFLOW_AI_ENABLED:false}
+    # Claude API 키(비밀 변수). 로그·응답에 쓰지 않는다. 없으면 AI 기능을 켤 수 없다.
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${DOCFLOW_AI_MODEL:claude-sonnet-5-5}
+    max-output-tokens: ${DOCFLOW_AI_MAX_OUTPUT_TOKENS:16000}
+    max-request-input-tokens: ${DOCFLOW_AI_MAX_REQUEST_INPUT_TOKENS:150000}
+    max-document-input-tokens: ${DOCFLOW_AI_MAX_DOCUMENT_INPUT_TOKENS:400000}
+    request-timeout: ${DOCFLOW_AI_REQUEST_TIMEOUT:180s}
+    max-attempts: 3
+    retry-delay: 30s
+    project-daily-calls: ${DOCFLOW_AI_PROJECT_DAILY_CALLS:50}
+    global-daily-calls: ${DOCFLOW_AI_GLOBAL_DAILY_CALLS:300}
+    # 서비스 전체 월 추정 비용 상한(USD). 아래 단가로 계산한 추정치이며 청구 금액과 다를 수 있다.
+    monthly-budget-usd: ${DOCFLOW_AI_MONTHLY_BUDGET_USD:20}
+    input-price-per-mtok: ${DOCFLOW_AI_INPUT_PRICE_PER_MTOK:2.0}
+    output-price-per-mtok: ${DOCFLOW_AI_OUTPUT_PRICE_PER_MTOK:10.0}
+    stale-after: 15m
+    refusal-fallback: ${DOCFLOW_AI_REFUSAL_FALLBACK:true}
+    worker:
+      poll-interval-ms: 5000
+      initial-delay-ms: 10000
 
 management:
   endpoints:

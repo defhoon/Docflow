@@ -30,6 +30,7 @@ import { DocumentVersionHistory } from "./DocumentVersionHistory";
 import { DocumentVersionPreview } from "./DocumentVersionPreview";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
 import { FinalizePanel } from "./FinalizePanel";
+import { VersionSummaryPanel } from "@/features/analysis/components/VersionSummaryPanel";
 
 type DetailResult =
   | { kind: "project-not-found" }
@@ -322,6 +323,9 @@ export function DocumentDetail() {
                     <p className="mt-1 text-sm text-ink-muted">{selectedSummary ? versionNoteEmptyText(selected) : "버전 정보를 불러오는 중..."}</p>
                   )}
                 </section>
+                {selectedSummary && (
+                  <VersionSummaryPanel projectId={projectId} documentId={documentId} versionNumber={selectedSummary.versionNumber} />
+                )}
                 {previewOpen && selectedSummary ? (
                   <DocumentVersionPreview
                     key={selectedSummary.versionNumber}

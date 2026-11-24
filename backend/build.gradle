@@ -28,6 +28,8 @@ dependencies {
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	// SPEC-10 PDF 텍스트·좌표 추출 (ADR-0008). SPEC-05 테스트 검증에도 같은 버전을 쓴다.
 	implementation 'org.apache.pdfbox:pdfbox:3.0.5'
+	// SPEC-11 AI 문서 요약 (ADR-0009). 공식 Claude API Java SDK.
+	implementation 'com.anthropic:anthropic-java:3.8.0'
 	runtimeOnly 'org.postgresql:postgresql'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
