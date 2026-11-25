@@ -27,12 +27,12 @@ export function Badge({ tone = "neutral", children, className }: { tone?: Tone; 
   );
 }
 
-/** 문서 협업 상태 배지 (SPEC-07). 색만으로 구분하지 않도록 점과 텍스트를 함께 표시한다. */
+/** 문서 협업 상태 배지 (SPEC-07). 색만으로 구분하지 않도록 텍스트와 점 모양(협업 중 원, 최종 확정 사각, SPEC-18)을 함께 표시한다. */
 export function StatusBadge({ status }: { status: "ACTIVE" | "FINALIZED" }) {
   const finalized = status === "FINALIZED";
   return (
     <Badge tone={finalized ? "success" : "info"}>
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", finalized ? "bg-success-600" : "bg-info-600")} />
+      <span aria-hidden="true" className={cn("size-1.5", finalized ? "rounded-[1px] bg-success-600" : "rounded-full bg-info-600")} />
       {finalized ? "최종 확정" : "협업 중"}
     </Badge>
   );

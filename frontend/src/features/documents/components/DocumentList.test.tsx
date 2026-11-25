@@ -20,90 +20,90 @@ const documents = [
   {
     id: 2,
     title: "둘째 문서",
+    description: "1장 개요와 일정",
     status: "ACTIVE",
     createdBy: { id: 2, displayName: "Member" },
     createdAt: "2026-10-27T10:00:00Z",
     latestVersionNumber: 2,
     finalVersionNumber: null,
+    updatedAt: "2026-10-28T10:00:00Z",
+    latestUploader: { id: 2, displayName: "Member" },
+    fileType: "PDF",
   },
   {
     id: 1,
-    title: "첫째 문서",
+    title: "가이드",
+    description: null,
     status: "FINALIZED",
     createdBy: { id: 1, displayName: "Owner" },
     createdAt: "2026-10-27T09:00:00Z",
-    latestVersionNumber: 1,
+    latestVersionNumber: 3,
     finalVersionNumber: 1,
+    updatedAt: "2026-10-29T10:00:00Z",
+    latestUploader: { id: 1, displayName: "Owner" },
+    fileType: "DOCX",
   },
 ];
 
-describe("DocumentList — 데스크톱 표·설명 (#50, SPEC-09)", () => {
+describe("DocumentList 문서 표 (SPEC-03 §8.2, SPEC-09, SPEC-18)", () => {
   beforeEach(() => {
     refresh.mockReset();
     fetchDocumentsMock.mockReset();
   });
 
-  it("표에 열 머리글과 행을 두고, 문서명 아래에 설명을 한 줄로 표시한다", async () => {
-    fetchDocumentsMock.mockResolvedValue([
-      { ...documents[0], description: "1장 개요\n2장 범위" },
-      { ...documents[1], description: null },
-    ]);
-    render(<DocumentList projectId="7" />);
-
-    const table = await screen.findByRole("table", { name: "문서 목록" });
-    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["문서", "상태", "버전", "등록"]);
-    const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows).toHaveLength(2);
-    expect(within(rows[0]).getByRole("link")).toHaveAttribute("href", "/projects/7/documents/2");
-    expect(within(rows[0]).getByTitle(/1장 개요/)).toHaveTextContent("1장 개요");
-    expect(rows[1]).toHaveTextContent("최종 v1");
-  });
-});
-
-describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
-  beforeEach(() => {
-    refresh.mockReset();
-    fetchDocumentsMock.mockReset();
-  });
-
-  it("로딩 후 서버 순서대로 제목·상태·작성자·최신 버전·상세 링크를 표시한다", async () => {
+  it("표에 형식·제목·설명·상태·최신·최종본·최근 업로더를 표시하고 기본은 최근 업데이트순이다", async () => {
     fetchDocumentsMock.mockResolvedValue(documents);
     render(<DocumentList projectId="7" />);
-
     expect(screen.getByRole("status")).toHaveTextContent("문서를 불러오는 중...");
-    const items = await screen.findAllByRole("listitem");
+    const table = await screen.findByRole("table", { name: "문서 목록" });
     expect(fetchDocumentsMock).toHaveBeenCalledWith("7");
-    expect(items).toHaveLength(2);
-    expect(within(items[0]).getByRole("link")).toHaveAttribute("href", "/projects/7/documents/2");
-    expect(items[0]).toHaveTextContent("둘째 문서");
-    expect(items[0]).toHaveTextContent("협업 중");
-    expect(items[0]).toHaveTextContent("최신 v2");
-    expect(items[0]).toHaveTextContent("Member");
-    expect(items[1]).toHaveTextContent("최종 확정");
-    // 문서 등록 버튼은 프로젝트 머리글 하나로 통일했다(#50). 목록 카드에는 없다.
-    expect(screen.queryByRole("link", { name: /문서 등록/ })).not.toBeInTheDocument();
-    // 최종 확정 문서는 최종 버전 번호를 함께 표시한다 (SPEC-07)
-    expect(items[1]).toHaveTextContent("최종 v1");
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["문서", "상태", "최신", "최종본", "업데이트", "열기"]);
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    // 최근 업데이트순: 가이드(10/29)가 먼저
+    expect(within(rows[0]).getByRole("link", { name: "가이드" })).toHaveAttribute("href", "/projects/7/documents/1");
+    expect(rows[0]).toHaveTextContent("DOCX");
+    expect(rows[0]).toHaveTextContent("최종 확정");
+    expect(rows[0]).toHaveTextContent("v3");
+    expect(rows[0]).toHaveTextContent("v1");
+    expect(rows[0]).toHaveTextContent("설명 없음");
+    expect(within(rows[1]).getByTitle("1장 개요와 일정")).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent("Member");
+    expect(rows[1]).toHaveTextContent("협업 중");
+    expect(within(rows[1]).getByLabelText("없음")).toBeInTheDocument();
   });
 
-  it("문서가 없으면 빈 상태에서 머리글의 등록 버튼을 안내한다", async () => {
+  it("제목으로 검색하고, 상태로 거르고, 정렬을 바꾼다", async () => {
+    fetchDocumentsMock.mockResolvedValue(documents);
+    render(<DocumentList projectId="7" />);
+    const table = await screen.findByRole("table", { name: "문서 목록" });
+    const titles = () => within(table).getAllByRole("link").map((link) => link.textContent);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "title" } });
+    expect(titles()).toEqual(["가이드", "둘째 문서"]);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "created" } });
+    expect(titles()).toEqual(["둘째 문서", "가이드"]);
+    fireEvent.click(screen.getByRole("button", { name: /최종 확정/ }));
+    expect(titles()).toEqual(["가이드"]);
+    fireEvent.click(screen.getByRole("button", { name: /전체/ }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "문서 제목 검색" }), { target: { value: "둘째" } });
+    expect(titles()).toEqual(["둘째 문서"]);
+    fireEvent.change(screen.getByRole("searchbox", { name: "문서 제목 검색" }), { target: { value: "없는 문서" } });
+    expect(screen.getByText('"없는 문서"와 일치하는 문서가 없습니다.')).toBeInTheDocument();
+  });
+
+  it("문서가 없으면 빈 상태에서 등록을 안내한다", async () => {
     fetchDocumentsMock.mockResolvedValue([]);
     render(<DocumentList projectId="7" />);
-
     expect(await screen.findByText("아직 등록된 문서가 없습니다.")).toBeInTheDocument();
-    expect(screen.getByText(/새 문서 등록/)).toBeInTheDocument();
-    // 중복 CTA 없음(#50): 등록 링크는 프로젝트 머리글에만 있다.
-    expect(screen.queryByRole("link", { name: /문서 등록/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/'문서 등록'으로/)).toBeInTheDocument();
   });
 
   it("실패하면 오류와 다시 시도를 표시하고 다시 요청한다", async () => {
-    fetchDocumentsMock.mockRejectedValueOnce(new ApiError("http", 500, "INTERNAL_ERROR", "x"));
+    fetchDocumentsMock.mockRejectedValueOnce(new ApiError("network", null, null, "서버에 연결할 수 없습니다."));
     fetchDocumentsMock.mockResolvedValueOnce([]);
     render(<DocumentList projectId="7" />);
-
     expect(await screen.findByRole("alert")).toHaveTextContent("문서 목록을 불러오지 못했습니다.");
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-
     expect(await screen.findByText("아직 등록된 문서가 없습니다.")).toBeInTheDocument();
     expect(fetchDocumentsMock).toHaveBeenCalledTimes(2);
   });
@@ -111,8 +111,6 @@ describe("DocumentList (SPEC-03 §8.2, AC-DOC-26)", () => {
   it("401이면 세션 만료 흐름을 시작한다", async () => {
     fetchDocumentsMock.mockRejectedValue(new ApiError("http", 401, "AUTH_REQUIRED", "x"));
     render(<DocumentList projectId="7" />);
-
-    await screen.findByRole("alert");
-    expect(refresh).toHaveBeenCalled();
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 });

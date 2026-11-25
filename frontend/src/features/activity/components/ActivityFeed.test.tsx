@@ -29,9 +29,12 @@ describe("ActivityFeed (#50)", () => {
 
     expect(await screen.findByText(/새 버전 v2을 올렸습니다/)).toBeInTheDocument();
     expect(screen.getByText(/문서 설명을 수정했습니다/)).toBeInTheDocument();
-    const links = screen.getAllByRole("link", { name: LONG_TITLE });
+    // 링크 이름은 문서 제목(+ 버전, SPEC-18)이다.
+    const links = screen.getAllByTitle(LONG_TITLE);
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute("href", "/projects/7/documents/3");
+    expect(links[0]).toHaveTextContent(`${LONG_TITLE}· v2`);
+    // SPEC-18: 버전이 있으면 그 버전을 연 문서 화면으로 이동한다
+    expect(links[0]).toHaveAttribute("href", "/projects/7/documents/3?v=2");
     expect(links[0]).toHaveAttribute("title", LONG_TITLE);
     // 행동 문장 안에는 문서 제목을 반복하지 않는다.
     expect(screen.getByText(/새 버전 v2을 올렸습니다/).textContent).not.toContain(LONG_TITLE);

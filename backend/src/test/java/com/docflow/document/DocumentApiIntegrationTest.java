@@ -267,7 +267,12 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$[3].id").value(first))
 			.andExpect(jsonPath("$[3].latestVersionNumber").value(1))
 			.andExpect(jsonPath("$[4].id").value(third))
-			.andExpect(jsonPath("$[0].*", hasSize(8))) // SPEC-07: finalVersionNumber, SPEC-09: description 추가
+			.andExpect(jsonPath("$[2].latestUploader.displayName").value("Member"))
+			.andExpect(jsonPath("$[2].fileType").value("PDF"))
+			.andExpect(jsonPath("$[2].updatedAt").exists())
+			// SPEC-07: finalVersionNumber, SPEC-09: description, SPEC-18: updatedAt·latestUploader·fileType 추가
+			.andExpect(jsonPath("$[0].*", hasSize(11)))
+			.andExpect(jsonPath("$[0].latestUploader.*", hasSize(2)))
 			.andExpect(jsonPath("$[0].createdBy.*", hasSize(2)));
 		// 접근 확인 1 + 목록 1
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);

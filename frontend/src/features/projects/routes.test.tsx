@@ -17,10 +17,12 @@ let pathname = "/projects";
 let params: Record<string, string> = {};
 const fetchMock = vi.fn();
 
+let search = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push }),
   usePathname: () => pathname,
   useParams: () => params,
+  useSearchParams: () => search,
 }));
 
 const user = { id: 1, email: "author@docflow.local", displayName: "Author" };
@@ -37,6 +39,7 @@ function renderWithAuth(page: React.ReactNode) {
 
 describe("프로젝트 화면 인증 연동", () => {
   beforeEach(() => {
+    search = new URLSearchParams();
     replace.mockReset();
     push.mockReset();
     fetchMock.mockReset();
@@ -119,6 +122,8 @@ describe("프로젝트 화면 인증 연동", () => {
 
   it("AC-MEMBER-21: 구성원 목록 조회가 401이면 세션 만료 안내와 함께 로그인 화면으로 이동한다", async () => {
     pathname = "/projects/7";
+    // SPEC-18: 구성원 목록은 구성원 탭에서 조회한다.
+    search = new URLSearchParams("tab=members");
     params = { projectId: "7" };
     let meCalls = 0;
     fetchMock.mockImplementation(async (url: string) => {

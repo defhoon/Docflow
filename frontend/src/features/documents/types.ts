@@ -18,7 +18,15 @@ export type DocumentSummary = {
   latestVersionNumber: number;
   /** 최종 확정 버전 번호 (SPEC-07). ACTIVE이면 null. */
   finalVersionNumber: number | null;
+  /** 문서 변경 시각(새 버전·설명 변경·최종 확정, SPEC-18) */
+  updatedAt: string;
+  /** 최신 버전 업로더 (SPEC-18) */
+  latestUploader: DocumentAuthor;
+  /** 최신 버전 형식 (SPEC-18). 알 수 없으면 null. */
+  fileType: FileType | null;
 };
+
+export type FileType = "PDF" | "DOCX" | "XLSX" | "PPTX";
 
 /** Backend `DocumentResponse` (등록 `201`, 상세 `200`). 저장 경로·저장 키·해시는 포함되지 않는다. */
 export type DocumentDetail = {
