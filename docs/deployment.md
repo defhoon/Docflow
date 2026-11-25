@@ -22,7 +22,25 @@
 | `frontend` | GitHub 저장소, Root Directory `frontend`, `frontend/Dockerfile` | 공개 도메인(HTTPS) | `BACKEND_URL`로 backend 호출 |
 | 볼륨 | backend에 연결, Mount path `/data` | — | Hobby 5GB/볼륨 상한 |
 
-배포 브랜치: PR #29~#37이 `main`에 병합된 뒤 `main`을 연결한다(병합 전 배포가 필요하면 `feat/37/pre-release-hardening`).
+배포 브랜치: **`production`** (2026-11-25, Issue #65). `main`은 기능 통합·CI 검증용이며 운영에 자동 배포하지 않는다. 절차는 §1.1.
+
+### 1.1 배포 브랜치와 운영 배포 절차
+
+배경: Backend·Frontend 서비스가 `main`에 연결되어 있어 `main` 병합 커밋마다 Railway 운영 배포가 자동으로 일어났다(GitHub 배포 기록 `railway-app[bot]`, 환경 `handsome-heart / production`). 백업 없이 운영 마이그레이션이 실행될 수 있어 배포 브랜치를 분리한다.
+
+**Railway 설정(사용자 작업, 서비스마다: backend·frontend)**
+
+1. 서비스 → **Settings** → **Source**(연결된 GitHub 저장소) 영역에서 배포 브랜치(Branch)를 `main` → `production`으로 바꾼다. 메뉴 이름은 Railway 화면 기준으로 확인한다.
+2. 두 서비스 모두 바꾼 뒤, `production`(현재 `main`과 같은 운영 커밋 `3386fcc`)으로 바꾼 것 자체가 새 배포를 만들지 않았는지 Deployments 목록에서 확인한다.
+3. 이후 `main` 병합 커밋에 새 Railway 배포 기록이 생기지 않는지 확인한다(Claude Code가 GitHub 배포 기록으로 확인할 수 있다).
+
+**운영 배포(명시적 승인 후에만)**
+
+1. 반영할 `main` 커밋의 CI(Backend, Frontend, 컨테이너 스모크, Docker 빌드) 통과 확인
+2. §7 백업: DB 덤프와 볼륨 파일 tar 생성, `SHA256SUMS`·`storage_key` 검증 스크립트로 정상 여부 확인, 로컬로 내려받아 보관
+3. `git checkout production && git merge --ff-only <main 커밋> && git push origin production` (fast-forward가 안 되면 중단하고 원인 확인. `production`에 직접 커밋하지 않는다)
+4. Railway 배포 로그에서 Flyway 적용 버전 확인(예: `Migrating schema "public" to version "11 - document version texts"`, `"12 - ai analysis"`, 이후 `Successfully applied`)
+5. §9 체크리스트로 기능 확인. 실패 시 §10 롤백
 
 ## 2. 빌드·실행 설정 (서비스별 Settings)
 
@@ -336,7 +354,8 @@ Railway 공식 요금(2026-11 확인, [docs.railway.com/pricing](https://docs.ra
 | 빌드 실패 | 이전 배포가 계속 동작. Build 로그 확인 후 수정 커밋 |
 | 기동·헬스체크 실패 | 이전 배포 유지. Deploy 로그의 `Caused by:`(DB 연결, 변수 누락, Flyway) 확인 |
 | 배포 후 기능 오류 | 서비스 → Deployments → 이전 성공 배포 → **Rollback**(또는 Redeploy) |
-| 새 마이그레이션 후 롤백 | 이전 앱은 미래 마이그레이션을 무시하고 기동하나(`*:future` 무시 기본값) 스키마 호환이 보장되지 않는다. 배포 전 백업 → 문제 시 백업으로 복구 후 이전 배포 |
+| 새 마이그레이션 후 롤백 | 이전 앱은 미래 마이그레이션을 무시하고 기동한다(`*:future` 무시 기본값). V11·V12(테이블·열 추가만)는 이전 앱(V10)이 V12 DB에서 정상 기동함을 로컬에서 확인했다(2026-11-25). 일반적으로는 스키마 호환이 보장되지 않으므로 배포 전 백업 → 문제 시 백업으로 복구 후 이전 배포 |
+| 코드 롤백 방법 | Railway Deployments에서 이전 성공 배포를 Redeploy(Rollback)한다. `production`에 직접 커밋하거나 강제 push하지 않는다. 수정은 `main`에서 PR로 검증한 뒤 정상 절차(§1.1)로 다시 배포한다 |
 | 데이터 손상·삭제 | 서비스 일시 중지 → §7 복구 → 검증 후 재개 |
 | 비밀 노출 의심 | 해당 변수 교체(DB 비밀번호는 Postgres 재설정 후 참조 변수 자동 반영), 모든 세션 무효화는 backend 재배포로 가능 |
 

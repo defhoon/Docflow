@@ -42,7 +42,8 @@ DocFlow는 문서 등록 → 구성원의 반복 버전 업로드·버전별 피
 | 새 의존성, 버전 변경, 아키텍처 변경 | 도입 이유·대안·영향 설명 → 승인 → ADR 기록 |
 | Redis, Kafka, Microservices 등 인프라 | 실제 필요성이 확인되지 않으면 도입하지 않는다 |
 | PR 생성 | 사용자 요청 시 |
-| `main` 병합·직접 수정 | 하지 않는다. 병합은 사용자가 직접 수행한다 |
+| `main` 병합·직접 수정 | 하지 않는다. 병합은 사용자가 직접 수행하거나 명시적으로 승인한 범위에서만 한다 |
+| `production` 업데이트(운영 배포) | 명시적 승인 + 운영 DB·파일 백업 후에만. 기능 커밋을 직접 작성하지 않는다(§7.4) |
 
 - 승인된 범위 안의 커밋·Push는 진행한다. 한 번의 승인은 그 범위에만 적용한다.
 
@@ -88,6 +89,7 @@ DocFlow는 문서 등록 → 구성원의 반복 버전 업로드·버전별 피
 - 예: `feat/4/auth`, `fix/12/login-error-message`, `docs/11/claude-md-cleanup`
 - 최신 `origin/main`에서 생성하고, PR로 `main`에 병합한다.
 - CI는 `docs/**` 브랜치 push에서는 실행되지 않으며 PR에서 실행된다.
+- `production` 브랜치에서 작업 브랜치를 만들지 않는다(§7.4).
 
 ### 7.2 커밋 메시지
 
@@ -117,3 +119,18 @@ DocFlow는 문서 등록 → 구성원의 반복 버전 업로드·버전별 피
 - 본문은 `.github/pull_request_template.md`를 따르며 `Closes #issueNumber`를 포함한다.
 - 병합 방식은 Merge commit을 사용한다.
 - `main` 병합은 사용자가 직접 수행한다. Claude Code는 사용자의 명시적 요청 없이 `main`에 병합하지 않는다.
+
+### 7.4 통합 브랜치와 운영 배포 브랜치 (2026-11-25, Issue #65)
+
+| 브랜치 | 용도 | 반영 방법 |
+| --- | --- | --- |
+| `feat/*`, `fix/*`, `docs/*` | 기능·수정 개발 | PR로 `main`에 병합 |
+| `main` | 기능 통합과 CI 검증. **운영에 자동 배포되지 않는다** | PR 병합(Merge commit) |
+| `production` | **운영 배포 전용**. Railway Backend·Frontend가 이 브랜치를 배포한다 | 검증된 `main` 커밋을 그대로 반영(가능하면 fast-forward). 개별 커밋을 직접 작성하지 않는다 |
+
+운영 배포 순서(모두 사용자의 명시적 승인 후):
+
+1. 반영할 `main` 커밋의 CI 통과 확인
+2. 운영 DB·볼륨 파일 백업과 검증(`docs/deployment.md` §7)
+3. `production`을 그 `main` 커밋으로 fast-forward 후 push → Railway 배포
+4. 배포 후 기능 확인(`docs/deployment.md` §9). 실패하면 이전 배포로 롤백(§10)
