@@ -10,8 +10,13 @@ const fetchProjectMock = vi.fn();
 const fetchMembersMock = vi.fn();
 let params: { projectId: string };
 
+let search = new URLSearchParams();
+const replaceMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useParams: () => params,
+  usePathname: () => `/projects/${params.projectId}`,
+  useRouter: () => ({ replace: replaceMock }),
+  useSearchParams: () => search,
 }));
 
 vi.mock("@/features/auth/AuthProvider", () => ({
@@ -44,6 +49,8 @@ describe("ProjectDetail", () => {
     fetchProjectMock.mockReset();
     fetchMembersMock.mockReset();
     fetchMembersMock.mockResolvedValue([]);
+    search = new URLSearchParams();
+    replaceMock.mockReset();
     params = { projectId: "7" };
   });
 
@@ -59,7 +66,9 @@ describe("ProjectDetail", () => {
     expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-01-02T03:04:05Z");
     // #28: 목록 링크는 빵부스러기의 "프로젝트"로 제공한다.
     expect(screen.getByRole("link", { name: "프로젝트" })).toHaveAttribute("href", "/projects");
-    expect(screen.getByRole("region", { name: "문서" })).toHaveTextContent("문서 섹션 7");
+    // SPEC-18: 기본 탭은 문서
+    expect(screen.getByRole("tab", { name: "문서" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "문서" })).toHaveTextContent("문서 섹션 7");
     // 주요 CTA는 머리글의 '새 문서 등록' 하나다(#50).
     expect(screen.getAllByRole("link", { name: /문서 등록/ }).map((link) => link.getAttribute("href"))).toEqual(["/projects/7/documents/new"]);
   });
@@ -136,6 +145,7 @@ describe("ProjectDetail", () => {
       { userId: 2, displayName: "Reviewer", role: "MEMBER", addedAt: "2026-01-03T00:00:00Z" },
     ]);
     fetchProjectMock.mockResolvedValueOnce(project).mockResolvedValueOnce({ ...project, myRole: "MEMBER" });
+    search = new URLSearchParams("tab=members");
 
     const { unmount } = render(<ProjectDetail />);
     expect(await screen.findByRole("list", { name: "구성원 목록" })).toHaveTextContent("Reviewer");
@@ -148,5 +158,27 @@ describe("ProjectDetail", () => {
     expect(await screen.findByRole("list", { name: "구성원 목록" })).toHaveTextContent("Reviewer");
     expect(screen.queryByLabelText("구성원 이메일")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /제거/ })).not.toBeInTheDocument();
+  });
+
+  it("SPEC-18: 탭을 바꾸면 URL(?tab=)을 갱신하고, 설정 탭에 프로젝트 정보를 보여 준다", async () => {
+    fetchProjectMock.mockResolvedValue(project);
+    const { unmount } = render(<ProjectDetail />);
+    fireEvent.click(await screen.findByRole("tab", { name: "활동 이력" }));
+    expect(replaceMock).toHaveBeenCalledWith("/projects/7?tab=activity", { scroll: false });
+    fireEvent.click(screen.getByRole("tab", { name: "문서" }));
+    expect(replaceMock).toHaveBeenLastCalledWith("/projects/7", { scroll: false });
+    unmount();
+
+    search = new URLSearchParams("tab=settings");
+    render(<ProjectDetail />);
+    expect(await screen.findByRole("heading", { name: "프로젝트 정보" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "설정" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("SPEC-18: 알 수 없는 탭 값은 문서 탭으로 대신한다", async () => {
+    fetchProjectMock.mockResolvedValue(project);
+    search = new URLSearchParams("tab=unknown");
+    render(<ProjectDetail />);
+    expect(await screen.findByRole("tab", { name: "문서" })).toHaveAttribute("aria-selected", "true");
   });
 });

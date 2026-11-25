@@ -61,9 +61,27 @@ export function ActivityFeed({ load, loadKey, showProject = false, showDocument 
   if (state.items.length === 0) {
     return <EmptyState title={emptyText} />;
   }
+  return <ActivityList items={state.items} showProject={showProject} showDocument={showDocument} />;
+}
+
+/** 활동 링크: 버전이 있으면 그 버전을 연 문서 화면, 없으면 문서 화면 (SPEC-18). */
+export function activityHref(activity: Activity): string | null {
+  if (!activity.document) {
+    return null;
+  }
+  const base = `/projects/${activity.project.id}/documents/${activity.document.id}`;
+  return activity.versionNumber ? `${base}?v=${activity.versionNumber}` : base;
+}
+
+/** 활동 목록 표시 (SPEC-06, SPEC-18). 문서명과 버전을 함께 보여 주고 누르면 해당 문서·버전으로 이동한다. */
+export function ActivityList({ items, showProject = false, showDocument = true }: {
+  items: Activity[];
+  showProject?: boolean;
+  showDocument?: boolean;
+}) {
   return (
     <ol className="flex flex-col">
-      {state.items.map((activity) => (
+      {items.map((activity) => (
         <li key={activity.id} className="flex gap-3 border-b border-line py-3 last:border-b-0">
           <span aria-hidden="true" className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-semibold text-ink-muted">
             {activity.actor.displayName.slice(0, 1)}
@@ -75,12 +93,13 @@ export function ActivityFeed({ load, loadKey, showProject = false, showDocument 
             </p>
             {showDocument && activity.document && (
               <Link
-                href={`/projects/${activity.project.id}/documents/${activity.document.id}`}
+                href={activityHref(activity)!}
                 title={activity.document.title}
                 className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
               >
                 <FileIcon className="size-3.5 shrink-0" />
                 <span className="truncate">{activity.document.title}</span>
+                {activity.versionNumber && <span className="shrink-0 text-ink-muted">· v{activity.versionNumber}</span>}
               </Link>
             )}
             <p className="mt-0.5 flex min-w-0 text-xs text-ink-faint">
