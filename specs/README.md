@@ -40,11 +40,11 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-07 문서 협업 상태와 최종 버전 확정 | `07-document-finalize.md` | #24 | **Done (2026-11-11, AC-FIN-01~12)**, main 병합 완료 (PR #32) |
 | SPEC-08 버전별 Feedback 작성·조회 | `08-version-feedback.md` | #25 | **Done (2026-11-11, AC-FB-01~09)**, main 병합 완료 (PR #33) |
 | SPEC-09 문서 설명·버전별 변경사항 | `09-document-metadata.md` | #49 | 구현 완료, main 병합 완료 (PR #51) |
-| SPEC-10 PDF 텍스트·좌표 추출 | `10-pdf-text-extraction.md` | #53 | 구현 완료, PR 리뷰 대기 (`feat/53/pdf-text-extraction`) |
-| SPEC-11 AI 문서 자동 요약 | `11-ai-document-summary.md` | #54 | 구현 완료, PR 리뷰 대기 (`feat/54/ai-document-summary`, #53 위 stacked). 실제 API 호출 미실행 |
-| SPEC-12 문서 버전 변경 비교 | `12-version-compare.md` | #55 | 구현 완료, PR 리뷰 대기 (`feat/55/version-compare`, #54 위 stacked) |
-| SPEC-13 PDF 변경사항 하이라이트 | `13-pdf-change-highlight.md` | #56 | 구현 완료, PR 리뷰 대기 (`feat/56/pdf-change-highlight`, #55 위 stacked) |
-| SPEC-14 AI 버전 변경사항 요약 | `14-ai-version-summary.md` | #57 | 구현 완료, PR 리뷰 대기 (`feat/57/ai-version-summary`, #56 위 stacked). 실제 API 호출 미실행 |
+| SPEC-10 PDF 텍스트·좌표 추출 | `10-pdf-text-extraction.md` | #53 | 구현 완료, main 병합 완료 (PR #58, 2026-11-25). 운영 미배포 |
+| SPEC-11 AI 문서 자동 요약 | `11-ai-document-summary.md` | #54 | 구현 완료, main 병합 완료 (PR #59, 2026-11-25). 운영 미배포. 실제 Claude API 호출 미실행 |
+| SPEC-12 문서 버전 변경 비교 | `12-version-compare.md` | #55 | 구현 완료, main 병합 완료 (PR #60, 2026-11-25). 운영 미배포 |
+| SPEC-13 PDF 변경사항 하이라이트 | `13-pdf-change-highlight.md` | #56 | 구현 완료, main 병합 완료 (PR #61, 2026-11-25). 운영 미배포 |
+| SPEC-14 AI 버전 변경사항 요약 | `14-ai-version-summary.md` | #57 | 구현 완료, main 병합 완료 (PR #62, 2026-11-25). 운영 미배포. 실제 Claude API 호출 미실행 |
 | SPEC-AUTH 확장 초대코드 회원가입·로그인 제한 | `00-auth.md` §확장 | #26 | **Done (2026-11-11, AC-INV-01~14, #37·#39 보완 포함)**, main 병합 완료 (PR #34, #38, #40) |
 | (비 SPEC) 공개 배포 준비 | `docs/deployment.md`, ADR-0007 | #27 | 준비 완료, main 병합 (PR #35). **미배포**(Railway 리소스 생성 승인 대기) |
 | (비 SPEC) UI/UX 전면 개선 | — | #28 | 완료, main 병합 (PR #36). 클라우드 3개 뷰포트·Windows 모바일/데스크톱 확인 |

@@ -1,7 +1,7 @@
 # SPEC-10 PDF 텍스트·좌표 추출 공통 모듈 (PDF Text Extraction)
 
 - Issue: #53 · 브랜치: `feat/53/pdf-text-extraction` (기준 `main` `3386fcc`)
-- 상태: **구현 완료, 리뷰 대기**
+- 상태: **구현 완료, main 병합 완료 (PR #58, 2026-11-25)**, 운영 미배포
 - 사용처: SPEC-11 AI 문서 요약, SPEC-12 버전 비교, SPEC-13 PDF 하이라이트, SPEC-14 AI 변경 요약
 - 결정 기록: [ADR-0008](../docs/adr/0008-pdf-text-extraction.md)
 

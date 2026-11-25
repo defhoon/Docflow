@@ -1,7 +1,7 @@
 # SPEC-14 AI 버전 변경사항 요약 (AI Version Summary)
 
 - Issue: #57 · 브랜치: `feat/57/ai-version-summary` (SPEC-13 `feat/56/pdf-change-highlight` 위 stacked)
-- 상태: **구현 완료, 리뷰 대기** · 실제 유료 API 호출: **미실행(별도 승인 필요)**
+- 상태: **구현 완료, main 병합 완료 (PR #62, 2026-11-25)**, 운영 미배포 · 실제 유료 API 호출: **미실행(별도 승인 필요)**
 - 의존: SPEC-11 작업 구조·설정·비용 통제, SPEC-12 Diff 결과(변경 ID)
 
 ## 1. 목적

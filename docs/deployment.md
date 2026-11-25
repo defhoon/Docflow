@@ -31,8 +31,10 @@
 **Railway 설정(사용자 작업, 서비스마다: backend·frontend)**
 
 1. 서비스 → **Settings** → **Source**(연결된 GitHub 저장소) 영역에서 배포 브랜치(Branch)를 `main` → `production`으로 바꾼다. 메뉴 이름은 Railway 화면 기준으로 확인한다.
-2. 두 서비스 모두 바꾼 뒤, `production`(현재 `main`과 같은 운영 커밋 `3386fcc`)으로 바꾼 것 자체가 새 배포를 만들지 않았는지 Deployments 목록에서 확인한다.
-3. 이후 `main` 병합 커밋에 새 Railway 배포 기록이 생기지 않는지 확인한다(Claude Code가 GitHub 배포 기록으로 확인할 수 있다).
+2. 두 서비스 모두 바꾼 뒤 Deployments 목록에서 `production`(운영 커밋 `3386fcc`) 배포가 정상인지 확인한다.
+3. 이후 `main` 병합 커밋에 새 Railway 배포 기록이 생기지 않는지 확인한다(Claude Code가 GitHub 커밋 상태·배포 기록으로 확인할 수 있다).
+
+확인 기록(2026-11-25): 사용자가 두 서비스를 `production`으로 바꾼 뒤 `3386fcc`에 Railway 배포 상태 2건(05:34)이 새로 붙었다. 이후 PR #58 병합 커밋 `1d9ce0d`에는 2분 30초가 지나도 Railway 배포 상태·배포 기록이 생기지 않았다(분리 전에는 병합 후 5초 안에 생성). PR #58~#62 병합 후에도 `production`은 `3386fcc`로 유지되었다.
 
 **운영 배포(명시적 승인 후에만)**
 
