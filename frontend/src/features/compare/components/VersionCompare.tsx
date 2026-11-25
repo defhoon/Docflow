@@ -19,6 +19,7 @@ import { failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { compareHref, fetchComparison } from "../api";
 import { CHANGE_LABELS, compareFailureMessage } from "../messages";
 import type { Change, CompareResponse } from "../types";
+import { PdfComparison } from "./PdfComparison";
 import { TextComparison } from "./TextComparison";
 
 type Loaded<T> = { key: string; value: { ok: true; data: T } | { ok: false; message: string } } | null;
@@ -38,6 +39,7 @@ export function VersionCompare() {
   const [doc, setDoc] = useState<Loaded<{ document: DocumentDetail; versions: DocumentVersionSummary[] }>>(null);
   const [comparison, setComparison] = useState<Loaded<CompareResponse>>(null);
   const [activeChange, setActiveChange] = useState<number | null>(null);
+  const [view, setView] = useState<"text" | "pdf">("text");
   const docKey = `${projectId}/${documentId}`;
 
   useEffect(() => {
@@ -97,11 +99,15 @@ export function VersionCompare() {
 
   const goToChange = useCallback((change: Change) => {
     setActiveChange(change.id);
+    if (view === "pdf") {
+      // PDF 보기에서는 PdfComparison이 양쪽 PDF의 해당 위치로 이동한다.
+      return;
+    }
     const side = change.type === "DELETED" ? "base" : "target";
     const element = window.document.getElementById(`change-${change.id}-${side}`);
     element?.scrollIntoView({ behavior: "smooth", block: "center" });
     element?.focus({ preventScroll: true });
-  }, []);
+  }, [view]);
 
   if (doc?.key === docKey && !doc.value.ok) {
     return <ErrorState title="문서를 불러오지 못했습니다." message={doc.value.message} />;
@@ -157,10 +163,28 @@ export function VersionCompare() {
               actions={<ChangeCounts counts={data.result.counts} />}
             />
             <CardBody>
+              {!data.result.identical && (
+                <div role="tablist" aria-label="보기 방식" className="mb-4 inline-flex rounded-[var(--radius-control)] border border-line bg-subtle p-0.5">
+                  {(["text", "pdf"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="tab"
+                      aria-selected={view === mode}
+                      onClick={() => setView(mode)}
+                      className={`rounded-[calc(var(--radius-control)-2px)] px-3 py-1 text-sm ${view === mode ? "bg-surface font-medium text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+                    >
+                      {mode === "text" ? "텍스트 비교" : "PDF에서 보기"}
+                    </button>
+                  ))}
+                </div>
+              )}
               {data.result.identical ? (
                 <p role="status" className="flex items-center gap-2 text-sm text-success-700">
                   <CheckCircleIcon className="size-5" /> 두 버전의 본문 텍스트가 같습니다. (공백·줄바꿈·쪽 번호 차이는 무시합니다)
                 </p>
+              ) : view === "pdf" ? (
+                <PdfComparison projectId={projectId} documentId={documentId} data={data} activeChangeId={activeChange} onSelectChange={setActiveChange} />
               ) : (
                 <TextComparison
                   blocks={data.result.blocks}
