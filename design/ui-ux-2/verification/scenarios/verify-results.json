@@ -1,0 +1,134 @@
+[
+  {
+    "id": "S1-a",
+    "name": "잘못된 비밀번호는 오류 안내, 비밀번호 표시 전환",
+    "pass": true,
+    "detail": "type=text, alert=\"이메일 또는 비밀번호가 올바르지 않습니다.\""
+  },
+  {
+    "id": "S1-b",
+    "name": "로그인 후 홈으로 이동",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S2",
+    "name": "초대코드로 가입하고 로그인한다",
+    "pass": true,
+    "detail": "invite=201, home stats=\"참여 프로젝트0협업 중인 문서0최종 확정 문서0\""
+  },
+  {
+    "id": "S3",
+    "name": "구성원이 아닌 사용자는 다른 프로젝트 문서에 접근할 수 없다(홈도 0)",
+    "pass": true,
+    "detail": "alert=\"프로젝트를 찾을 수 없습니다.프로젝트 목록으로\""
+  },
+  {
+    "id": "S4",
+    "name": "파일 우선 등록: 파일 이름 제목 채움, 직접 고친 제목 유지, 등록 후 상세 이동",
+    "pass": true,
+    "detail": "auto=\"meeting-v1\", kept=\"통합 검증 문서\", doc=5"
+  },
+  {
+    "id": "S5",
+    "name": "새 버전 등록 후 새 최신 버전(v2)이 선택된다",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S6",
+    "name": "피드백은 작성한 버전에만 보인다",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S7",
+    "name": "빠른 전환에서 늦게 온 이전 버전 응답이 현재 화면을 덮지 않는다",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S8",
+    "name": "작성 중 버전을 바꿔도 초안이 유지·복원되고 다른 버전 입력창은 비어 있다",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S9",
+    "name": "PDF 비교가 기본이며 최신·직전 버전(v2→v3), 동기 스크롤·강조 기본 켜짐",
+    "pass": true,
+    "detail": "columns=이전 · v2· 삭제·수정 전1쪽 | 이후 · v3· 추가·수정 후3쪽"
+  },
+  {
+    "id": "S10",
+    "name": "페이지 수가 다른 문서(1쪽↔3쪽) 동기 스크롤: 없는 쪽은 끝, 돌아오면 다시 맞춤",
+    "pass": true,
+    "detail": "{\"atEnd\":true,\"backToTop\":true}"
+  },
+  {
+    "id": "S11",
+    "name": "확대·회전·패널 접기 후에도 강조가 같은 상대 위치(페이지 안)",
+    "pass": true,
+    "detail": "{\"inside\":true,\"x\":0.851,\"y\":0.207} → {\"inside\":true,\"x\":0.851,\"y\":0.207}"
+  },
+  {
+    "id": "S12",
+    "name": "변경 필터와 이전/다음 탐색",
+    "pass": true,
+    "detail": "added=6, 2 / 9 → 1 / 9"
+  },
+  {
+    "id": "S9-b",
+    "name": "텍스트 비교 전환과 번호 안내",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S13",
+    "name": "AI 비활성 시 탭 없음, 요청 전·진행·실패(재시도)·완료(서버 모델명·검토 필요)·쪽 이동",
+    "pass": true,
+    "detail": "off=0, none=true, processing=true, failed=true, done=true, page=2"
+  },
+  {
+    "id": "S13-b",
+    "name": "비교 화면 오른쪽 패널에 AI 변경 요약 탭(요청 전 상태)",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S15",
+    "name": "Office 미지원 안내(PDF 도구 숨김), PDF 실패 시 오류·다시 시도·원본 받기, 재시도 성공",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S14-a",
+    "name": "과거 버전(v1) 확정: 경고·확인 체크·오너만 버튼, 확정 후 읽기 전용(서버도 409), 과거 버전 조회·다운로드·비교 유지",
+    "pass": true,
+    "detail": "{\"memberNoFinalize\":true,\"warn\":true,\"disabledBefore\":true,\"noUpload\":true,\"noComposer\":true,\"latestNote\":true,\"finalBtn\":true,\"noDescEdit\":true,\"pastDownload\":true,\"compareLink\":true,\"serverBlocks\":true}"
+  },
+  {
+    "id": "S14-b",
+    "name": "최신 버전 확정(경고 없음)",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "id": "S16",
+    "name": "동시 업로드는 번호가 겹치지 않고, 동시 확정은 하나만 성공(나머지 409, 구성원 403), 확정 후 업로드 409",
+    "pass": true,
+    "detail": "uploads=201,201, versions=1,2,3, finalize=200,409,403, late=409"
+  },
+  {
+    "id": "S17",
+    "name": "최근 활동에서 문서·버전으로 이동, 전체 활동, 프로젝트 탭 URL",
+    "pass": true,
+    "detail": "activity=25"
+  },
+  {
+    "id": "CONSOLE",
+    "name": "예상하지 못한 콘솔 오류 없음",
+    "pass": true,
+    "detail": ""
+  }
+]
