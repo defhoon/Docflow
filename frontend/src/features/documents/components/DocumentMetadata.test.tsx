@@ -102,7 +102,7 @@ describe("문서 등록 — 설명·초기 버전 내용 (SPEC-09 AC-META-UI-01)
     fillAndSubmit("  목적\n범위 ", " 초안 ");
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/projects/7/documents/11"));
-    expect(createDocumentMock).toHaveBeenCalledWith("7", expect.objectContaining({ description: "목적\n범위", versionNote: "초안" }));
+    expect(createDocumentMock).toHaveBeenCalledWith("7", expect.objectContaining({ description: "목적\n범위", versionNote: "초안" }), expect.any(Function));
   });
 
   it("1000자를 넘는 초기 버전 내용은 보내지 않고 오류를 표시하며 글자 수를 안내한다", () => {
@@ -147,7 +147,7 @@ describe("새 버전 — 변경사항 (SPEC-09 AC-META-UI-02)", () => {
     submit("  3장 수정 ");
 
     expect(await screen.findByText(/새 버전을 등록했습니다/)).toBeInTheDocument();
-    expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", expect.any(File), "3장 수정");
+    expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", expect.any(File), "3장 수정", expect.any(Function));
     expect(screen.getByLabelText("직전 버전 대비 변경사항 (선택)")).toHaveValue("");
   });
 

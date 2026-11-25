@@ -43,6 +43,8 @@ function sessionExpiresAfterFirstCheck(other: (url: string, init?: RequestInit) 
 
 describe("문서 화면 인증 연동", () => {
   beforeEach(() => {
+    // 실제 api-client 경로를 fetch 목으로 검증한다. 업로드 진행률(XHR) 경로는 api-client.test에서 따로 검증한다.
+    vi.stubGlobal("XMLHttpRequest", undefined);
     replace.mockReset();
     push.mockReset();
     fetchMock.mockReset();

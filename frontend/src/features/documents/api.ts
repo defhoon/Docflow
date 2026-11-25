@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, type UploadProgress } from "@/lib/api-client";
 
 import type { CreateDocumentInput, DocumentDetail, DocumentSummary } from "./types";
 
@@ -7,7 +7,11 @@ function documentsPath(projectId: string): string {
 }
 
 /** 문서와 v1을 multipart 요청 하나로 등록한다 (SPEC-03 §6.3). */
-export function createDocument(projectId: string, input: CreateDocumentInput): Promise<DocumentDetail> {
+export function createDocument(
+  projectId: string,
+  input: CreateDocumentInput,
+  onUploadProgress?: (progress: UploadProgress) => void,
+): Promise<DocumentDetail> {
   const form = new FormData();
   form.append("title", input.title);
   if (input.description !== null) {
@@ -17,7 +21,7 @@ export function createDocument(projectId: string, input: CreateDocumentInput): P
     form.append("versionNote", input.versionNote);
   }
   form.append("file", input.file);
-  return apiRequest<DocumentDetail>(documentsPath(projectId), { method: "POST", body: form });
+  return apiRequest<DocumentDetail>(documentsPath(projectId), { method: "POST", body: form, onUploadProgress });
 }
 
 /** 서버 정렬(`created_at DESC, id DESC`)을 그대로 사용한다. */
@@ -34,6 +38,7 @@ export function createDocumentVersion(
   documentId: string,
   file: File,
   versionNote: string | null = null,
+  onUploadProgress?: (progress: UploadProgress) => void,
 ): Promise<DocumentDetail> {
   const form = new FormData();
   form.append("file", file);
@@ -43,6 +48,7 @@ export function createDocumentVersion(
   return apiRequest<DocumentDetail>(`${documentsPath(projectId)}/${encodeURIComponent(documentId)}/versions`, {
     method: "POST",
     body: form,
+    onUploadProgress,
   });
 }
 
