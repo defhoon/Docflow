@@ -30,3 +30,13 @@ export type AiSettings = {
   provider: string;
   model: string;
 };
+
+export type ChangeSummaryResult = {
+  overview: string;
+  added: { text: string; changeIds: number[] }[];
+  deleted: { text: string; changeIds: number[] }[];
+  modified: { text: string; changeIds: number[] }[];
+  keyChanges: { type: "DATE" | "NUMBER" | "REQUIREMENT" | "OTHER"; label: string; before: string; after: string; changeIds: number[] }[];
+  significance: { level: "NONE" | "LOW" | "MEDIUM" | "HIGH"; reason: string };
+  meta: { changeCount: number; droppedItems: number } | null;
+};

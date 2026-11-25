@@ -19,6 +19,8 @@ import { failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { compareHref, fetchComparison } from "../api";
 import { CHANGE_LABELS, compareFailureMessage } from "../messages";
 import type { Change, CompareResponse } from "../types";
+import { ChangeSummaryPanel } from "@/features/analysis/components/ChangeSummaryPanel";
+
 import { PdfComparison } from "./PdfComparison";
 import { TextComparison } from "./TextComparison";
 
@@ -153,6 +155,20 @@ export function VersionCompare() {
       {versions.length >= 2 && base === target && <p role="alert" className="text-sm text-danger-700">서로 다른 두 버전을 선택해 주세요.</p>}
       {canCompare && !current && <LoadingBlock label="비교하는 중..." lines={4} />}
       {current && !current.ok && <ErrorState title="비교하지 못했습니다." message={current.message} />}
+      {data && !data.result.identical && (
+        <ChangeSummaryPanel
+          projectId={projectId}
+          documentId={documentId}
+          base={data.base.versionNumber}
+          target={data.target.versionNumber}
+          onGoToChange={(id) => {
+            const change = changes.find((item) => item.id === id);
+            if (change) {
+              goToChange(change);
+            }
+          }}
+        />
+      )}
       {data && (
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <Card aria-labelledby="compare-result-heading" className="min-w-0">

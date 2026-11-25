@@ -15,7 +15,8 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => search,
   useRouter: () => ({ replace }),
 }));
-vi.mock("@/features/auth/AuthProvider", () => ({ useAuth: () => ({ refresh: vi.fn() }) }));
+const refresh = vi.fn();
+vi.mock("@/features/auth/AuthProvider", () => ({ useAuth: () => ({ refresh }) }));
 vi.mock("@/features/documents/api", () => ({
   fetchDocument: () => Promise.resolve({ id: 3, title: "사업 계획서", status: "ACTIVE" }),
 }));
