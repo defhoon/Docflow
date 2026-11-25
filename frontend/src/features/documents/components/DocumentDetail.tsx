@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button, ButtonLink, buttonClass } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { CheckCircleIcon, FileIcon, LockIcon, UploadIcon } from "@/components/ui/icons";
+import { CheckCircleIcon, CompareIcon, FileIcon, LockIcon, UploadIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ErrorState, LoadingBlock } from "@/components/ui/States";
 import { Badge, StatusBadge } from "@/components/ui/StatusBadge";
@@ -30,6 +30,8 @@ import { DocumentVersionHistory } from "./DocumentVersionHistory";
 import { DocumentVersionPreview } from "./DocumentVersionPreview";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
 import { FinalizePanel } from "./FinalizePanel";
+import { VersionSummaryPanel } from "@/features/analysis/components/VersionSummaryPanel";
+import { compareHref } from "@/features/compare/api";
 
 type DetailResult =
   | { kind: "project-not-found" }
@@ -322,6 +324,9 @@ export function DocumentDetail() {
                     <p className="mt-1 text-sm text-ink-muted">{selectedSummary ? versionNoteEmptyText(selected) : "버전 정보를 불러오는 중..."}</p>
                   )}
                 </section>
+                {selectedSummary && (
+                  <VersionSummaryPanel projectId={projectId} documentId={documentId} versionNumber={selectedSummary.versionNumber} />
+                )}
                 {previewOpen && selectedSummary ? (
                   <DocumentVersionPreview
                     key={selectedSummary.versionNumber}
@@ -348,7 +353,21 @@ export function DocumentDetail() {
             </Card>
             <aside aria-label="버전과 피드백" className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
               <Card aria-labelledby="versions-card-heading">
-                <CardHeader title="버전" titleId="versions-card-heading" description="버전을 고르면 변경사항·미리보기·피드백이 그 버전으로 바뀝니다." />
+                <CardHeader
+                  title="버전"
+                  titleId="versions-card-heading"
+                  description="버전을 고르면 변경사항·미리보기·피드백이 그 버전으로 바뀝니다."
+                  actions={
+                    versions.length >= 2 ? (
+                      <ButtonLink
+                        size="sm"
+                        href={compareHref(projectId, documentId, selected > 1 ? selected - 1 : selected, selected > 1 ? selected : selected + 1)}
+                      >
+                        <CompareIcon /> 버전 비교
+                      </ButtonLink>
+                    ) : undefined
+                  }
+                />
                 <CardBody className="px-3 py-2">
                   <DocumentVersionHistory
                     projectId={projectId}

@@ -70,4 +70,5 @@ SPEC-05는 PDF·DOCX·XLSX·PPTX 네 형식 모두의 브라우저 미리보기�
 - 격리 래퍼 동작: `docflow.preview.launcher`가 비어 있으면 격리 없이 실행하고 WARN 로그를 남긴다. 지정했는데 자체 점검(`--version`)이 실패하면 ERROR 로그를 남기고 Office 미리보기를 끈다(503). 격리 없이 대체 실행하지 않는다.
 - CI: `ubuntu-latest`는 AppArmor가 비특권 사용자 namespace를 막는다. 워크플로에서 `kernel.apparmor_restrict_unprivileged_userns=0`으로 바꾼 뒤 `unshare -rn`을 확인하고 `DOCFLOW_PREVIEW_LAUNCHER=unshare,-rn`으로 실제 변환 테스트를 실행한다. 사용할 수 없으면 워크플로 경고를 남긴다.
 - 테스트 의존성: Apache PDFBox 3.0.5 `testImplementation`(승인 2026-11-04). 운영 의존성에는 없다.
+- 2026-11-24 개정(ADR-0008, SPEC-10): PDF 텍스트·좌표 추출을 위해 같은 버전을 운영 의존성(`implementation`)으로 옮겼다. 미리보기 변환 방식은 바뀌지 않는다.
 - 검증 결과와 한계는 SPEC-05 §18.
