@@ -35,12 +35,40 @@ const LEVEL_LABEL: Record<ChangeSummaryResult["significance"]["level"], { label:
  * 위해 사용자가 요청할 때만 만든다.
  */
 export function ChangeSummaryPanel({ projectId, documentId, base, target, onGoToChange }: Props) {
+  const summary = useChangeSummary(projectId, documentId, base, target);
+  return <ChangeSummaryView summary={summary} onGoToChange={onGoToChange} />;
+}
+
+/** AI 변경 요약 상태 조회·요청 (SPEC-14). 비교 화면이 탭 표시 판단에도 쓴다 (SPEC-17). */
+export function useChangeSummary(projectId: string, documentId: string, base: number, target: number) {
   const load = useCallback(() => fetchChangeSummary(projectId, documentId, base, target), [projectId, documentId, base, target]);
   const submit = useCallback(() => requestChangeSummary(projectId, documentId, base, target), [projectId, documentId, base, target]);
-  const { state, request, requesting, requestError } = useAnalysis<ChangeSummaryResult>(`${projectId}/${documentId}/${base}/${target}`, load, submit);
+  return useAnalysis<ChangeSummaryResult>(`${projectId}/${documentId}/${base}/${target}`, load, submit);
+}
+
+export type ChangeSummaryHandle = ReturnType<typeof useChangeSummary>;
+
+/** 요약 표시. `plain`이면 카드 없이 탭 패널 안에 표시한다 (SPEC-17). */
+export function ChangeSummaryView({ summary, onGoToChange, plain = false }: {
+  summary: ChangeSummaryHandle;
+  onGoToChange: (changeId: number) => void;
+  plain?: boolean;
+}) {
+  const { state, request, requesting, requestError, reload } = summary;
+  const Frame = plain ? PlainFrame : CardFrame;
 
   if (state.kind === "error") {
-    return null;
+    // 카드(보조 영역)는 숨기고, 탭(사용자가 직접 연 화면)에서는 실패를 알린다.
+    return plain ? (
+      <Frame>
+        <p role="alert" className="text-sm text-danger-700">
+          AI 변경 요약을 불러오지 못했습니다. {state.message}
+        </p>
+        <Button size="sm" onClick={reload} className="self-start">
+          다시 불러오기
+        </Button>
+      </Frame>
+    ) : null;
   }
   if (state.kind === "loading") {
     return (
@@ -167,7 +195,21 @@ export function ChangeSummaryPanel({ projectId, documentId, base, target, onGoTo
   );
 }
 
-function Frame({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
+function PlainFrame({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
+  return (
+    <section aria-label="AI 변경 요약" className="flex flex-col gap-3">
+      <p>
+        <Badge tone="brand">
+          <SparkleIcon className="size-3.5" /> AI 생성 · 검토 필요
+        </Badge>
+      </p>
+      {children}
+      {footer}
+    </section>
+  );
+}
+
+function CardFrame({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <Card aria-labelledby="change-summary-heading" className="border-brand-500/25">
       <CardHeader
