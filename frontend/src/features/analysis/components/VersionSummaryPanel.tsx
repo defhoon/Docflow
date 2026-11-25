@@ -19,17 +19,60 @@ type Props = {
   versionNumber: number;
 };
 
+/** 선택한 버전의 AI 요약 상태 조회·요청 (SPEC-11). 문서 워크스페이스가 탭 표시 여부 판단에도 쓴다 (SPEC-16). */
+export function useVersionSummary(projectId: string, documentId: string, versionNumber: number) {
+  const load = useCallback(() => fetchVersionSummary(projectId, documentId, versionNumber), [projectId, documentId, versionNumber]);
+  const submit = useCallback(() => requestVersionSummary(projectId, documentId, versionNumber), [projectId, documentId, versionNumber]);
+  return useAnalysis<SummaryResult>(`${projectId}/${documentId}/${versionNumber}`, load, submit);
+}
+
+export type VersionSummaryHandle = ReturnType<typeof useVersionSummary>;
+
 /**
  * 선택한 버전의 AI 요약 (SPEC-11 §8). AI가 만든 결과임을 표시하고, 사용자가 쓴 버전 정보와 구분한다. 모든 값은 텍스트로만
  * 표시한다(HTML 해석 없음).
  */
 export function VersionSummaryPanel({ projectId, documentId, versionNumber }: Props) {
-  const load = useCallback(() => fetchVersionSummary(projectId, documentId, versionNumber), [projectId, documentId, versionNumber]);
-  const submit = useCallback(() => requestVersionSummary(projectId, documentId, versionNumber), [projectId, documentId, versionNumber]);
-  const { state, request, requesting, requestError, reload } = useAnalysis<SummaryResult>(
-    `${projectId}/${documentId}/${versionNumber}`,
-    load,
-    submit,
+  const summary = useVersionSummary(projectId, documentId, versionNumber);
+  return <VersionSummaryView summary={summary} />;
+}
+
+/**
+ * 요약 표시 (SPEC-11 §8, SPEC-16). `onGoToPage`가 있으면 쪽 번호(p.N)를 버튼으로 그려 문서 뷰어를 그 쪽으로 옮긴다.
+ * `plain`이면 테두리 상자 없이 탭 패널 안에 바로 표시한다.
+ */
+export function VersionSummaryView({ summary, onGoToPage, plain = false }: {
+  summary: VersionSummaryHandle;
+  onGoToPage?: (page: number) => void;
+  plain?: boolean;
+}) {
+  const { state, request, requesting, requestError, reload } = summary;
+  const SummaryFrame = plain ? PlainFrame : BoxFrame;
+  const pageRef = (page: number) =>
+    onGoToPage ? (
+      <button
+        key={page}
+        type="button"
+        onClick={() => onGoToPage(page)}
+        className="rounded px-0.5 text-brand-700 underline-offset-2 hover:underline"
+        aria-label={`${page}쪽으로 이동`}
+      >
+        p.{page}
+      </button>
+    ) : (
+      <span key={page}>p.{page}</span>
+    );
+  const pageRefs = (pages: number[]) => !onGoToPage ? (
+    <span className="ml-1 text-xs text-ink-muted">(p.{pages.join(", ")})</span>
+  ) : (
+    <span className="ml-1 inline-flex flex-wrap gap-x-1 text-xs text-ink-muted">
+      ({pages.map((page, index) => (
+        <span key={page}>
+          {index > 0 && ", "}
+          {pageRef(page)}
+        </span>
+      ))})
+    </span>
   );
 
   if (state.kind === "loading") {
@@ -131,7 +174,7 @@ export function VersionSummaryPanel({ projectId, documentId, versionNumber }: Pr
                 {result.keyPoints.map((point, index) => (
                   <li key={index} className="break-words">
                     {point.text}
-                    {point.pages.length > 0 && <span className="ml-1 text-xs text-ink-muted">(p.{point.pages.join(", ")})</span>}
+                    {point.pages.length > 0 && pageRefs(point.pages)}
                   </li>
                 ))}
               </ul>
@@ -150,7 +193,7 @@ export function VersionSummaryPanel({ projectId, documentId, versionNumber }: Pr
                     <dd className="break-words text-ink">
                       {fact.value}
                       <span className="block text-xs text-ink-muted" title="원문 인용">
-                        “{fact.quote}”{fact.page !== null && ` · p.${fact.page}`}
+                        “{fact.quote}”{fact.page !== null && <> · {pageRef(fact.page)}</>}
                       </span>
                     </dd>
                   </div>
@@ -164,7 +207,21 @@ export function VersionSummaryPanel({ projectId, documentId, versionNumber }: Pr
   }
 }
 
-function SummaryFrame({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
+function PlainFrame({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
+  return (
+    <section aria-label="AI 요약" className="flex flex-col gap-3">
+      <p className="flex items-center gap-2">
+        <Badge tone="brand">
+          <SparkleIcon className="size-3.5" /> AI 생성 · 검토 필요
+        </Badge>
+      </p>
+      {children}
+      {footer}
+    </section>
+  );
+}
+
+function BoxFrame({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <section aria-labelledby="ai-summary-heading" className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-brand-500/20 bg-brand-50/40 px-4 py-3">
       <h3 id="ai-summary-heading" className="flex items-center gap-2 text-xs font-medium text-brand-700">

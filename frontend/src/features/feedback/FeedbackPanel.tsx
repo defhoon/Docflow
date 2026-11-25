@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Field";
-import { ChatIcon } from "@/components/ui/icons";
+import { cn } from "@/components/ui/cn";
+import { ChatIcon, LockIcon } from "@/components/ui/icons";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -21,14 +22,21 @@ type ListState = { kind: "loading" } | { kind: "error"; message: string } | { ki
 /**
  * 선택한 버전의 피드백 목록과 작성 폼 (SPEC-08). 내용은 텍스트로만 렌더링한다(HTML 해석 없음).
  * {@code canWrite}가 false(FINALIZED)이면 작성 폼을 표시하지 않는다. 최종 판정은 Backend가 한다.
+ * <p>
+ * SPEC-16: `draft`·`onDraftChange`를 주면 작성 내용을 부모가 버전별로 보관한다(버전을 바꿔도 유지). 콜백은 항상 이 패널의
+ * 버전 번호와 함께 호출되므로, 응답 전에 다른 버전으로 바뀌어도 그 버전의 초안을 건드리지 않는다. `layout="pane"`이면 목록은
+ * 패널 안에서 스크롤하고 입력창은 아래에 고정한다.
  */
-export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, onFinalizedConflict, onCreated }: {
+export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, onFinalizedConflict, onCreated, draft, onDraftChange, layout = "stack" }: {
   projectId: string;
   documentId: string;
   versionNumber: number;
   canWrite: boolean;
   onFinalizedConflict: () => void;
   onCreated?: () => void;
+  draft?: string;
+  onDraftChange?: (versionNumber: number, value: string) => void;
+  layout?: "stack" | "pane";
 }) {
   const { refresh } = useAuth();
   const toast = useToast();
@@ -36,7 +44,15 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
   const key = `${projectId}/${documentId}/v${versionNumber}#${attempt}`;
   const [result, setResult] = useState<{ key: string; value: ListState } | null>(null);
   const state: ListState = result?.key === key ? result.value : { kind: "loading" };
-  const [content, setContent] = useState("");
+  const [localContent, setLocalContent] = useState("");
+  const content = draft ?? localContent;
+  const setContent = (value: string) => {
+    if (onDraftChange) {
+      onDraftChange(versionNumber, value);
+    } else {
+      setLocalContent(value);
+    }
+  };
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -106,8 +122,9 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
     }
   }
 
-  return (
-    <div className="flex flex-col gap-4">
+  const pane = layout === "pane";
+  const list = (
+    <>
       {state.kind === "loading" && <LoadingBlock label="피드백을 불러오는 중..." />}
       {state.kind === "error" && (
         <ErrorState role="status" title="피드백을 불러오지 못했습니다." message={state.message} onRetry={() => setAttempt((n) => n + 1)} />
@@ -139,8 +156,15 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
           ))}
         </ol>
       )}
-      {canWrite && (
-        <form onSubmit={(event) => void handleSubmit(event)} noValidate className="flex flex-col gap-2" aria-busy={submitting}>
+    </>
+  );
+  const form = canWrite && (
+        <form
+          onSubmit={(event) => void handleSubmit(event)}
+          noValidate
+          className={cn("flex flex-col gap-2", pane && "shrink-0 border-t border-line bg-surface px-4 py-3")}
+          aria-busy={submitting}
+        >
           <label htmlFor="feedback-content" className="text-sm font-medium text-ink">
             v{versionNumber}에 피드백 남기기
           </label>
@@ -154,7 +178,14 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
             placeholder="수정이 필요한 부분이나 의견을 적어 주세요."
             invalid={Boolean(formError) || tooLong}
             aria-describedby="feedback-content-count"
-            rows={3}
+            rows={pane ? 2 : 3}
+            onKeyDown={(event) => {
+              // Ctrl/⌘+Enter로 등록
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
           />
           <div className="flex items-center justify-between gap-3">
             <span id="feedback-content-count" className={tooLong ? "text-xs text-danger-700" : "text-xs text-ink-faint"}>
@@ -170,7 +201,25 @@ export function FeedbackPanel({ projectId, documentId, versionNumber, canWrite, 
             </p>
           )}
         </form>
-      )}
+  );
+
+  if (pane) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-feedback-panel>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">{list}</div>
+        {form}
+        {!canWrite && (
+          <p className="flex shrink-0 items-center gap-2 border-t border-line bg-surface px-4 py-3 text-xs text-ink-muted">
+            <LockIcon className="size-3.5" /> 최종 확정된 문서는 피드백을 조회만 할 수 있습니다.
+          </p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-4" data-feedback-panel>
+      {list}
+      {form}
     </div>
   );
 }

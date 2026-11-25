@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { CharCount } from "@/components/ui/CharCount";
@@ -31,6 +31,12 @@ type Props = {
   onUploaded: (document: DocumentDetail) => void;
   /** `409 DOCUMENT_STATUS_CONFLICT` 시 문서 상세를 다시 조회한다 (결정 I6). */
   onConflict: () => void;
+  /** 모달 안에서 쓸 때 제목을 숨긴다(모달 제목이 대신, SPEC-16). */
+  bare?: boolean;
+  /** 업로드 중 여부 알림(모달이 닫히지 않게, SPEC-16). */
+  onSubmittingChange?: (submitting: boolean) => void;
+  /** 취소 버튼(모달). 업로드 중에는 비활성화한다. */
+  onCancel?: () => void;
 };
 
 /**
@@ -38,7 +44,7 @@ type Props = {
  * 보낸다. 실패하면 파일과 변경사항을 그대로 유지하고, 성공하면 비운다. 상태에 따른 비활성화는 사용성 보조이며
  * Backend가 최종 판정한다. 네트워크 오류는 결과가 불명확하므로 자동으로 다시 보내지 않는다.
  */
-export function DocumentVersionUploadForm({ projectId, documentId, status, onUploaded, onConflict }: Props) {
+export function DocumentVersionUploadForm({ projectId, documentId, status, onUploaded, onConflict, bare = false, onSubmittingChange, onCancel }: Props) {
   const { refresh } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   // 파일 입력은 코드로 값을 비울 수 없으므로 key를 바꿔 다시 마운트한다.
@@ -57,6 +63,11 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   const visibleRef = useRef(false);
   const resetWhenSettledRef = useRef(false);
   const allowed = canUploadNewVersion(status);
+  useEffect(() => {
+    onSubmittingChange?.(submitting);
+    // 알림용 콜백이라 바뀌어도 다시 알릴 필요가 없다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitting]);
   const disabled = submitting || !allowed;
 
   const resetForm = useCallback(() => {
@@ -156,8 +167,8 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   }
 
   return (
-    <section aria-labelledby="document-version-heading" className="flex flex-col gap-4">
-      <div>
+    <section aria-labelledby={bare ? undefined : "document-version-heading"} aria-label={bare ? "새 버전 등록" : undefined} className="flex flex-col gap-4">
+      <div className={bare ? "hidden" : undefined}>
         <h3 id="document-version-heading" className="text-sm font-semibold text-ink">
           새 버전 등록
         </h3>
@@ -212,9 +223,16 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
             파일을 업로드하는 중입니다. 화면을 닫지 마세요.
           </p>
         )}
-        <Button type="submit" variant="primary" disabled={disabled} className="self-start">
-          {submitting ? "등록 중..." : "새 버전 등록"}
-        </Button>
+        <div className={onCancel ? "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end" : "flex"}>
+          {onCancel && (
+            <Button onClick={onCancel} disabled={submitting}>
+              취소
+            </Button>
+          )}
+          <Button type="submit" variant="primary" disabled={disabled} className={onCancel ? undefined : "self-start"}>
+            {submitting ? "등록 중..." : "새 버전 등록"}
+          </Button>
+        </div>
       </form>
     </section>
   );

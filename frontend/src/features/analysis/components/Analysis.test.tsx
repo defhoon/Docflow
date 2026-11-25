@@ -5,7 +5,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 
 import type { AiSettings, AnalysisState, SummaryResult } from "../types";
 import { AiSettingsCard } from "./AiSettingsCard";
-import { VersionSummaryPanel } from "./VersionSummaryPanel";
+import { useVersionSummary, VersionSummaryPanel, VersionSummaryView } from "./VersionSummaryPanel";
 
 const refresh = vi.fn();
 const fetchSummary = vi.fn();
@@ -64,6 +64,21 @@ describe("VersionSummaryPanel (SPEC-11)", () => {
     expect(screen.getByText("1,200만원")).toBeInTheDocument();
     expect(screen.getByText(/원문과 다를 수 있으니/)).toBeInTheDocument();
     expect(fetchSummary).toHaveBeenCalledWith("1", "2", 3);
+  });
+
+  it("SPEC-16 AC-WS-11: 쪽 이동이 가능하면 쪽 번호를 버튼으로 그리고 누르면 그 쪽으로 이동을 요청한다", async () => {
+    fetchSummary.mockResolvedValue(completed);
+    const onGoToPage = vi.fn();
+    function Harness() {
+      const summary = useVersionSummary("1", "2", 3);
+      return <VersionSummaryView summary={summary} onGoToPage={onGoToPage} plain />;
+    }
+    render(<Harness />);
+    fireEvent.click(await screen.findByRole("button", { name: "2쪽으로 이동" }));
+    expect(onGoToPage).toHaveBeenLastCalledWith(2);
+    // 주요 일정·수치의 원문 쪽도 이동할 수 있다
+    expect(screen.getAllByRole("button", { name: "1쪽으로 이동" })).toHaveLength(2);
+    expect(screen.getByText("AI 생성 · 검토 필요")).toBeInTheDocument();
   });
 
   it("AI가 꺼진 프로젝트에서 결과가 없으면 아무것도 표시하지 않는다", async () => {

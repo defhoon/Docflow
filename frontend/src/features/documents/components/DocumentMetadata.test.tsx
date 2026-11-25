@@ -9,8 +9,8 @@ import type { DocumentDetail } from "../types";
 import type { DocumentVersionSummary } from "../version-files";
 import { DocumentCreateForm } from "./DocumentCreateForm";
 import { DocumentDescription } from "./DocumentDescription";
-import { DocumentVersionHistory } from "./DocumentVersionHistory";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
+import { VersionList } from "./VersionList";
 
 
 /** 성공 알림은 토스트로 표시되므로(#50) 화면을 ToastProvider 안에서 렌더링한다. */
@@ -74,6 +74,7 @@ function version(versionNumber: number, versionNote: string | null): DocumentVer
     uploadedAt: "2026-11-01T09:00:00Z",
     latest: false,
     versionNote,
+    feedbackCount: 0,
   };
 }
 
@@ -263,16 +264,20 @@ describe("문서 설명 보기·수정 (SPEC-09 AC-META-UI-03)", () => {
   });
 });
 
-describe("버전 히스토리 — 버전 정보 (SPEC-09 AC-META-UI-04)", () => {
-  it("v1은 '초기 버전 내용', v2 이상은 '변경사항', 없으면 빈 상태 문구", async () => {
-    fetchVersionsMock.mockResolvedValueOnce([version(3, null), version(2, "3장 추가\n표 수정"), version(1, "초안")]);
-    render(<DocumentVersionHistory projectId="7" documentId="3" reloadKey={0} selectedVersion={3} onPreview={vi.fn()} />);
-
-    const items = await screen.findAllByRole("listitem");
-    expect(within(items[0]).getByText("변경사항")).toBeInTheDocument();
+describe("버전 목록 — 버전 정보 (SPEC-09 AC-META-UI-04, SPEC-16)", () => {
+  it("버전 정보를 줄여 보여 주고, 없으면 v1은 초기 버전 내용·v2 이상은 변경사항 빈 상태 문구를 보여 준다", () => {
+    render(
+      <VersionList
+        versions={[version(3, null), version(2, "3장 추가\n표 수정"), version(1, "초안")]}
+        selected={3}
+        finalVersionNumber={null}
+        drafts={new Set()}
+        onSelect={vi.fn()}
+      />,
+    );
+    const items = screen.getAllByRole("listitem");
     expect(within(items[0]).getByText("작성된 변경사항이 없습니다.")).toBeInTheDocument();
     expect(within(items[1]).getByText(/3장 추가/)).toBeInTheDocument();
-    expect(within(items[2]).getByText("초기 버전 내용")).toBeInTheDocument();
     expect(within(items[2]).getByText("초안")).toBeInTheDocument();
   });
 });

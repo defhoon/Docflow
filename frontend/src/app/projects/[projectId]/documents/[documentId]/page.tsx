@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 export default function DocumentDetailPage() {
   return (
     // 동적 세그먼트의 useParams·usePathname은 요청 시점까지 suspend되므로 하위 트리 전체를 감싼다 (SPEC-01 §8.2).
-    <Suspense fallback={<ShellFallback />}>
-      <AppShell>
+    <Suspense fallback={<ShellFallback mode="workspace" />}>
+      <AppShell mode="workspace">
         <DocumentDetail />
       </AppShell>
     </Suspense>

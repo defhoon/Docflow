@@ -6,12 +6,14 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
  * 모달 대화상자. 열릴 때 첫 포커스 대상으로 이동하고, Esc로 닫으며, Tab 포커스를 대화상자 안에 가둔다.
  * 닫히면 열기 전 요소로 포커스를 돌려준다. {@code busy}이면 Esc·배경 클릭으로 닫지 않는다.
  */
-export function Dialog({ open, title, description, children, footer, onClose, busy = false }: {
+export function Dialog({ open, title, description, children, footer, onClose, busy = false, size = "md" }: {
   open: boolean;
   title: string;
   description?: ReactNode;
   children?: ReactNode;
-  footer: ReactNode;
+  /** 없으면 본문(예: 자체 제출 버튼이 있는 폼)이 행동을 가진다. */
+  footer?: ReactNode;
+  size?: "md" | "lg";
   onClose: () => void;
   busy?: boolean;
 }) {
@@ -71,7 +73,7 @@ export function Dialog({ open, title, description, children, footer, onClose, bu
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto rounded-xl bg-surface shadow-[var(--shadow-overlay)]"
+        className={`relative flex max-h-[90vh] w-full flex-col overflow-y-auto rounded-xl bg-surface shadow-[var(--shadow-overlay)] ${size === "lg" ? "max-w-xl" : "max-w-lg"}`}
       >
         <div className="flex flex-col gap-2 px-6 pt-6">
           <h2 id={titleId} className="text-lg font-semibold text-ink">
@@ -83,8 +85,8 @@ export function Dialog({ open, title, description, children, footer, onClose, bu
             </div>
           )}
         </div>
-        {children && <div className="px-6 pt-4">{children}</div>}
-        <div className="flex flex-col-reverse gap-2 px-6 py-5 sm:flex-row sm:justify-end">{footer}</div>
+        {children && <div className={footer ? "px-6 pt-4" : "px-6 pt-4 pb-6"}>{children}</div>}
+        {footer && <div className="flex flex-col-reverse gap-2 px-6 py-5 sm:flex-row sm:justify-end">{footer}</div>}
       </div>
     </div>
   );

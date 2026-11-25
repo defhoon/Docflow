@@ -10,6 +10,8 @@ export type DocumentVersionSummary = {
   latest: boolean;
   /** 버전 정보 (SPEC-09): v1은 초기 버전 내용, v2 이상은 직전 버전 대비 변경사항. 없으면 null. */
   versionNote: string | null;
+  /** 버전에 남은 피드백 수 (SPEC-16). */
+  feedbackCount: number;
 };
 
 function versionsPath(projectId: string, documentId: string): string {

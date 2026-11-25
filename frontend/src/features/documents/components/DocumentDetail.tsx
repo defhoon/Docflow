@@ -1,37 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button, ButtonLink, buttonClass } from "@/components/ui/Button";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { CheckCircleIcon, CompareIcon, FileIcon, LockIcon, UploadIcon } from "@/components/ui/icons";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { ErrorState, LoadingBlock } from "@/components/ui/States";
-import { Badge, StatusBadge } from "@/components/ui/StatusBadge";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { cn } from "@/components/ui/cn";
+import { Dialog } from "@/components/ui/Dialog";
+import { IconButton, IconLink } from "@/components/ui/IconButton";
+import {
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  CompareIcon,
+  DownloadIcon,
+  PanelLeftIcon,
+  PanelRightIcon,
+  UploadIcon,
+} from "@/components/ui/icons";
+import { PaneResizer } from "@/components/ui/PaneResizer";
+import { ErrorState, LoadingBlock, Skeleton } from "@/components/ui/States";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Segmented, Tabs, tabPanelProps } from "@/components/ui/Tabs";
 import { fetchDocumentActivities } from "@/features/activity/api";
 import { ActivityFeed } from "@/features/activity/components/ActivityFeed";
+import { fetchAiSettings } from "@/features/analysis/api";
+import { useVersionSummary, VersionSummaryView } from "@/features/analysis/components/VersionSummaryPanel";
+import type { AiSettings } from "@/features/analysis/types";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { compareHref } from "@/features/compare/api";
 import { FeedbackPanel } from "@/features/feedback/FeedbackPanel";
 import { fetchProject } from "@/features/projects/api";
-import type { Project } from "@/features/projects/types";
 import { errorCode, failureMessage, isUnauthenticated } from "@/features/projects/errors";
 import { formatDateTime } from "@/features/projects/format";
+import type { Project } from "@/features/projects/types";
 import { ApiError } from "@/lib/api-client";
 
 import { fetchDocument } from "../api";
+import { fileFailureMessage } from "../errors";
 import { formatFileSize } from "../format";
-import { versionNoteEmptyText, versionNoteLabel } from "../version-note";
 import type { DocumentDetail as DocumentDetailData } from "../types";
-import type { DocumentVersionSummary } from "../version-files";
+import { type DocumentVersionSummary, downloadVersionFile, fetchDocumentVersions, saveBlob } from "../version-files";
+import { versionNoteEmptyText, versionNoteLabel } from "../version-note";
 import { DocumentDescription } from "./DocumentDescription";
-import { DocumentVersionHistory } from "./DocumentVersionHistory";
-import { DocumentVersionPreview } from "./DocumentVersionPreview";
 import { DocumentVersionUploadForm } from "./DocumentVersionUploadForm";
-import { FinalizePanel } from "./FinalizePanel";
-import { VersionSummaryPanel } from "@/features/analysis/components/VersionSummaryPanel";
-import { compareHref } from "@/features/compare/api";
+import { FinalizeDialog } from "./FinalizeDialog";
+import { type PageRequest, PdfDocumentViewer } from "./PdfDocumentViewer";
+import { VersionList } from "./VersionList";
 
 type DetailResult =
   | { kind: "project-not-found" }
@@ -41,11 +55,20 @@ type DetailResult =
 
 type DetailState = { kind: "loading" } | DetailResult;
 
+type CollabTab = "feedback" | "ai" | "info" | "activity";
+type MobileTab = "doc" | "versions" | "collab";
+
 const ID_PATTERN = /^[0-9]+$/;
+const LEFT = { min: 220, max: 400, initial: 264 };
+const RIGHT = { min: 300, max: 560, initial: 368 };
+
+function parseVersion(value: string | null): number | null {
+  return value && ID_PATTERN.test(value) ? Number(value) : null;
+}
 
 /**
- * 문서 협업 작업 공간 (#28): 버전 미리보기·히스토리(SPEC-05), 선택 버전의 피드백(SPEC-08), 새 버전 등록(SPEC-04),
- * 오너의 최종 확정(SPEC-07), 활동 이력(SPEC-06). FINALIZED이면 읽기 전용으로 바뀐다.
+ * 문서 상세 3단 워크스페이스 (SPEC-16): 버전 | 문서 뷰어 | 협업(피드백·AI 요약·정보·활동). 선택 버전 하나가 모든 패널의
+ * 기준이며 URL `?v=N`과 동기화한다. FINALIZED이면 읽기 전용으로 바뀐다. 권한·상태 판정은 Backend가 한다.
  */
 export function DocumentDetail() {
   const { projectId, documentId } = useParams<{ projectId: string; documentId: string }>();
@@ -67,11 +90,7 @@ export function DocumentDetail() {
     }
     let active = true;
     fetchDocument(projectId, documentId).then(
-      (document) => {
-        if (active) {
-          setResult({ key: requestKey, value: { kind: "success", document } });
-        }
-      },
+      (document) => active && setResult({ key: requestKey, value: { kind: "success", document } }),
       (error: unknown) => {
         if (!active) {
           return;
@@ -97,85 +116,29 @@ export function DocumentDetail() {
   }, [projectId, documentId, requestKey, validIds, refresh]);
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
-  // 버전 히스토리 갱신 신호와 미리보기 중인 버전 (SPEC-05 §9.2).
-  const [versionsReloadKey, setVersionsReloadKey] = useState(0);
-  // 미리보기는 선택한 버전을 보여 준다. 열지 않으면 파일을 내려받지 않는다(불필요한 전송량 방지).
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const closePreview = useCallback(() => setPreviewOpen(false), []);
-  // 피드백 대상 버전(기본: 최신)과 선택 가능한 버전 목록 (#28).
-  const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
-  const [versions, setVersions] = useState<DocumentVersionSummary[]>([]);
-  const [activityKey, setActivityKey] = useState(0);
-  const bumpActivity = useCallback(() => setActivityKey((n) => n + 1), []);
-  // 오너 여부·프로젝트 이름(빵부스러기). 실패해도 문서 화면은 표시하고 확정 영역만 숨긴다(권한은 Backend가 판정).
-  const [project, setProject] = useState<{ key: string; value: Project | null } | null>(null);
-  useEffect(() => {
-    if (!validIds) {
-      return;
-    }
-    let active = true;
-    fetchProject(projectId).then(
-      (value) => active && setProject({ key: projectId, value }),
-      () => active && setProject({ key: projectId, value: null }),
-    );
-    return () => {
-      active = false;
-    };
-  }, [projectId, validIds]);
-  const projectInfo = project?.key === projectId ? project.value : null;
-  const loadActivities = useCallback(
-    () => fetchDocumentActivities(projectId, documentId, 15),
-    [projectId, documentId],
+  const setDocument = useCallback(
+    (document: DocumentDetailData) => setResult({ key: requestKey, value: { kind: "success", document } }),
+    [requestKey],
   );
-
-  // 새 버전 등록 성공: 응답(갱신된 상세)으로 바로 바꾼다. 로딩 화면을 거치지 않는다.
-  const handleVersionUploaded = useCallback(
-    (document: DocumentDetailData) => {
-      setResult({ key: requestKey, value: { kind: "success", document } });
-      setVersionsReloadKey((current) => current + 1);
-      setSelectedNumber(document.latestVersion.versionNumber);
-      bumpActivity();
-    },
-    [requestKey, bumpActivity],
-  );
-
-  // 설명 변경 성공: 응답(갱신된 상세)으로 바꾸고 활동 이력을 다시 불러온다 (SPEC-09).
-  const handleDescriptionUpdated = useCallback(
-    (document: DocumentDetailData) => {
-      setResult({ key: requestKey, value: { kind: "success", document } });
-      bumpActivity();
-    },
-    [requestKey, bumpActivity],
-  );
-
-  // 최종 확정 성공: 응답으로 읽기 전용 화면으로 바꾼다.
-  const handleFinalized = useCallback(
-    (document: DocumentDetailData) => {
-      setResult({ key: requestKey, value: { kind: "success", document } });
-      setVersionsReloadKey((current) => current + 1);
-      bumpActivity();
-    },
-    [requestKey, bumpActivity],
-  );
-
-  // 409(상태 충돌): 등록 영역의 오류 문구를 유지하도록 로딩 화면 없이 다시 조회한다 (결정 I6). 실패하면 현재 화면을 유지한다.
+  // 409(상태 충돌): 오류 문구를 유지하도록 로딩 화면 없이 다시 조회한다. 실패하면 현재 화면을 유지한다.
   const reloadInBackground = useCallback(() => {
-    setVersionsReloadKey((current) => current + 1);
     fetchDocument(projectId, documentId).then(
       (document) =>
-        setResult((current) =>
-          current?.key === requestKey ? { key: requestKey, value: { kind: "success", document } } : current,
-        ),
+        setResult((current) => (current?.key === requestKey ? { key: requestKey, value: { kind: "success", document } } : current)),
       () => undefined,
     );
   }, [projectId, documentId, requestKey]);
 
   switch (state.kind) {
     case "loading":
-      return <LoadingBlock label="불러오는 중..." lines={6} />;
+      return (
+        <div className="p-6">
+          <LoadingBlock label="불러오는 중..." lines={6} />
+        </div>
+      );
     case "project-not-found":
       return (
-        <div role="alert" className="flex flex-col items-start gap-3">
+        <div role="alert" className="flex flex-col items-start gap-3 p-6">
           <p className="font-medium">프로젝트를 찾을 수 없습니다.</p>
           <Link href="/projects" className="text-sm text-brand-700 underline">
             프로젝트 목록으로
@@ -184,283 +147,540 @@ export function DocumentDetail() {
       );
     case "not-found":
       return (
-        <div role="alert" className="flex flex-col items-start gap-3">
+        <div role="alert" className="flex flex-col items-start gap-3 p-6">
           <p className="font-medium">문서를 찾을 수 없습니다.</p>
-          <ProjectLink projectId={projectId} />
+          <Link href={`/projects/${projectId}`} className="text-sm text-brand-700 underline">
+            프로젝트로 돌아가기
+          </Link>
         </div>
       );
     case "error":
-      return <ErrorState title="문서를 불러오지 못했습니다." message={state.message} onRetry={retry} />;
-    case "success": {
-      const { document } = state;
-      const latest = document.latestVersion;
-      const finalized = document.status === "FINALIZED";
-      const finalization = document.finalization;
-      const selected = selectedNumber ?? finalization?.versionNumber ?? latest.versionNumber;
-      const selectedSummary = versions.find((version) => version.versionNumber === selected) ?? null;
-      const isOwner = projectInfo?.myRole === "OWNER";
-      const isFinalVersion = finalization?.versionNumber === selected;
       return (
-        <>
-          <PageHeader
-            breadcrumb={[
-              { label: "프로젝트", href: "/projects" },
-              { label: projectInfo?.name ?? "프로젝트", href: `/projects/${projectId}` },
-              { label: document.title },
-            ]}
-            title={document.title}
-            meta={
-              <>
-                <StatusBadge status={document.status} />
-                <span>작성자 {document.createdBy.displayName}</span>
-                <span aria-hidden="true">·</span>
-                <span>
-                  등록 <time dateTime={document.createdAt}>{formatDateTime(document.createdAt)}</time>
-                </span>
-                <span aria-hidden="true">·</span>
-                <span>최신 버전 v{latest.versionNumber}</span>
-                {finalization && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-medium text-success-700">최종 버전 v{finalization.versionNumber}</span>
-                  </>
-                )}
-              </>
-            }
-            actions={
-              !finalized ? (
-                <a href="#new-version" className={buttonClass("primary", "md")}>
-                  <UploadIcon /> 새 버전 올리기
-                </a>
-              ) : undefined
-            }
+        <div className="p-6">
+          <ErrorState title="문서를 불러오지 못했습니다." message={state.message} onRetry={retry} />
+        </div>
+      );
+    case "success":
+      return (
+        <Workspace
+          key={`${projectId}/${documentId}`}
+          projectId={projectId}
+          documentId={documentId}
+          document={state.document}
+          onDocument={setDocument}
+          onConflict={reloadInBackground}
+        />
+      );
+  }
+}
+
+function Workspace({ projectId, documentId, document, onDocument, onConflict }: {
+  projectId: string;
+  documentId: string;
+  document: DocumentDetailData;
+  onDocument: (document: DocumentDetailData) => void;
+  onConflict: () => void;
+}) {
+  const { refresh } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const finalized = document.status === "FINALIZED";
+  const finalization = document.finalization;
+  const latestNumber = document.latestVersion.versionNumber;
+
+  // 프로젝트(오너 여부·이름). 실패해도 문서 화면은 표시하고 확정 버튼만 숨긴다(권한은 Backend가 판정).
+  const [project, setProject] = useState<Project | null>(null);
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchProject(projectId).then((value) => active && setProject(value), () => undefined);
+    fetchAiSettings(projectId).then((value) => active && setAiSettings(value), () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+  const isOwner = project?.myRole === "OWNER";
+
+  // 버전 목록. 다시 불러오는 동안 이전 목록을 유지한다.
+  const [versionsKey, setVersionsKey] = useState(0);
+  const [versionsState, setVersionsState] = useState<{ key: number; versions: DocumentVersionSummary[] } | { key: number; error: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchDocumentVersions(projectId, documentId).then(
+      (versions) => active && setVersionsState({ key: versionsKey, versions }),
+      (error: unknown) => {
+        if (!active) {
+          return;
+        }
+        if (isUnauthenticated(error)) {
+          void refresh();
+        }
+        setVersionsState((current) => (current && "versions" in current ? current : { key: versionsKey, error: failureMessage(error) }));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [projectId, documentId, versionsKey, refresh]);
+  const versions = useMemo(() => (versionsState && "versions" in versionsState ? versionsState.versions : []), [versionsState]);
+  const reloadVersions = useCallback(() => setVersionsKey((n) => n + 1), []);
+
+  // 선택 버전: URL ?v=N(있는 버전일 때) → 확정 문서는 확정 버전, 협업 중이면 최신 버전.
+  const defaultVersion = finalization?.versionNumber ?? latestNumber;
+  const requested = parseVersion(searchParams.get("v"));
+  const selected =
+    requested !== null && (versions.length === 0 ? requested <= latestNumber : versions.some((v) => v.versionNumber === requested))
+      ? requested
+      : defaultVersion;
+  const selectedSummary = versions.find((version) => version.versionNumber === selected) ?? null;
+  const [mobileTab, setMobileTab] = useState<MobileTab>("doc");
+  function selectVersion(versionNumber: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("v", String(versionNumber));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setMobileTab("doc");
+  }
+
+  // 버전별 피드백 초안 (SPEC-16 §3.2)
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const setDraft = useCallback((versionNumber: number, value: string) => {
+    setDrafts((current) => ({ ...current, [versionNumber]: value }));
+  }, []);
+  const draftVersions = useMemo(
+    () => new Set(Object.entries(drafts).filter(([, value]) => value.trim().length > 0).map(([key]) => Number(key))),
+    [drafts],
+  );
+  useEffect(() => {
+    if (draftVersions.size === 0) {
+      return;
+    }
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [draftVersions]);
+
+  // AI 요약 (선택 버전). 탭 표시: (프로젝트 AI 켜짐 그리고 서버 사용 가능) 또는 완료된 요약이 있음.
+  const summary = useVersionSummary(projectId, documentId, selected);
+  const summaryCompleted = summary.state.kind === "ready" && summary.state.value.status === "COMPLETED";
+  const aiVisible = Boolean(aiSettings?.enabled && aiSettings.available) || summaryCompleted;
+  const [tab, setTab] = useState<CollabTab>("feedback");
+  const activeTab: CollabTab = tab === "ai" && !aiVisible ? "feedback" : tab;
+  const [pageRequest, setPageRequest] = useState<PageRequest | null>(null);
+  function goToPage(page: number) {
+    setPageRequest((current) => ({ page, nonce: (current?.nonce ?? 0) + 1 }));
+    setMobileTab("doc");
+  }
+
+  const [activityKey, setActivityKey] = useState(0);
+  const bumpActivity = useCallback(() => setActivityKey((n) => n + 1), []);
+  const loadActivities = useCallback(() => fetchDocumentActivities(projectId, documentId, 30), [projectId, documentId]);
+
+  // 패널 접기·너비 (저장하지 않음)
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(LEFT.initial);
+  const [rightWidth, setRightWidth] = useState(RIGHT.initial);
+
+  const [modal, setModal] = useState<"upload" | "finalize" | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // 최종본 받기 (확정 버전)
+  const [finalDownloading, setFinalDownloading] = useState(false);
+  const [finalDownloadError, setFinalDownloadError] = useState<string | null>(null);
+  async function downloadFinal() {
+    if (!finalization) {
+      return;
+    }
+    const finalSummary = versions.find((version) => version.versionNumber === finalization.versionNumber);
+    setFinalDownloading(true);
+    setFinalDownloadError(null);
+    try {
+      const blob = await downloadVersionFile(projectId, documentId, finalization.versionNumber);
+      saveBlob(blob, finalSummary?.originalFilename ?? `${document.title}-v${finalization.versionNumber}`);
+    } catch (error) {
+      if (isUnauthenticated(error)) {
+        void refresh();
+      } else {
+        setFinalDownloadError(fileFailureMessage(error));
+      }
+    } finally {
+      setFinalDownloading(false);
+    }
+  }
+
+  const compareLink = useMemo(() => {
+    if (versions.length < 2) {
+      return null;
+    }
+    // 목록은 최신 먼저. 선택 버전과 그 직전 버전을 비교한다(가장 오래된 버전이면 다음 버전과).
+    const index = versions.findIndex((version) => version.versionNumber === selected);
+    if (index < 0) {
+      return compareHref(projectId, documentId, versions[1].versionNumber, versions[0].versionNumber);
+    }
+    if (index === versions.length - 1) {
+      return compareHref(projectId, documentId, versions[index].versionNumber, versions[index - 1].versionNumber);
+    }
+    return compareHref(projectId, documentId, versions[index + 1].versionNumber, versions[index].versionNumber);
+  }, [versions, selected, projectId, documentId]);
+
+  function handleUploaded(updated: DocumentDetailData) {
+    onDocument(updated);
+    reloadVersions();
+    bumpActivity();
+    setModal(null);
+    selectVersion(updated.latestVersion.versionNumber);
+  }
+  function handleFinalized(updated: DocumentDetailData) {
+    onDocument(updated);
+    reloadVersions();
+    bumpActivity();
+    if (updated.finalization) {
+      selectVersion(updated.finalization.versionNumber);
+    }
+  }
+  function handleConflict() {
+    onConflict();
+    reloadVersions();
+  }
+
+  const versionsError = versionsState && "error" in versionsState ? versionsState.error : null;
+  const feedbackCount = selectedSummary?.feedbackCount;
+
+  const versionsPane = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
+        <h2 className="text-sm font-semibold text-ink">버전</h2>
+        <span className="text-xs text-ink-muted tabular-nums">{versions.length || ""}</span>
+        <span className="flex-1" />
+        <span className="max-lg:hidden">
+          <IconButton label="버전 패널 접기" icon={<PanelLeftIcon />} onClick={() => setLeftOpen(false)} />
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {versionsError ? (
+          <div className="p-3">
+            <ErrorState role="status" title="버전 목록을 불러오지 못했습니다." message={versionsError} onRetry={reloadVersions} />
+          </div>
+        ) : versions.length === 0 ? (
+          <div className="flex flex-col gap-2 p-3">
+            <p role="status" className="sr-only">
+              버전 목록을 불러오는 중...
+            </p>
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : (
+          <VersionList
+            versions={versions}
+            selected={selected}
+            finalVersionNumber={finalization?.versionNumber ?? null}
+            drafts={draftVersions}
+            onSelect={selectVersion}
           />
-          {finalized && finalization && (
-            <div role="status" className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-success-600/25 bg-success-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-3">
-                <CheckCircleIcon className="mt-0.5 size-5 shrink-0 text-success-700" />
-                <div className="text-sm">
-                  <p className="font-semibold text-success-700">v{finalization.versionNumber}이 최종 버전으로 확정되었습니다.</p>
-                  <p className="mt-0.5 text-ink-muted">
-                    {finalization.finalizedBy.displayName} ·{" "}
-                    <time dateTime={finalization.finalizedAt}>{formatDateTime(finalization.finalizedAt)}</time>. 이 문서는 읽기 전용이며
-                    다시 열 수 없습니다. 변경이 필요하면 새 문서를 등록해 주세요.
-                  </p>
-                </div>
-              </div>
-              <ButtonLink href={`/projects/${projectId}/documents/new`} size="sm">
-                새 문서 등록
-              </ButtonLink>
-            </div>
-          )}
-          <Card aria-labelledby="document-description-heading">
-            <CardHeader title="문서 설명" titleId="document-description-heading" />
-            <CardBody className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_16rem]">
+        )}
+      </div>
+    </div>
+  );
+
+  const collabPane = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-end border-b border-line px-2">
+        <Tabs<CollabTab>
+          label="협업"
+          idBase="collab"
+          size="sm"
+          className="min-w-0 flex-1"
+          value={activeTab}
+          onChange={setTab}
+          items={[
+            { key: "feedback", label: "피드백", count: feedbackCount },
+            { key: "ai", label: "AI 요약", hidden: !aiVisible },
+            { key: "info", label: "정보" },
+            { key: "activity", label: "활동" },
+          ]}
+        />
+        <span className="mb-1.5 max-lg:hidden">
+          <IconButton label="협업 패널 접기" icon={<PanelRightIcon />} onClick={() => setRightOpen(false)} tooltipSide="left" />
+        </span>
+      </div>
+      <div {...tabPanelProps("collab", activeTab)} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
+        {activeTab === "feedback" && (
+          <FeedbackPanel
+            key={selected}
+            layout="pane"
+            projectId={projectId}
+            documentId={documentId}
+            versionNumber={selected}
+            canWrite={!finalized}
+            draft={drafts[selected] ?? ""}
+            onDraftChange={setDraft}
+            onFinalizedConflict={handleConflict}
+            onCreated={() => {
+              bumpActivity();
+              reloadVersions();
+            }}
+          />
+        )}
+        {activeTab === "ai" && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            <p className="mb-3 text-xs text-ink-muted">v{selected} 요약</p>
+            <VersionSummaryView summary={summary} onGoToPage={goToPage} plain />
+          </div>
+        )}
+        {activeTab === "info" && (
+          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
+            <section aria-labelledby="info-description" className="flex flex-col gap-2">
+              <h3 id="info-description" className="text-xs font-medium text-ink-muted">
+                문서 설명
+              </h3>
               <DocumentDescription
                 projectId={projectId}
                 documentId={documentId}
                 description={document.description}
                 editable={!finalized}
-                onUpdated={handleDescriptionUpdated}
-                onFinalizedConflict={reloadInBackground}
+                onUpdated={(updated) => {
+                  onDocument(updated);
+                  bumpActivity();
+                }}
+                onFinalizedConflict={handleConflict}
               />
-              {/* 최신 버전 파일 정보. 아래 '선택한 버전'과 구분되도록 이름에 '최신'을 명시한다. */}
-              <section aria-labelledby="document-info-heading" className="border-t border-line pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-5">
-                <h3 id="document-info-heading" className="text-xs font-medium text-ink-muted">
-                  최신 버전 파일 · v{latest.versionNumber}
-                </h3>
-                <dl className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+            </section>
+            <section aria-labelledby="info-version" className="flex flex-col gap-2">
+              <h3 id="info-version" className="text-xs font-medium text-ink-muted">
+                선택한 버전 · v{selected}
+              </h3>
+              {selectedSummary ? (
+                <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
                   <dt className="text-ink-muted">파일</dt>
-                  <dd className="truncate" title={latest.originalFilename}>
-                    {latest.originalFilename}
-                  </dd>
+                  <dd className="break-all">{selectedSummary.originalFilename}</dd>
                   <dt className="text-ink-muted">크기</dt>
-                  <dd title={`${latest.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(latest.sizeBytes)}</dd>
+                  <dd title={`${selectedSummary.sizeBytes.toLocaleString("ko-KR")} 바이트`}>{formatFileSize(selectedSummary.sizeBytes)}</dd>
                   <dt className="text-ink-muted">업로드</dt>
                   <dd>
-                    <time dateTime={latest.uploadedAt}>{formatDateTime(latest.uploadedAt)}</time>
+                    {selectedSummary.uploadedBy.displayName} · <time dateTime={selectedSummary.uploadedAt}>{formatDateTime(selectedSummary.uploadedAt)}</time>
+                  </dd>
+                  <dt className="text-ink-muted">{versionNoteLabel(selected)}</dt>
+                  <dd className={selectedSummary.versionNote ? "whitespace-pre-wrap break-words" : "text-ink-muted"}>
+                    {selectedSummary.versionNote ?? versionNoteEmptyText(selected)}
                   </dd>
                 </dl>
-              </section>
-            </CardBody>
-          </Card>
-          {/* 작업 공간: 데스크톱은 [선택한 버전(변경사항·미리보기) | 버전 목록·피드백] 2열, 모바일은 같은 순서로 세로 배치한다. */}
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
-            <Card aria-labelledby="preview-heading" className="min-w-0 lg:col-start-1 lg:row-start-1">
-              <CardHeader
-                title={
-                  <span className="flex flex-wrap items-center gap-2">
-                    선택한 버전 · v{selected}
-                    {selectedSummary?.latest && <Badge>최신</Badge>}
-                    {isFinalVersion && <Badge tone="success">최종본</Badge>}
-                  </span>
-                }
-                titleId="preview-heading"
-                description={
-                  selectedSummary ? (
-                    <span className="flex min-w-0 flex-wrap gap-x-1.5">
-                      <span className="max-w-full truncate" title={selectedSummary.originalFilename}>
-                        {selectedSummary.originalFilename}
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span>
-                        {selectedSummary.uploadedBy.displayName} ·{" "}
-                        <time dateTime={selectedSummary.uploadedAt}>{formatDateTime(selectedSummary.uploadedAt)}</time>
-                      </span>
-                    </span>
-                  ) : undefined
-                }
-              />
-              <CardBody className="flex flex-col gap-4">
-                <section aria-labelledby="selected-version-heading">
-                  <h3 id="selected-version-heading" className="text-xs font-medium text-ink-muted">
-                    {versionNoteLabel(selected)}
-                  </h3>
-                  {selectedSummary?.versionNote ? (
-                    <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
-                      {selectedSummary.versionNote}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm text-ink-muted">{selectedSummary ? versionNoteEmptyText(selected) : "버전 정보를 불러오는 중..."}</p>
-                  )}
-                </section>
-                {selectedSummary && (
-                  <VersionSummaryPanel projectId={projectId} documentId={documentId} versionNumber={selectedSummary.versionNumber} />
+              ) : (
+                <p className="text-sm text-ink-muted">버전 정보를 불러오는 중...</p>
+              )}
+            </section>
+            <section aria-labelledby="info-document" className="flex flex-col gap-2">
+              <h3 id="info-document" className="text-xs font-medium text-ink-muted">
+                문서
+              </h3>
+              <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+                <dt className="text-ink-muted">상태</dt>
+                <dd>
+                  <StatusBadge status={document.status} />
+                </dd>
+                <dt className="text-ink-muted">작성자</dt>
+                <dd>{document.createdBy.displayName}</dd>
+                <dt className="text-ink-muted">등록</dt>
+                <dd>
+                  <time dateTime={document.createdAt}>{formatDateTime(document.createdAt)}</time>
+                </dd>
+                <dt className="text-ink-muted">최신 버전</dt>
+                <dd>v{latestNumber}</dd>
+                {finalization && (
+                  <>
+                    <dt className="text-ink-muted">최종본</dt>
+                    <dd>
+                      v{finalization.versionNumber} · {finalization.finalizedBy.displayName} ·{" "}
+                      <time dateTime={finalization.finalizedAt}>{formatDateTime(finalization.finalizedAt)}</time>
+                    </dd>
+                  </>
                 )}
-                {previewOpen && selectedSummary ? (
-                  <DocumentVersionPreview
-                    key={selectedSummary.versionNumber}
-                    projectId={projectId}
-                    documentId={documentId}
-                    version={selectedSummary}
-                    onClose={closePreview}
-                  />
-                ) : (
-                  // 열기 전에는 파일을 받지 않는다(전송량 절약). 빈 영역을 크게 두지 않고 한 줄 안내와 버튼만 둔다.
-                  <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-dashed border-line-strong bg-subtle/50 px-4 py-4 sm:flex-row sm:items-center">
-                    <FileIcon className="hidden size-6 shrink-0 text-ink-decor sm:block" />
-                    <p className="flex-1 text-sm text-ink-muted">
-                      미리보기를 열면 이 화면에서 문서를 확인할 수 있습니다. 연 상태에서 다른 버전을 고르면 그 버전으로 바뀝니다.
-                    </p>
-                    {selectedSummary && (
-                      <Button size="sm" variant="primary" onClick={() => setPreviewOpen(true)} className="self-start sm:self-auto">
-                        v{selected} 미리보기 열기
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-            <aside aria-label="버전과 피드백" className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-              <Card aria-labelledby="versions-card-heading">
-                <CardHeader
-                  title="버전"
-                  titleId="versions-card-heading"
-                  description="버전을 고르면 변경사항·미리보기·피드백이 그 버전으로 바뀝니다."
-                  actions={
-                    versions.length >= 2 ? (
-                      <ButtonLink
-                        size="sm"
-                        href={compareHref(projectId, documentId, selected > 1 ? selected - 1 : selected, selected > 1 ? selected : selected + 1)}
-                      >
-                        <CompareIcon /> 버전 비교
-                      </ButtonLink>
-                    ) : undefined
-                  }
-                />
-                <CardBody className="px-3 py-2">
-                  <DocumentVersionHistory
-                    projectId={projectId}
-                    documentId={documentId}
-                    reloadKey={versionsReloadKey}
-                    selectedVersion={selected}
-                    hideHeading
-                    compact
-                    finalVersionNumber={finalization?.versionNumber ?? null}
-                    onLoaded={setVersions}
-                    onSelect={(version) => setSelectedNumber(version.versionNumber)}
-                    onPreview={(version) => {
-                      setSelectedNumber(version.versionNumber);
-                      setPreviewOpen(true);
-                    }}
-                  />
-                </CardBody>
-              </Card>
-              <Card aria-labelledby="feedback-heading">
-                <CardHeader
-                  title={`피드백 · v${selected}`}
-                  titleId="feedback-heading"
-                  description={finalized ? "최종 확정된 문서의 피드백은 조회만 할 수 있습니다." : "모든 구성원이 각 버전에 피드백을 남길 수 있습니다."}
-                />
-                <CardBody>
-                  <FeedbackPanel
-                    projectId={projectId}
-                    documentId={documentId}
-                    versionNumber={selected}
-                    canWrite={!finalized}
-                    onFinalizedConflict={reloadInBackground}
-                    onCreated={bumpActivity}
-                  />
-                </CardBody>
-              </Card>
-            </aside>
-            <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-2">
-              {!finalized && (
-                <Card>
-                  <CardBody>
-                    <div id="new-version" className="scroll-mt-24">
-                      <DocumentVersionUploadForm
-                        projectId={projectId}
-                        documentId={documentId}
-                        status={document.status}
-                        onUploaded={handleVersionUploaded}
-                        onConflict={reloadInBackground}
-                      />
-                    </div>
-                  </CardBody>
-                </Card>
-              )}
-              {!finalized && isOwner && (
-                <Card className="border-warning-700/20">
-                  <CardBody>
-                    <FinalizePanel
-                      projectId={projectId}
-                      documentId={documentId}
-                      versions={versions}
-                      defaultVersion={selected}
-                      onFinalized={handleFinalized}
-                      onConflict={reloadInBackground}
-                    />
-                  </CardBody>
-                </Card>
-              )}
-              {finalized && (
-                <p className="flex items-center gap-2 text-xs text-ink-muted">
-                  <LockIcon /> 새 버전 업로드와 피드백 작성이 종료되었습니다.
-                </p>
-              )}
-              <Card aria-labelledby="document-activity-heading">
-                <CardHeader title="활동 이력" titleId="document-activity-heading" />
-                <CardBody className="py-1">
-                  <ActivityFeed
-                    load={loadActivities}
-                    loadKey={`document-${projectId}-${documentId}-${activityKey}`}
-                    showDocument={false}
-                  />
-                </CardBody>
-              </Card>
-            </div>
+              </dl>
+            </section>
           </div>
-        </>
-      );
-    }
-  }
-}
+        )}
+        {activeTab === "activity" && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+            <ActivityFeed load={loadActivities} loadKey={`document-${projectId}-${documentId}-${activityKey}`} showDocument={false} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
-function ProjectLink({ projectId }: { projectId: string }) {
   return (
-    <Link href={`/projects/${projectId}`} className="text-sm text-brand-700 underline">
-      프로젝트로 돌아가기
-    </Link>
+    <div className="flex h-full min-h-0 flex-col bg-surface">
+      {/* 머리글 */}
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2 sm:px-4 lg:h-14 lg:flex-nowrap lg:py-0">
+        <IconLink href={`/projects/${projectId}`} label="프로젝트로 돌아가기" icon={<ArrowLeftIcon />} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <nav aria-label="현재 위치" className="hidden min-w-0 text-xs text-ink-muted sm:block">
+            <ol className="flex min-w-0 items-center gap-1">
+              <li className="min-w-0 truncate">
+                <Link href={`/projects/${projectId}`} className="hover:text-ink" title={project?.name}>
+                  {project?.name ?? "프로젝트"}
+                </Link>
+              </li>
+              <li aria-hidden="true">/</li>
+              <li className="shrink-0">문서</li>
+            </ol>
+          </nav>
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="min-w-0 truncate text-base font-semibold text-ink" title={document.title}>
+              {document.title}
+            </h1>
+            <StatusBadge status={document.status} />
+            <span className="hidden shrink-0 rounded-full border border-line px-2 py-0.5 text-xs text-ink-muted sm:inline">v{selected} 보는 중</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {compareLink && (
+            <ButtonLink href={compareLink} size="sm">
+              <CompareIcon /> <span className="max-sm:sr-only">버전 비교</span>
+            </ButtonLink>
+          )}
+          {!finalized && isOwner && (
+            <Button size="sm" onClick={() => setModal("finalize")} disabled={versions.length === 0}>
+              <CheckCircleIcon /> <span className="max-sm:sr-only">최종본 확정</span>
+            </Button>
+          )}
+          {!finalized && (
+            <Button size="sm" variant="primary" onClick={() => setModal("upload")}>
+              <UploadIcon /> 새 버전
+            </Button>
+          )}
+          {finalized && finalization && (
+            <Button size="sm" variant="primary" onClick={() => void downloadFinal()} disabled={finalDownloading}>
+              <DownloadIcon /> {finalDownloading ? "내려받는 중..." : `최종본 v${finalization.versionNumber} 받기`}
+            </Button>
+          )}
+        </div>
+      </header>
+      {finalDownloadError && (
+        <p role="alert" className="shrink-0 border-b border-danger-600/20 bg-danger-50 px-4 py-2 text-sm text-danger-700">
+          {finalDownloadError}
+        </p>
+      )}
+      {finalized && finalization && (
+        <div role="status" className="flex shrink-0 items-start gap-2 border-b border-success-600/20 bg-success-50 px-4 py-2 text-sm">
+          <CheckCircleIcon className="mt-0.5 size-4 shrink-0 text-success-700" />
+          <p className="min-w-0">
+            <strong className="font-semibold text-success-700">v{finalization.versionNumber}이 최종본으로 확정되었습니다.</strong>{" "}
+            <span className="text-ink-muted">
+              {finalization.finalizedBy.displayName} · <time dateTime={finalization.finalizedAt}>{formatDateTime(finalization.finalizedAt)}</time> ·
+              읽기 전용이며 다시 열 수 없습니다.
+              {latestNumber !== finalization.versionNumber && ` 최신 버전(v${latestNumber})은 최종본이 아닙니다.`}
+            </span>{" "}
+            <Link href={`/projects/${projectId}/documents/new`} className="font-medium whitespace-nowrap text-brand-700 hover:underline">
+              새 문서 등록
+            </Link>
+          </p>
+        </div>
+      )}
+      {/* 모바일: 한 패널씩 */}
+      <div className="shrink-0 border-b border-line px-3 py-2 lg:hidden">
+        <Segmented<MobileTab>
+          label="화면"
+          className="w-full [&>button]:flex-1 [&>button]:justify-center"
+          value={mobileTab}
+          onChange={setMobileTab}
+          items={[
+            { key: "doc", label: "문서" },
+            { key: "versions", label: `버전${versions.length ? ` ${versions.length}` : ""}` },
+            { key: "collab", label: "협업" },
+          ]}
+        />
+      </div>
+      <div className="flex min-h-0 flex-1">
+        {/* 왼쪽: 버전 */}
+        {leftOpen ? (
+          <>
+            <aside
+              aria-label="버전"
+              style={{ "--pane-w": `${leftWidth}px` } as CSSProperties}
+              className={cn("min-h-0 w-full shrink-0 bg-surface lg:w-[var(--pane-w)]", mobileTab !== "versions" && "max-lg:hidden")}
+            >
+              {versionsPane}
+            </aside>
+            <PaneResizer label="버전 패널 너비" edge="left" value={leftWidth} min={LEFT.min} max={LEFT.max} onChange={setLeftWidth} className="max-lg:hidden" />
+          </>
+        ) : (
+          <div className="hidden w-11 shrink-0 flex-col items-center border-r border-line bg-surface py-2 lg:flex">
+            <IconButton label="버전 패널 펼치기" icon={<PanelLeftIcon />} onClick={() => setLeftOpen(true)} tooltipSide="right" />
+            <span className="mt-3 text-xs font-medium text-ink-muted [writing-mode:vertical-rl]">버전 {versions.length}</span>
+          </div>
+        )}
+        {/* 가운데: 뷰어 */}
+        <main
+          aria-label="문서"
+          className={cn("min-h-0 min-w-0 flex-1 border-line lg:border-x", mobileTab !== "doc" && "max-lg:hidden")}
+        >
+          {selectedSummary ? (
+            <PdfDocumentViewer key={selected} projectId={projectId} documentId={documentId} version={selectedSummary} pageRequest={pageRequest} />
+          ) : (
+            <div className="flex h-full flex-col gap-3 bg-canvas-sunken p-6">
+              <p role="status" className="sr-only">
+                문서를 불러오는 중...
+              </p>
+              <Skeleton className="mx-auto h-full w-full max-w-2xl bg-surface" />
+            </div>
+          )}
+        </main>
+        {/* 오른쪽: 협업 */}
+        {rightOpen ? (
+          <>
+            <PaneResizer label="협업 패널 너비" edge="right" value={rightWidth} min={RIGHT.min} max={RIGHT.max} onChange={setRightWidth} className="max-lg:hidden" />
+            <aside
+              aria-label="협업"
+              style={{ "--pane-w": `${rightWidth}px` } as CSSProperties}
+              className={cn("min-h-0 w-full shrink-0 bg-surface lg:w-[var(--pane-w)]", mobileTab !== "collab" && "max-lg:hidden")}
+            >
+              {collabPane}
+            </aside>
+          </>
+        ) : (
+          <div className="hidden w-11 shrink-0 flex-col items-center border-l border-line bg-surface py-2 lg:flex">
+            <IconButton label="협업 패널 펼치기" icon={<PanelRightIcon />} onClick={() => setRightOpen(true)} tooltipSide="left" />
+            <span className="mt-3 text-xs font-medium text-ink-muted [writing-mode:vertical-rl]">
+              피드백{feedbackCount ? ` ${feedbackCount}` : ""}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <Dialog
+        open={modal === "upload"}
+        busy={uploading}
+        onClose={() => setModal(null)}
+        title="새 버전 등록"
+        description={`v${latestNumber + 1}로 추가됩니다. 이전 버전과 피드백은 그대로 남습니다.`}
+      >
+        <DocumentVersionUploadForm
+          bare
+          projectId={projectId}
+          documentId={documentId}
+          status={document.status}
+          onUploaded={handleUploaded}
+          onConflict={handleConflict}
+          onSubmittingChange={setUploading}
+          onCancel={() => setModal(null)}
+        />
+      </Dialog>
+      {!finalized && isOwner && (
+        <FinalizeDialog
+          open={modal === "finalize"}
+          onClose={() => setModal(null)}
+          projectId={projectId}
+          documentId={documentId}
+          versions={versions}
+          defaultVersion={selected}
+          onFinalized={handleFinalized}
+          onConflict={handleConflict}
+        />
+      )}
+    </div>
   );
 }
