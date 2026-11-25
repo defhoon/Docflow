@@ -122,19 +122,52 @@ class DocumentVersionQueryIntegrationTest {
 			.andExpect(jsonPath("$[1].uploadedBy.*", hasSize(2)))
 			.andExpect(jsonPath("$[1].uploadedAt").exists())
 			.andExpect(jsonPath("$[1].versionNote").value(org.hamcrest.Matchers.nullValue()))
-			.andExpect(jsonPath("$[1].*", hasSize(7))) // SPEC-09: versionNote 추가
+			.andExpect(jsonPath("$[1].feedbackCount").value(0))
+			.andExpect(jsonPath("$[1].*", hasSize(8))) // SPEC-09: versionNote, SPEC-16: feedbackCount 추가
 			.andExpect(jsonPath("$[2].versionNumber").value(1))
 			.andReturn()
 			.getResponse()
 			.getContentAsString();
 
-		assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(3);
+		// 접근 확인·문서 확인·버전 목록 + 피드백 수 집계 1회 (SPEC-16: 버전 수와 무관)
+		assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(4);
 		assertThat(body).doesNotContain("documents/")
 			.doesNotContain("storage")
 			.doesNotContain("sha256")
 			.doesNotContain("contentType")
 			.doesNotContain("@test.local")
 			.doesNotContain(DocumentTestSupport.STORAGE_ROOT.toString());
+	}
+
+	// SPEC-16 AC-WS-12: 버전별 피드백 수를 집계 한 번으로 돌려주고, 다른 문서의 피드백은 세지 않는다
+	@Test
+	void listsFeedbackCountPerVersionWithSingleAggregate() throws Exception {
+		Long documentId = createDocument(this.owner, file("v1.pdf", DocumentTestFiles.pdf()));
+		uploadVersion(this.member, documentId, file("v2.pdf", DocumentTestFiles.pdf()));
+		uploadVersion(this.owner, documentId, file("v3.pdf", DocumentTestFiles.pdf()));
+		Long otherDocumentId = createDocument(this.owner, file("other.pdf", DocumentTestFiles.pdf()));
+		insertFeedback(documentId, 1, 2);
+		insertFeedback(documentId, 3, 1);
+		insertFeedback(otherDocumentId, 1, 5);
+		Statistics statistics = this.entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+		statistics.clear();
+
+		this.mockMvc.perform(get(versionsUrl(documentId)).with(as(this.member)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].versionNumber").value(3))
+			.andExpect(jsonPath("$[0].feedbackCount").value(1))
+			.andExpect(jsonPath("$[1].feedbackCount").value(0))
+			.andExpect(jsonPath("$[2].feedbackCount").value(2));
+		assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(4);
+	}
+
+	private void insertFeedback(Long documentId, int versionNumber, int count) {
+		for (int i = 0; i < count; i++) {
+			this.jdbcTemplate.update("""
+					INSERT INTO feedbacks (document_version_id, author_id, content, created_at)
+					SELECT id, ?, ?, now() FROM document_versions WHERE document_id = ? AND version_number = ?""",
+					this.member.getId(), "fb" + i, documentId, versionNumber);
+		}
 	}
 
 	// AC-VDL-03, 04: 4개 형식 원본 바이트 일치와 다운로드 헤더
