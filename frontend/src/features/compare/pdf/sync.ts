@@ -6,10 +6,16 @@ export type PageBox = { top: number; height: number };
 
 export type ScrollAnchor = { index: number; fraction: number };
 
-/** 스크롤 위치(보이는 영역 맨 위)가 걸친 페이지와 그 페이지 안의 비율(0~1). */
+/**
+ * 스크롤 위치(보이는 영역 맨 위)가 걸친 페이지와 그 페이지 안의 비율(0~1). 첫 페이지 위 여백에 있으면 `index = -1`이고 비율은
+ * 여백 안의 위치다(맨 위로 돌아오면 양쪽 모두 맨 위가 되도록).
+ */
 export function anchorOf(scrollTop: number, pages: PageBox[]): ScrollAnchor {
   if (pages.length === 0) {
     return { index: 0, fraction: 0 };
+  }
+  if (scrollTop < pages[0].top) {
+    return { index: -1, fraction: pages[0].top > 0 ? Math.max(0, scrollTop) / pages[0].top : 0 };
   }
   let index = 0;
   for (let i = 0; i < pages.length; i++) {
@@ -30,6 +36,9 @@ export function anchorOf(scrollTop: number, pages: PageBox[]): ScrollAnchor {
 export function scrollTopFor(anchor: ScrollAnchor, pages: PageBox[]): number {
   if (pages.length === 0) {
     return 0;
+  }
+  if (anchor.index < 0) {
+    return pages[0].top * anchor.fraction;
   }
   if (anchor.index >= pages.length) {
     const last = pages[pages.length - 1];
