@@ -78,10 +78,14 @@ public class DocumentTextService {
 		this.permits = new Semaphore(properties.concurrency(), true);
 	}
 
-	/** 저장된 결과만 조회한다(추출하지 않음). 추출기 버전이 낮으면 없는 것으로 본다. */
+	/**
+	 * 저장된 결과만 조회한다(추출하지 않음). 추출기 버전이 낮거나, 처리 시간 초과({@code TIMEOUT})처럼 다시 시도하면 결과가 달라질
+	 * 수 있는 상태면 없는 것으로 본다(다음 요청에서 다시 추출).
+	 */
 	public Optional<VersionText> findStored(Long versionId) {
 		return this.textRepository.findById(versionId)
 			.filter((row) -> row.getExtractorVersion() >= EXTRACTOR_VERSION)
+			.filter((row) -> row.getStatus() != ExtractionStatus.TIMEOUT)
 			.map(this::toVersionText);
 	}
 
@@ -188,7 +192,8 @@ public class DocumentTextService {
 				    status = EXCLUDED.status, extractor_version = EXCLUDED.extractor_version,
 				    page_count = EXCLUDED.page_count, word_count = EXCLUDED.word_count,
 				    char_count = EXCLUDED.char_count, content = EXCLUDED.content, created_at = now()
-				WHERE document_version_texts.extractor_version < EXCLUDED.extractor_version""", (ps) -> {
+				WHERE document_version_texts.extractor_version < EXCLUDED.extractor_version
+				   OR document_version_texts.status = 'TIMEOUT'""", (ps) -> {
 			ps.setLong(1, versionId);
 			ps.setString(2, outcome.status().name());
 			ps.setInt(3, EXTRACTOR_VERSION);

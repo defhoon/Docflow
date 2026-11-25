@@ -165,4 +165,19 @@ class DocumentTextServiceIntegrationTest {
 			.isEqualTo(DocumentTextService.EXTRACTOR_VERSION);
 	}
 
+
+	// AC-EXT-13: 처리 시간 초과는 일시적일 수 있으므로 저장된 결과를 재사용하지 않고 다시 추출해 덮어쓴다
+	@Test
+	void timeoutIsRetriedOnNextRequest() throws Exception {
+		Long versionId = uploadVersion1("plan.pdf", TestPdfs.pages(TestPage.a4("시간 초과 재시도")));
+		this.documentTextService.getOrExtract(versionId);
+		this.jdbcTemplate.update("UPDATE document_version_texts SET status = 'TIMEOUT', content = NULL, word_count = 0");
+		assertThat(this.documentTextService.findStored(versionId)).isEmpty();
+
+		assertThat(this.documentTextService.getOrExtract(versionId).status()).isEqualTo(ExtractionStatus.EXTRACTED);
+		assertThat(this.jdbcTemplate.queryForObject("SELECT status FROM document_version_texts", String.class))
+			.isEqualTo("EXTRACTED");
+		assertThat(rowCount()).isEqualTo(1);
+	}
+
 }
