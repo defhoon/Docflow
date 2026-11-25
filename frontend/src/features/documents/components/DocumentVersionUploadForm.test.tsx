@@ -96,7 +96,7 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     fireEvent.click(submitButton());
 
     expect(await screen.findByText("새 버전을 등록했습니다. 최신 버전: v2")).toBeInTheDocument(); // 토스트 (#50)
-    expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", file, null);
+    expect(createDocumentVersionMock).toHaveBeenCalledWith("7", "3", file, null, expect.any(Function));
     expect(onUploaded).toHaveBeenCalledWith(updated(2));
     expect(fileInput().files).toHaveLength(0);
     expect(submitButton()).toBeEnabled();
@@ -143,7 +143,8 @@ describe("DocumentVersionUploadForm (SPEC-04 §9, AC-VER-16)", () => {
     expect(submitButton()).toBeDisabled();
     expect(submitButton()).toHaveTextContent("등록 중...");
     expect(fileInput()).toBeDisabled();
-    expect(screen.getByText("파일을 업로드하는 중입니다. 화면을 닫지 마세요.")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "업로드 진행률" })).toBeInTheDocument();
+    expect(screen.getByText("화면을 닫지 마세요.")).toBeInTheDocument();
 
     await act(async () => resolve(updated(2)));
     expect(submitButton()).toBeEnabled();

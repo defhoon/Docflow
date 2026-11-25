@@ -7,6 +7,8 @@
  *   그 밖의 403, 네트워크 오류, 5xx는 재시도하지 않는다.
  * - 본문이 `FormData`이면 JSON으로 변환하지 않고 그대로 보내며, `Content-Type`은 브라우저가 boundary와 함께
  *   정하도록 지정하지 않는다 (SPEC-03 §8.3). 재시도 시 같은 `FormData`를 다시 보낸다.
+ * - `onUploadProgress`를 주면 업로드 진행률을 받기 위해 `fetch` 대신 `XMLHttpRequest`로 보낸다(SPEC-19). 헤더·쿠키·
+ *   CSRF 재시도·오류 변환 규칙은 같다.
  */
 
 export const CSRF_COOKIE_NAME = "XSRF-TOKEN";
@@ -30,9 +32,13 @@ export class ApiError extends Error {
   }
 }
 
+export type UploadProgress = { loaded: number; total: number };
+
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  /** 업로드 진행률 알림 (SPEC-19). 본문을 보내는 동안 호출된다. */
+  onUploadProgress?: (progress: UploadProgress) => void;
 };
 
 export function readCookie(name: string): string | null {
@@ -75,7 +81,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     await refreshCsrfToken();
   }
 
-  let response = await send(path, method, options.body, unsafe);
+  let response = await send(path, method, options.body, unsafe, options.onUploadProgress);
 
   if (unsafe && response.status === 403) {
     const error = await toHttpError(response);
@@ -83,7 +89,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       throw error;
     }
     await refreshCsrfToken();
-    response = await send(path, method, options.body, unsafe);
+    response = await send(path, method, options.body, unsafe, options.onUploadProgress);
   }
 
   if (!response.ok) {
@@ -95,7 +101,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return (await response.json()) as T;
 }
 
-async function send(path: string, method: string, body: unknown, unsafe: boolean): Promise<Response> {
+async function send(
+  path: string,
+  method: string,
+  body: unknown,
+  unsafe: boolean,
+  onUploadProgress?: (progress: UploadProgress) => void,
+): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const formData = body instanceof FormData;
   if (body !== undefined && !formData) {
@@ -106,6 +118,9 @@ async function send(path: string, method: string, body: unknown, unsafe: boolean
     if (token) {
       headers[CSRF_HEADER_NAME] = token;
     }
+  }
+  if (onUploadProgress && typeof XMLHttpRequest !== "undefined") {
+    return sendWithProgress(path, method, headers, body === undefined ? null : formData ? (body as FormData) : JSON.stringify(body), onUploadProgress);
   }
   try {
     return await fetch(path, {
@@ -118,6 +133,43 @@ async function send(path: string, method: string, body: unknown, unsafe: boolean
   } catch {
     return toNetworkError();
   }
+}
+
+/** 진행률을 알리는 전송. 결과를 `Response`로 감싸 나머지 처리(상태·JSON·오류)를 fetch와 같게 한다. */
+function sendWithProgress(
+  path: string,
+  method: string,
+  headers: Record<string, string>,
+  body: XMLHttpRequestBodyInit | null,
+  onUploadProgress: (progress: UploadProgress) => void,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, path);
+    xhr.withCredentials = true;
+    for (const [name, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(name, value);
+    }
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onUploadProgress({ loaded: event.loaded, total: event.total });
+      }
+    };
+    xhr.onload = () => {
+      const responseHeaders = new Headers();
+      for (const line of xhr.getAllResponseHeaders().trim().split(/[\r\n]+/)) {
+        const index = line.indexOf(":");
+        if (index > 0) {
+          responseHeaders.append(line.slice(0, index).trim(), line.slice(index + 1).trim());
+        }
+      }
+      const noBody = xhr.status === 204 || xhr.status === 205 || xhr.status === 304;
+      resolve(new Response(noBody ? null : xhr.responseText, { status: xhr.status, headers: responseHeaders }));
+    };
+    xhr.onerror = () => reject(new ApiError("network", null, null, "서버에 연결할 수 없습니다."));
+    xhr.onabort = xhr.onerror;
+    xhr.send(body);
+  });
 }
 
 function toNetworkError(): never {

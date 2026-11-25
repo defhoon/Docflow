@@ -7,9 +7,10 @@ import { CharCount } from "@/components/ui/CharCount";
 import { Field, Textarea } from "@/components/ui/Field";
 import { FileDropzone } from "@/components/ui/FileDropzone";
 import { useToast } from "@/components/ui/Toast";
+import { UploadProgressBar } from "@/components/ui/UploadProgress";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { errorCode, isUnauthenticated } from "@/features/projects/errors";
-import { ApiError } from "@/lib/api-client";
+import { ApiError, type UploadProgress } from "@/lib/api-client";
 
 import { createDocumentVersion } from "../api";
 import { VERSION_MESSAGES, versionUploadFailureMessage } from "../errors";
@@ -56,6 +57,7 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
   // 성공은 화면 상태(새 버전이 목록·미리보기에 반영됨)와 짧은 토스트로 알린다. 화면 안 성공 문구는 두지 않는다 (#50).
   const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   // 상태 반영 전 연속 제출도 막는다 (결정 V7).
   const submittingRef = useRef(false);
   // cacheComponents 사용 시 Next.js는 다른 경로로 이동해도 이 화면을 언마운트하지 않고 <Activity>로 숨긴다.
@@ -114,8 +116,9 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
 
     submittingRef.current = true;
     setSubmitting(true);
+    setProgress(null);
     try {
-      const updated = await createDocumentVersion(projectId, documentId, file, note.value);
+      const updated = await createDocumentVersion(projectId, documentId, file, note.value, setProgress);
       onUploaded(updated);
       settle(() => {
         resetForm();
@@ -214,15 +217,16 @@ export function DocumentVersionUploadForm({ projectId, documentId, status, onUpl
           />
         </Field>
         {formError && (
-          <p role="alert" className="rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
-            {formError}
-          </p>
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
+            <span>{formError}</span>
+            {allowed && (
+              <Button type="submit" size="sm" disabled={submitting}>
+                다시 시도
+              </Button>
+            )}
+          </div>
         )}
-        {submitting && (
-          <p role="status" className="text-sm text-ink-muted">
-            파일을 업로드하는 중입니다. 화면을 닫지 마세요.
-          </p>
-        )}
+        {submitting && <UploadProgressBar progress={progress} filename={file?.name} />}
         <div className={onCancel ? "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end" : "flex"}>
           {onCancel && (
             <Button onClick={onCancel} disabled={submitting}>

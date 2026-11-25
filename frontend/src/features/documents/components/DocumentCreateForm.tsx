@@ -8,9 +8,10 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { CharCount } from "@/components/ui/CharCount";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { FileDropzone } from "@/components/ui/FileDropzone";
+import { UploadProgressBar } from "@/components/ui/UploadProgress";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { isUnauthenticated } from "@/features/projects/errors";
-import { ApiError } from "@/lib/api-client";
+import { ApiError, type UploadProgress } from "@/lib/api-client";
 
 import { createDocument } from "../api";
 import { uploadFailureMessage } from "../errors";
@@ -26,15 +27,30 @@ import {
 
 const FIELDS = ["title", "description", "versionNote", "file"] as const;
 
+/** 제목 최대 글자 수(코드 포인트, SPEC-03). 파일 이름으로 채울 때 넘지 않게 자른다. */
+const TITLE_MAX = 200;
+
+/** 파일 이름에서 확장자를 뺀 제목 후보 (SPEC-19). */
+export function titleFromFilename(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const base = (dot > 0 ? name.slice(0, dot) : name).replace(/[_]+/g, " ").trim();
+  return Array.from(base).slice(0, TITLE_MAX).join("");
+}
+
 /**
- * 문서 등록 폼 (SPEC-03 §8.3, SPEC-09). 제목·설명(선택)·초기 버전 내용(선택)·파일을 `FormData` 요청 하나로 보낸다. 실패하면
- * 입력값을 그대로 유지한다.
+ * 문서 등록 폼 (SPEC-03 §8.3, SPEC-09, SPEC-19). 파일을 먼저 고르면 파일 이름으로 제목을 채운다(직접 고친 제목은 파일을 바꿔도
+ * 유지). 설명·초기 버전 내용은 선택 입력으로 접어 둔다. 제목·설명·초기 버전 내용·파일을 `FormData` 요청 하나로 보내며 업로드
+ * 진행률을 보여 준다. 실패하면 입력값을 그대로 유지하고 다시 시도할 수 있다.
  */
 export function DocumentCreateForm() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
   const { refresh } = useAuth();
   const [title, setTitle] = useState("");
+  // 제목 출처: 파일 이름으로 채움(auto) / 사용자가 직접 입력(user) / 비어 있음(empty)
+  const [titleSource, setTitleSource] = useState<"auto" | "user" | "empty">("empty");
+  const [optionalOpen, setOptionalOpen] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [description, setDescription] = useState("");
   const [versionNote, setVersionNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -55,6 +71,9 @@ export function DocumentCreateForm() {
     submittingRef.current = false;
     setSubmitting(false);
     setTitle("");
+    setTitleSource("empty");
+    setOptionalOpen(false);
+    setProgress(null);
     setDescription("");
     setVersionNote("");
     setFile(null);
@@ -77,6 +96,15 @@ export function DocumentCreateForm() {
 
   function handleFileChange(selected: File | null) {
     setFile(selected);
+    // 직접 고친 제목은 그대로 둔다. 파일 이름으로 채운 제목은 파일을 따라 바꾸고, 파일을 빼면 비운다.
+    if (titleSource !== "user") {
+      const next = selected ? titleFromFilename(selected.name) : "";
+      setTitle(next);
+      setTitleSource(next ? "auto" : "empty");
+      if (next) {
+        setFieldErrors((current) => ({ ...current, title: undefined }));
+      }
+    }
     // 선택 즉시 크기·형식을 알려 20MB 초과 파일을 보내지 않게 한다.
     setFieldErrors((current) => ({ ...current, file: selected ? validateFile(selected) : undefined }));
   }
@@ -89,14 +117,18 @@ export function DocumentCreateForm() {
     setFormError(null);
     const { value, errors } = validateDocumentInput(title, description, file, versionNote);
     setFieldErrors(errors);
+    if (errors.description || errors.versionNote) {
+      setOptionalOpen(true);
+    }
     if (Object.keys(errors).length > 0 || !file) {
       return;
     }
 
     submittingRef.current = true;
     setSubmitting(true);
+    setProgress(null);
     try {
-      const created = await createDocument(projectId, { ...value, file });
+      const created = await createDocument(projectId, { ...value, file }, setProgress);
       if (visibleRef.current) {
         // 이동하는 동안 다시 제출되지 않도록 제출 상태를 유지하고, 화면이 숨겨질 때 초기화한다.
         resetOnHideRef.current = true;
@@ -139,6 +171,9 @@ export function DocumentCreateForm() {
         }
       }
       setFieldErrors(serverErrors);
+      if (serverErrors.description || serverErrors.versionNote) {
+        setOptionalOpen(true);
+      }
       if (unmatched.length > 0) {
         setFormError(unmatched[0]);
       }
@@ -160,29 +195,11 @@ export function DocumentCreateForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6" aria-busy={submitting}>
-      <Field
-        label="문서 제목"
-        htmlFor="document-title"
-        error={fieldErrors.title}
-        errorId="document-title-error"
-      >
-        <Input
-          id="document-title"
-          type="text"
-          name="title"
-          value={title}
-          disabled={submitting}
-          onChange={(event) => setTitle(event.target.value)}
-          invalid={Boolean(fieldErrors.title)}
-          aria-describedby={fieldErrors.title ? "document-title-error" : undefined}
-          placeholder="예: 2026 상반기 서비스 기획서"
-        />
-      </Field>
       <FileDropzone
         key={fileInputKey}
         id="document-file"
         label="파일"
-        hint="PDF, DOCX, XLSX, PPTX · 20MB 이하"
+        hint="PDF, DOCX, XLSX, PPTX · 20MB 이하 · 이 파일이 v1이 됩니다"
         accept={FILE_ACCEPT}
         file={file}
         disabled={submitting}
@@ -190,6 +207,39 @@ export function DocumentCreateForm() {
         errorId="document-file-error"
         onFile={handleFileChange}
       />
+      <Field
+        label="문서 제목"
+        htmlFor="document-title"
+        error={fieldErrors.title}
+        errorId="document-title-error"
+        hint={titleSource === "auto" ? "파일 이름으로 채웠습니다. 바꿀 수 있어요." : undefined}
+        hintId="document-title-hint"
+      >
+        <Input
+          id="document-title"
+          type="text"
+          name="title"
+          value={title}
+          disabled={submitting}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            setTitleSource(event.target.value.trim() ? "user" : "empty");
+          }}
+          invalid={Boolean(fieldErrors.title)}
+          aria-describedby={fieldErrors.title ? "document-title-error" : titleSource === "auto" ? "document-title-hint" : undefined}
+          placeholder="파일을 고르면 파일 이름으로 채워집니다"
+        />
+      </Field>
+      <details
+        open={optionalOpen}
+        onToggle={(event) => setOptionalOpen(event.currentTarget.open)}
+        className="group border-t border-line pt-4"
+      >
+        <summary className="cursor-pointer list-inside text-sm font-medium text-ink select-none">
+          선택 입력 <span className="font-normal text-ink-muted">· 문서 설명, 초기 버전 내용</span>
+          {!optionalOpen && (description.trim() || versionNote.trim()) && <span className="ml-2 text-xs text-brand-700">입력됨</span>}
+        </summary>
+        <div className="mt-4 flex flex-col gap-6">
       <Field
         label="문서 설명"
         optional
@@ -240,16 +290,17 @@ export function DocumentCreateForm() {
           }
         />
       </Field>
+        </div>
+      </details>
       {formError && (
-        <p role="alert" className="rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
-          {formError}
-        </p>
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-danger-600/20 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
+          <span>{formError}</span>
+          <Button type="submit" size="sm" disabled={submitting}>
+            다시 시도
+          </Button>
+        </div>
       )}
-      {submitting && (
-        <p role="status" className="text-sm text-ink-muted">
-          파일을 업로드하는 중입니다. 화면을 닫지 마세요.
-        </p>
-      )}
+      {submitting && <UploadProgressBar progress={progress} filename={file?.name} />}
       <div className="flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
         <ButtonLink href={`/projects/${projectId}`}>취소</ButtonLink>
         <Button type="submit" variant="primary" disabled={submitting}>

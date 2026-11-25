@@ -1,10 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Activity } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
 
-import { DocumentCreateForm } from "./DocumentCreateForm";
+import { DocumentCreateForm, titleFromFilename } from "./DocumentCreateForm";
 
 const push = vi.fn();
 const refresh = vi.fn();
@@ -67,7 +67,7 @@ describe("DocumentCreateForm (SPEC-03 §8.3, AC-DOC-24)", () => {
     fireEvent.click(submitButton());
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/projects/7/documents/11"));
-    expect(createDocumentMock).toHaveBeenCalledWith("7", { title: "요구사항", description: "1차", versionNote: null, file });
+    expect(createDocumentMock).toHaveBeenCalledWith("7", { title: "요구사항", description: "1차", versionNote: null, file }, expect.any(Function));
   });
 
   it("클라이언트 검증 실패 시 요청하지 않는다", () => {
@@ -276,3 +276,72 @@ describe("DocumentCreateForm — 경로 재방문 (Activity, AC-DOC-25)", () => 
     expect(screen.getByLabelText("문서 제목")).toHaveValue("");
   });
 });
+
+describe("DocumentCreateForm 파일 우선 등록 (SPEC-19)", () => {
+  beforeEach(() => {
+    push.mockReset();
+    refresh.mockReset();
+    createDocumentMock.mockReset();
+  });
+
+  it("AC-CA-01: 파일을 먼저 고르면 확장자를 뺀 파일 이름으로 제목을 채우고, 파일을 바꾸면 따라 바뀌며 빼면 비운다", () => {
+    render(<DocumentCreateForm />);
+    expect(screen.getAllByLabelText(/^파일/)[0]).toBeInTheDocument();
+    fireEvent.change(fileInput(), { target: { files: [pdf("12월 정기 회의록.pdf")] } });
+    expect(screen.getByLabelText("문서 제목")).toHaveValue("12월 정기 회의록");
+    expect(screen.getByText("파일 이름으로 채웠습니다. 바꿀 수 있어요.")).toBeInTheDocument();
+    fireEvent.change(fileInput(), { target: { files: [pdf("요구사항_명세서_v2.pdf")] } });
+    expect(screen.getByLabelText("문서 제목")).toHaveValue("요구사항 명세서 v2");
+  });
+
+  it("AC-CA-02: 직접 고친 제목은 파일을 바꿔도 유지한다", () => {
+    render(<DocumentCreateForm />);
+    fireEvent.change(fileInput(), { target: { files: [pdf("a.pdf")] } });
+    fireEvent.change(screen.getByLabelText("문서 제목"), { target: { value: "내가 정한 제목" } });
+    fireEvent.change(fileInput(), { target: { files: [pdf("다른 파일.pdf")] } });
+    expect(screen.getByLabelText("문서 제목")).toHaveValue("내가 정한 제목");
+    expect(screen.queryByText("파일 이름으로 채웠습니다. 바꿀 수 있어요.")).not.toBeInTheDocument();
+  });
+
+  it("파일 이름 제목은 200자로 자르고 확장자 없는 이름도 처리한다", () => {
+    expect(titleFromFilename(`${"가".repeat(250)}.pdf`)).toHaveLength(200);
+    expect(titleFromFilename("README")).toBe("README");
+    expect(titleFromFilename(".hidden.pdf")).toBe(".hidden");
+  });
+
+  it("AC-CA-03: 선택 입력은 접혀 있고, 그 안의 값이 잘못되면 펼쳐서 오류를 보여 준다", () => {
+    render(<DocumentCreateForm />);
+    const details = screen.getByText(/선택 입력/).closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    fireEvent.click(screen.getByText(/선택 입력/));
+    fireEvent.change(screen.getByLabelText("문서 설명 (선택)"), { target: { value: "가".repeat(2001) } });
+    fireEvent.click(screen.getByText(/선택 입력/));
+    fill({ title: "제목" });
+    fireEvent.submit(submitButton().closest("form")!);
+    expect(createDocumentMock).not.toHaveBeenCalled();
+    expect(details).toHaveAttribute("open");
+  });
+
+  it("AC-CA-04: 업로드 진행률을 보여 주고, 실패하면 입력을 유지한 채 다시 시도할 수 있다", async () => {
+    let report: ((progress: { loaded: number; total: number }) => void) | undefined;
+    let fail!: (error: unknown) => void;
+    createDocumentMock.mockImplementationOnce((_p: string, _i: unknown, onProgress: typeof report) => {
+      report = onProgress;
+      return new Promise((_resolve, reject) => (fail = reject));
+    });
+    createDocumentMock.mockResolvedValueOnce({ id: 9 });
+    render(<DocumentCreateForm />);
+    fill({ title: "제목" });
+    fireEvent.click(submitButton());
+    await act(async () => report?.({ loaded: 50, total: 100 }));
+    expect(screen.getByRole("progressbar", { name: "업로드 진행률" })).toHaveAttribute("aria-valuenow", "50");
+    expect(screen.getByText("파일을 업로드하는 중입니다. 50%")).toBeInTheDocument();
+    await act(async () => fail(new ApiError("network", null, null, "서버에 연결할 수 없습니다.")));
+    const alert = await screen.findByRole("alert");
+    expect(screen.getByLabelText("문서 제목")).toHaveValue("제목");
+    fireEvent.click(within(alert).getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/projects/7/documents/9"));
+    expect(createDocumentMock).toHaveBeenCalledTimes(2);
+  });
+});
+

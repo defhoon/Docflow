@@ -187,3 +187,81 @@ describe("apiRequest", () => {
     });
   });
 });
+
+describe("apiRequest 업로드 진행률 (SPEC-19)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setCookie(null);
+  });
+
+  /** 진행 이벤트를 흉내 내는 XMLHttpRequest. */
+  class FakeXhr {
+    static last: FakeXhr | null = null;
+    upload: { onprogress: ((event: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = { onprogress: null };
+    status = 0;
+    responseText = "";
+    withCredentials = false;
+    headers: Record<string, string> = {};
+    method = "";
+    url = "";
+    body: unknown = null;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    constructor() {
+      FakeXhr.last = this;
+    }
+    open(method: string, url: string) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name: string, value: string) {
+      this.headers[name] = value;
+    }
+    getAllResponseHeaders() {
+      return "content-type: application/json\r\n";
+    }
+    send(body: unknown) {
+      this.body = body;
+    }
+  }
+
+  it("진행률을 알리고 CSRF 헤더·쿠키 포함 요청을 보내며, 응답은 fetch와 같이 처리한다", async () => {
+    vi.stubGlobal("XMLHttpRequest", FakeXhr);
+    setCookie("token-x");
+    const progress = vi.fn();
+    const form = new FormData();
+    form.append("title", "t");
+    const promise = apiRequest<{ id: number }>("/api/projects/1/documents", { method: "POST", body: form, onUploadProgress: progress });
+    await Promise.resolve();
+    const xhr = FakeXhr.last!;
+    expect(xhr.method).toBe("POST");
+    expect(xhr.withCredentials).toBe(true);
+    expect(xhr.headers[CSRF_HEADER_NAME]).toBe("token-x");
+    expect(xhr.headers["Content-Type"]).toBeUndefined();
+    expect(xhr.body).toBe(form);
+    xhr.upload.onprogress?.({ lengthComputable: true, loaded: 30, total: 60 });
+    expect(progress).toHaveBeenCalledWith({ loaded: 30, total: 60 });
+    xhr.status = 201;
+    xhr.responseText = JSON.stringify({ id: 5 });
+    xhr.onload?.();
+    await expect(promise).resolves.toEqual({ id: 5 });
+  });
+
+  it("오류 응답·네트워크 오류는 같은 ApiError로 바꾼다", async () => {
+    vi.stubGlobal("XMLHttpRequest", FakeXhr);
+    setCookie("token-x");
+    const failed = apiRequest("/api/x", { method: "POST", body: new FormData(), onUploadProgress: vi.fn() });
+    await Promise.resolve();
+    FakeXhr.last!.status = 413;
+    FakeXhr.last!.responseText = JSON.stringify({ code: "FILE_TOO_LARGE", message: "크다" });
+    FakeXhr.last!.onload?.();
+    await expect(failed).rejects.toMatchObject({ status: 413, code: "FILE_TOO_LARGE" });
+
+    const offline = apiRequest("/api/x", { method: "POST", body: new FormData(), onUploadProgress: vi.fn() });
+    await Promise.resolve();
+    FakeXhr.last!.onerror?.();
+    await expect(offline).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
