@@ -1,7 +1,7 @@
 # SPEC-12 문서 버전 변경 비교 (Version Compare)
 
 - Issue: #55 · 브랜치: `feat/55/version-compare` (SPEC-11 `feat/54/ai-document-summary` 위 stacked)
-- 상태: **구현 완료, 리뷰 대기**
+- 상태: **구현 완료, main 병합 완료 (PR #60, 2026-11-25)**, 운영 미배포
 - 결정 기록: [ADR-0010](../docs/adr/0010-version-compare-diff.md) · 의존: SPEC-10 추출·정규화
 
 ## 1. 목적

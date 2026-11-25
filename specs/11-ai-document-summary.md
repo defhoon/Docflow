@@ -1,7 +1,7 @@
 # SPEC-11 AI 문서 자동 요약 (AI Document Summary)
 
 - Issue: #54 · 브랜치: `feat/54/ai-document-summary` (SPEC-10 `feat/53/pdf-text-extraction` 위 stacked)
-- 상태: **구현 완료, 리뷰 대기** · 실제 유료 API 호출: **미실행(별도 승인 필요)**
+- 상태: **구현 완료, main 병합 완료 (PR #59, 2026-11-25)**, 운영 미배포 · 실제 유료 API 호출: **미실행(별도 승인 필요)**
 - 결정 기록: [ADR-0009](../docs/adr/0009-ai-analysis-claude.md) · 의존: SPEC-10 추출 모듈
 
 ## 1. 목적

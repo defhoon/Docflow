@@ -1,7 +1,7 @@
 # SPEC-13 원본 PDF 변경사항 하이라이트 (PDF Change Highlight)
 
 - Issue: #56 · 브랜치: `feat/56/pdf-change-highlight` (SPEC-12 `feat/55/version-compare` 위 stacked)
-- 상태: **구현 완료, 리뷰 대기**
+- 상태: **구현 완료, main 병합 완료 (PR #61, 2026-11-25)**, 운영 미배포
 - 결정 기록: [ADR-0011](../docs/adr/0011-pdfjs-rendering.md) · 의존: SPEC-10 좌표, SPEC-12 변경 상자
 
 ## 1. 목적
