@@ -93,4 +93,30 @@ describe("PdfComparison (SPEC-13)", () => {
     render(<PdfComparison projectId="7" documentId="3" data={data} activeChangeId={null} onSelectChange={vi.fn()} />);
     expect(await screen.findByText("PDF를 불러오지 못했습니다.")).toBeInTheDocument();
   });
+
+  it("SPEC-17: 동기 스크롤과 강조 표시는 기본으로 켜져 있고 끌 수 있다", async () => {
+    render(<PdfComparison projectId="7" documentId="3" data={data} activeChangeId={null} onSelectChange={vi.fn()} />);
+    const toolbar = screen.getByRole("toolbar", { name: "PDF 보기 도구" });
+    const sync = within(toolbar).getByRole("button", { name: "동기 스크롤" });
+    expect(sync).toHaveAttribute("aria-pressed", "true");
+    expect(within(toolbar).getByLabelText("변경 강조 표시")).toBeChecked();
+    fireEvent.click(sync);
+    expect(sync).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("SPEC-17: 좁은 화면에서는 고른 쪽 문서만 보이도록 다른 쪽을 숨긴다", async () => {
+    render(<PdfComparison projectId="7" documentId="3" data={data} activeChangeId={null} onSelectChange={vi.fn()} mobileSide="base" />);
+    const base = await screen.findByRole("region", { name: "이전 · v1" });
+    expect(base.className).not.toContain("max-lg:hidden");
+    expect(screen.getByRole("region", { name: "이후 · v2" }).className).toContain("max-lg:hidden");
+  });
+
+  it("SPEC-17: 위치가 없는 변경으로 이동을 요청해도 아무 곳도 강조·이동하지 않는다", async () => {
+    Element.prototype.scrollTo = vi.fn();
+    render(<PdfComparison projectId="7" documentId="3" data={data} activeChangeId={3} onSelectChange={vi.fn()} navRequest={{ changeId: 3, nonce: 1 }} />);
+    await screen.findAllByRole("button", { name: /쪽\)/ });
+    await act(async () => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    expect(Element.prototype.scrollTo).not.toHaveBeenCalled();
+    expect(document.querySelector("[id^='pdf-target-change-3']")).toBeNull();
+  });
 });

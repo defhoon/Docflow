@@ -34,20 +34,33 @@ const SEGMENT_MARK: Record<Segment["op"], string> = { EQUAL: "", INSERT: "+", DE
  * 모든 텍스트는 그대로 표시한다(HTML 해석 없음).
  */
 export function TextComparison({ blocks, baseLabel, targetLabel, activeChangeId, onSelectChange }: Props) {
+  // 변경 구간 순서(1부터). 원본 줄 번호가 아니다 (SPEC-17 §3.5).
+  const ordinals = new Map<number, number>();
+  blocks.forEach((block, index) => block.type === "CHANGED" && ordinals.set(index, ordinals.size + 1));
   return (
     <div className="flex flex-col gap-3">
-      <div className="hidden grid-cols-2 gap-4 text-xs font-medium text-ink-muted md:grid">
+      <p className="text-xs text-ink-muted">
+        본문을 문단 단위로 비교합니다. 왼쪽의 번호는 원본 PDF의 줄 번호가 아니라 <strong className="font-medium">변경 구간 순서</strong>입니다.
+      </p>
+      <div className="hidden grid-cols-[3rem_1fr_1fr] gap-4 text-xs font-medium text-ink-muted md:grid">
+        <span aria-hidden="true" />
         <span>{baseLabel}</span>
         <span>{targetLabel}</span>
       </div>
       {blocks.map((block, index) =>
         block.type === "EQUAL" ? (
-          <p key={index} className="rounded-[var(--radius-control)] border border-dashed border-line bg-subtle/50 px-3 py-2 text-xs text-ink-muted">
+          <p key={index} className="rounded-[var(--radius-control)] border border-dashed border-line bg-subtle/50 px-3 py-2 text-xs text-ink-muted md:ml-16">
             변경 없는 문단 {block.paragraphCount}개
             {block.firstText && <span className="mt-0.5 block truncate" title={block.firstText}>“{block.firstText}”</span>}
           </p>
         ) : (
-          <div key={index} className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-4">
+          <div key={index} className="grid grid-cols-1 gap-2 md:grid-cols-[3rem_1fr_1fr] md:gap-4">
+            <span
+              className="pt-2 text-xs font-medium text-ink-muted tabular-nums md:text-right"
+              title="원본 줄 번호가 아니라 변경 구간 순서입니다"
+            >
+              구간 {ordinals.get(index)}
+            </span>
             <Column label={baseLabel} side="base" segments={block.base} activeChangeId={activeChangeId} onSelectChange={onSelectChange} />
             <Column label={targetLabel} side="target" segments={block.target} activeChangeId={activeChangeId} onSelectChange={onSelectChange} />
           </div>
