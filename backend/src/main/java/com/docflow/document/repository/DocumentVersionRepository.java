@@ -25,6 +25,25 @@ public interface DocumentVersionRepository extends JpaRepository<DocumentVersion
 			order by v.versionNumber desc""")
 	List<DocumentVersion> findAllWithUploaderByDocumentId(@Param("documentId") Long documentId);
 
+	/**
+	 * 버전별 피드백 수 (SPEC-16). 피드백이 있는 버전만 한 번의 집계 쿼리로 돌려준다(버전마다 조회하지 않음, N+1 방지).
+	 */
+	@Query("""
+			select f.documentVersion.versionNumber as versionNumber, count(f) as feedbackCount
+			from Feedback f
+			where f.documentVersion.document.id = :documentId
+			group by f.documentVersion.versionNumber""")
+	List<VersionFeedbackCount> countFeedbacksByVersion(@Param("documentId") Long documentId);
+
+	/** {@link #countFeedbacksByVersion} 결과. */
+	interface VersionFeedbackCount {
+
+		Integer getVersionNumber();
+
+		Long getFeedbackCount();
+
+	}
+
 	/** 문서 안의 버전 번호로 단건 조회한다 (SPEC-05 §5.2). 문서 소속은 호출 측이 먼저 확인한다. */
 	Optional<DocumentVersion> findByDocumentIdAndVersionNumber(Long documentId, int versionNumber);
 

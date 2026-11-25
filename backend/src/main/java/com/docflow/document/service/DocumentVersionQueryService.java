@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,7 @@ import com.docflow.document.domain.DocumentVersion;
 import com.docflow.document.dto.DocumentVersionResponse;
 import com.docflow.document.repository.DocumentRepository;
 import com.docflow.document.repository.DocumentVersionRepository;
+import com.docflow.document.repository.DocumentVersionRepository.VersionFeedbackCount;
 import com.docflow.document.storage.FileStorage;
 import com.docflow.document.validation.DocumentFileType;
 import com.docflow.global.error.BusinessException;
@@ -55,14 +58,22 @@ public class DocumentVersionQueryService {
 		this.readOnlyTransaction.setReadOnly(true);
 	}
 
-	/** 버전 히스토리: 최신 먼저, 첫 항목만 최신 표시 (SPEC-05 §6.3). */
+	/**
+	 * 버전 히스토리: 최신 먼저, 첫 항목만 최신 표시 (SPEC-05 §6.3). 버전별 피드백 수는 집계 쿼리 한 번으로 붙인다 (SPEC-16).
+	 */
 	@Transactional(readOnly = true)
 	public List<DocumentVersionResponse> findVersions(Long projectId, Long documentId, Long sessionUserId) {
 		requireDocument(projectId, documentId, sessionUserId);
 		List<DocumentVersion> versions = this.documentVersionRepository.findAllWithUploaderByDocumentId(documentId);
+		Map<Integer, Long> feedbackCounts = new HashMap<>();
+		for (VersionFeedbackCount count : this.documentVersionRepository.countFeedbacksByVersion(documentId)) {
+			feedbackCounts.put(count.getVersionNumber(), count.getFeedbackCount());
+		}
 		List<DocumentVersionResponse> responses = new ArrayList<>(versions.size());
 		for (int i = 0; i < versions.size(); i++) {
-			responses.add(DocumentVersionResponse.from(versions.get(i), i == 0));
+			DocumentVersion version = versions.get(i);
+			responses.add(DocumentVersionResponse.from(version, i == 0,
+					feedbackCounts.getOrDefault(version.getVersionNumber(), 0L)));
 		}
 		return responses;
 	}
