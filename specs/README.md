@@ -48,6 +48,7 @@ GitHub Issue (#N)  →  브랜치 feat/N/description  →  specs/NN-name.md 작�
 | SPEC-15 UI/UX 2.0 디자인 시스템과 앱 셸 | `15-design-system.md` | #68 | 구현 완료, PR 리뷰 대기 |
 | SPEC-16 문서 상세 3단 워크스페이스 | `16-document-workspace.md` | #69 | 구현 완료, PR 리뷰 대기 (SPEC-15 위 stacked) |
 | SPEC-17 버전 비교 집중 모드 | `17-compare-workspace.md` | #70 | 구현 완료, PR 리뷰 대기 (SPEC-16 위 stacked) |
+| SPEC-18 홈 대시보드·프로젝트 상세와 조회 API | `18-home-project-api.md` | #71 | 구현 완료, PR 리뷰 대기 (SPEC-17 위 stacked) |
 | SPEC-AUTH 확장 초대코드 회원가입·로그인 제한 | `00-auth.md` §확장 | #26 | **Done (2026-11-11, AC-INV-01~14, #37·#39 보완 포함)**, main 병합 완료 (PR #34, #38, #40) |
 | (비 SPEC) 공개 배포 준비 | `docs/deployment.md`, ADR-0007 | #27 | 준비 완료, main 병합 (PR #35). **미배포**(Railway 리소스 생성 승인 대기) |
 | (비 SPEC) UI/UX 전면 개선 | — | #28 | 완료, main 병합 (PR #36). 클라우드 3개 뷰포트·Windows 모바일/데스크톱 확인 |
