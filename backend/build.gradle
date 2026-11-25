@@ -30,6 +30,8 @@ dependencies {
 	implementation 'org.apache.pdfbox:pdfbox:3.0.5'
 	// SPEC-11 AI 문서 요약 (ADR-0009). 공식 Claude API Java SDK.
 	implementation 'com.anthropic:anthropic-java:3.8.0'
+	// SPEC-12 버전 비교: Myers Diff (Apache-2.0, ADR-0010)
+	implementation 'io.github.java-diff-utils:java-diff-utils:4.18'
 	runtimeOnly 'org.postgresql:postgresql'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
