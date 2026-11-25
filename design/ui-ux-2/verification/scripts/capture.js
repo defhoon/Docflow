@@ -4,13 +4,16 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 const [out, label] = process.argv.slice(2);
 const seed = JSON.parse(fs.readFileSync(__dirname + "/seed.json", "utf8"));
+// 로컬 시드 계정 비밀번호는 환경 변수로 받는다(저장소에 값을 두지 않음).
+const SEED_PASSWORD = process.env.DEV_SEED_PASSWORD;
+if (!SEED_PASSWORD) throw new Error("DEV_SEED_PASSWORD is required");
 const APP = "http://127.0.0.1:3000";
 fs.mkdirSync(out, { recursive: true });
 
 async function login(page, email = "author@docflow.local") {
   await page.goto(APP + "/login");
   await page.fill("input[type=email], input[name=email]", email);
-  await page.fill("input[type=password]", "devpass1234");
+  await page.fill("input[type=password]", SEED_PASSWORD);
   await page.press("input[type=password]", "Enter");
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 15000 });
 }

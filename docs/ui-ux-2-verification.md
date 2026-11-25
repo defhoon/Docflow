@@ -100,4 +100,4 @@ Before는 같은 데이터·같은 해상도로 기존 main(`6253d59`)을 띄워
 
 ## 8. 재현 방법
 
-`design/ui-ux-2/verification/scripts/`: `make_pdfs.py`(검증 PDF 생성, reportlab·한글 글꼴) → Backend(local 프로파일, `DEV_SEED_PASSWORD` 지정) → `node seed.mjs > seed.json` → Frontend standalone 실행 → `node capture.js <out> after` / `node verify.js <out>`. 스크립트는 로컬 검증 DB 전용이며 운영 환경에 쓰지 않는다.
+`design/ui-ux-2/verification/scripts/`: `make_pdfs.py`(검증 PDF 생성, reportlab·한글 글꼴) → Backend(local 프로파일, `DEV_SEED_PASSWORD` 지정, 스크립트에도 같은 환경 변수와 `E2E_NEW_USER_PASSWORD` 지정) → `node seed.mjs > seed.json` → Frontend standalone 실행 → `node capture.js <out> after` / `node verify.js <out>`. 스크립트는 로컬 검증 DB 전용이며 운영 환경에 쓰지 않는다.

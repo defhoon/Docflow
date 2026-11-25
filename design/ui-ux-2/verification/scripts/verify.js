@@ -4,6 +4,10 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
 
+// 로컬 시드 계정 비밀번호는 환경 변수로 받는다(저장소에 값을 두지 않음).
+const SEED_PASSWORD = process.env.DEV_SEED_PASSWORD;
+const NEW_USER_PASSWORD = process.env.E2E_NEW_USER_PASSWORD;
+if (!SEED_PASSWORD || !NEW_USER_PASSWORD) throw new Error("DEV_SEED_PASSWORD and E2E_NEW_USER_PASSWORD are required");
 const APP = "http://127.0.0.1:3000";
 const API = "http://localhost:8080";
 const F = path.join(__dirname, "files");
@@ -37,7 +41,7 @@ function client() {
   }
   return {
     req,
-    async login(email, password = "devpass1234") {
+    async login(email, password = SEED_PASSWORD) {
       await req("GET", "/api/auth/csrf");
       const r = await req("POST", "/api/auth/login", { email, password });
       await req("GET", "/api/auth/csrf");
@@ -52,7 +56,7 @@ function form(file, fields = {}) {
   return f;
 }
 
-async function login(page, email, password = "devpass1234") {
+async function login(page, email, password = SEED_PASSWORD) {
   await page.goto(APP + "/login");
   await page.fill("input[type=email]", email);
   await page.fill("input[type=password]", password);
@@ -94,12 +98,12 @@ const docUrl = (d, v) => `${APP}/projects/${seed.project}/documents/${d}${v ? `?
     await page2.fill("#signup-inviteCode", code || "");
     await page2.fill("#signup-email", "newbie@docflow.local");
     await page2.fill("#signup-displayName", "새구성원");
-    await page2.fill("#signup-password", "Newbie-Pass-2026");
-    await page2.fill("#signup-passwordConfirm", "Newbie-Pass-2026");
+    await page2.fill("#signup-password", NEW_USER_PASSWORD);
+    await page2.fill("#signup-passwordConfirm", NEW_USER_PASSWORD);
     await page2.getByRole("button", { name: /가입/ }).click();
     await page2.waitForURL((u) => u.pathname.startsWith("/login"), { timeout: 10000 }).catch(() => undefined);
     const signedUp = new URL(page2.url()).pathname.startsWith("/login");
-    await login(page2, "newbie@docflow.local", "Newbie-Pass-2026");
+    await login(page2, "newbie@docflow.local", NEW_USER_PASSWORD);
     await settle(page2, 1500);
     const zeroProjects = await page2.getByRole("region", { name: "요약" }).textContent();
     record("S2", "초대코드로 가입하고 로그인한다", invite.status === 201 && signedUp, `invite=${invite.status}, home stats="${zeroProjects.replace(/\s+/g, " ").trim()}"`);

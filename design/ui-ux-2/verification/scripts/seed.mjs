@@ -1,5 +1,8 @@
 // Seed local e2e data through the real API (no DB writes). Usage: node seed.mjs
 import fs from "node:fs";
+// 로컬 시드 계정 비밀번호는 환경 변수로 받는다(저장소에 값을 두지 않음).
+const SEED_PASSWORD = process.env.DEV_SEED_PASSWORD;
+if (!SEED_PASSWORD) throw new Error("DEV_SEED_PASSWORD is required");
 const B = process.env.API || "http://localhost:8080";
 const F = new URL("./files/", import.meta.url).pathname;
 function client() {
@@ -17,7 +20,7 @@ function client() {
   }
   return {
     req,
-    async login(email) { await req("GET", "/api/auth/csrf"); const u = await req("POST", "/api/auth/login", { email, password: "devpass1234" }); await req("GET", "/api/auth/csrf"); return u; },
+    async login(email) { await req("GET", "/api/auth/csrf"); const u = await req("POST", "/api/auth/login", { email, password: SEED_PASSWORD }); await req("GET", "/api/auth/csrf"); return u; },
   };
 }
 function form(file, fields = {}) {
