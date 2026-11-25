@@ -5,7 +5,7 @@
  * brand: 주요 행동, success: 최종 확정, info: 협업 중, danger: 오류·되돌릴 수 없는 행동.
  */
 @theme {
-  --font-sans: "Pretendard", "Pretendard Variable", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* 중립색 (#50): Background #F8FAFC, Surface #FFFFFF, Border #E2E8F0, 본문 #0F172A, 보조 #64748B */
   --color-canvas: #f8fafc;
@@ -39,6 +39,15 @@
   --color-danger-50: #fef2f2;
   --color-danger-600: #dc2626;
   --color-danger-700: #b91c1c;
+
+  /* PDF 뷰어·비교 화면 바탕 (#68). 흰 페이지가 구분되도록 canvas보다 한 단계 어둡다. */
+  --color-canvas-sunken: #eef1f5;
+
+  /* 변경 표시 (SPEC-12·13): 색 외에 선 형태로도 구분한다. 추가 = 실선, 삭제 = 파선, 수정 = 점선 */
+  --color-diff-add: #16a34a;
+  --color-diff-del: #dc2626;
+  --color-diff-mod: #b45309;
+  --color-warning-500: #f59e0b;
 
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
