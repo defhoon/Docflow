@@ -51,6 +51,13 @@ docflow:
       max-idle: 30d
       cleanup-interval: 1h
 
+  # PDF 텍스트·좌표 추출 (SPEC-10, ADR-0008). AI 요약·버전 비교가 공통으로 쓴다.
+  extraction:
+    max-pages: ${DOCFLOW_EXTRACTION_MAX_PAGES:300}
+    max-words: ${DOCFLOW_EXTRACTION_MAX_WORDS:200000}
+    timeout: ${DOCFLOW_EXTRACTION_TIMEOUT:60s}
+    concurrency: 2
+
 management:
   endpoints:
     web:
