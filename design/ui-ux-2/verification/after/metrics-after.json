@@ -1,0 +1,144 @@
+{
+  "01-login": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 0,
+    "feedbackVisible": false
+  },
+  "02-home": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 0,
+    "feedbackVisible": false
+  },
+  "03-project": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 0,
+    "feedbackVisible": false
+  },
+  "04-doc-initial": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 45.6,
+    "feedbackVisible": true
+  },
+  "05-doc-preview": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 45.6,
+    "feedbackVisible": true,
+    "clicksToPreview": 0
+  },
+  "06-doc-finalized": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 43.4,
+    "feedbackVisible": true
+  },
+  "07-compare-default": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 30.9,
+    "feedbackVisible": false
+  },
+  "08-compare-pdf": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 30.9,
+    "feedbackVisible": false,
+    "clicksToPdf": 0
+  },
+  "09-compare-text": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 30.9,
+    "feedbackVisible": false
+  },
+  "10-doc-create": {
+    "viewport": "1440x900",
+    "pageHeight": 900,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 0,
+    "feedbackVisible": false
+  },
+  "11-doc-1920": {
+    "viewport": "1920x1080",
+    "pageHeight": 1080,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 57.6,
+    "feedbackVisible": true
+  },
+  "12-compare-1920": {
+    "viewport": "1920x1080",
+    "pageHeight": 1080,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 34.6,
+    "feedbackVisible": false
+  },
+  "11-doc-1280": {
+    "viewport": "1280x720",
+    "pageHeight": 720,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 38.9,
+    "feedbackVisible": true
+  },
+  "12-compare-1280": {
+    "viewport": "1280x720",
+    "pageHeight": 720,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 27.9,
+    "feedbackVisible": false
+  },
+  "m1-home": {
+    "viewport": "390x844",
+    "pageHeight": 1674,
+    "pageScreens": 2,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 0,
+    "feedbackVisible": false
+  },
+  "m2-doc": {
+    "viewport": "390x844",
+    "pageHeight": 844,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 76.4,
+    "feedbackVisible": false
+  },
+  "m3-compare": {
+    "viewport": "390x844",
+    "pageHeight": 844,
+    "pageScreens": 1,
+    "horizontalOverflow": false,
+    "pdfAreaPct": 53.5,
+    "feedbackVisible": false
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ]
+}
