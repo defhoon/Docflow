@@ -21,6 +21,7 @@ import { failureMessage, isUnauthenticated } from "../errors";
 import { formatDateTime } from "../format";
 import type { Project } from "../types";
 import { ProjectMembers } from "./ProjectMembers";
+import { AiSettingsCard } from "@/features/analysis/components/AiSettingsCard";
 
 type DetailResult =
   | { kind: "not-found" }
@@ -123,6 +124,7 @@ export function ProjectDetail() {
             </div>
             <div className="flex min-w-0 flex-col gap-6">
               <ProjectMembers projectId={projectId} myRole={project.myRole} onProjectChanged={retry} />
+              <AiSettingsCard projectId={projectId} />
               <Card aria-labelledby="project-activity">
                 <CardHeader title="최근 활동" titleId="project-activity" />
                 <CardBody className="py-1">

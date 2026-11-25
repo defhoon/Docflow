@@ -259,13 +259,13 @@ v0.4의 대표 SPEC(Review 요청)은 워크플로 변경으로 폐기되었다(
 - Spring Boot 4.1.1은 Spring Initializr가 아니라 Maven Central 메타데이터로 4.1.x 최신 안정 버전임을 확인하였다. 클라우드 개발 환경의 네트워크 정책이 `start.spring.io`를 차단하였기 때문이다.
 - Spring Security 세션 인증을 도입하였다(SPEC-AUTH, [`specs/00-auth.md`](./specs/00-auth.md), [ADR-0005](./docs/adr/0005-session-authentication.md)). 의존성: `spring-boot-starter-security`(Spring Security 7.1.1), 테스트용 `spring-boot-starter-security-test`.
 
-#### AI — Post-MVP
+#### AI — 확장 기능 (2026-11-24 결정, ADR-0008·0009)
 
-- Python
-- FastAPI
-- LLM API
+- PDF 텍스트·좌표 추출: Apache PDFBox 3.0.5 (Backend 안)
+- LLM: Anthropic Claude API, 공식 Java SDK `anthropic-java` 3.8.0, 기본 모델 `claude-sonnet-5-5`
+- 비동기 작업: Spring Scheduler + PostgreSQL 작업 테이블
 
-AI Stack은 Post-MVP 예정이며 아직 설치하지 않았다.
+초기 안(Python·FastAPI 별도 서비스)은 채택하지 않았다. 별도 런타임·인프라 없이 Spring Boot 안에서 처리한다.
 
 ### 11.2 Repository 구조
 

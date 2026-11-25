@@ -83,7 +83,13 @@
 | backend | `DOCFLOW_TRUSTED_PROXY_HOPS` | **설정하지 않음(0)**. §9-14 확인 후에만 `1` | |
 | backend | `DOCFLOW_STORAGE_DIR` | 생략(기본 `/data/storage`) | |
 | backend | `DOCFLOW_PREVIEW_OFFICE_ENABLED` | 생략(기본 false). 격리 검증 전 켜지 않음 | |
+| backend | `DOCFLOW_AI_ENABLED` | 생략(기본 false). AI 기능 사용 승인 후에만 `true` (SPEC-11) | |
+| backend | `ANTHROPIC_API_KEY` | Claude API 키. AI를 켤 때만 | ✔ Sealed |
+| backend | `DOCFLOW_AI_MODEL` | 생략(기본 `claude-sonnet-5-5`) | |
+| backend | `DOCFLOW_AI_MONTHLY_BUDGET_USD` / `DOCFLOW_AI_PROJECT_DAILY_CALLS` / `DOCFLOW_AI_GLOBAL_DAILY_CALLS` | 생략(기본 20 / 50 / 300). 비용 상한 조정 시 | |
 | frontend | `BACKEND_URL` | `http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:8080` 또는 `http://backend.railway.internal:8080` | |
+
+AI 기능은 서비스 스위치(`DOCFLOW_AI_ENABLED`)와 키가 모두 있어야 프로젝트 Owner가 켤 수 있다(기본 모든 프로젝트 꺼짐). 월 비용 상한은 앱이 추정한 값이므로 Anthropic Console의 사용량 한도(spend limit)도 함께 설정한다. 처음 켤 때는 한 프로젝트에서 문서 1건으로 동작·비용을 확인한다(유료 호출, 사용자 승인 후).
 
 `SESSION_COOKIE_SECURE`는 prod 기본값 true이므로 설정하지 않는다(HTTPS 전용 쿠키). false로 두면 backend가 기동을 거부한다(#39). `DOCFLOW_ALLOW_INSECURE_COOKIES`는 로컬 HTTP 확인 전용이며 Railway에 **설정하지 않는다**. prod 프로파일은 저장소의 `.env`를 읽지 않는다(이미지에도 없음).
 
