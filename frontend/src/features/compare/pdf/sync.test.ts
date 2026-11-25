@@ -28,7 +28,10 @@ describe("동기 스크롤 계산 (SPEC-17 AC-CW-04)", () => {
 
   it("첫 페이지 위 여백·페이지 사이 간격·빈 문서도 안전하게 처리한다", () => {
     const p = pages(2);
-    expect(anchorOf(0, p)).toEqual({ index: 0, fraction: 0 });
+    // 첫 페이지 위 여백: 맨 위로 돌아오면 상대 문서도 맨 위(0)
+    expect(anchorOf(0, p)).toEqual({ index: -1, fraction: 0 });
+    expect(scrollTopFor(anchorOf(0, p), pages(3, 1400))).toBe(0);
+    expect(scrollTopFor(anchorOf(12, p), pages(1, 800, 16, 48))).toBe(24);
     // 1쪽과 2쪽 사이 간격은 1쪽 끝(비율 1)으로 본다
     expect(anchorOf(p[0].top + p[0].height + 8, p)).toEqual({ index: 0, fraction: 1 });
     expect(anchorOf(100, [])).toEqual({ index: 0, fraction: 0 });
