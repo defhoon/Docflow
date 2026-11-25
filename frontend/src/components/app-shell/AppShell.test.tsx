@@ -21,7 +21,7 @@ describe("AppShell (#28)", () => {
   it("실제 화면만 메뉴에 두고 현재 위치를 표시한다. 초대 관리는 관리자에게만 보인다", () => {
     render(<AppShell>본문</AppShell>);
     const nav = screen.getByRole("navigation", { name: "주 메뉴" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["내 작업", "프로젝트"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["홈", "프로젝트"]);
     expect(within(nav).getByRole("link", { name: "프로젝트" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("본문")).toBeInTheDocument();
   });
@@ -41,6 +41,26 @@ describe("AppShell (#28)", () => {
     expect(screen.getAllByRole("navigation", { name: "주 메뉴" })).toHaveLength(2);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getAllByRole("navigation", { name: "주 메뉴" })).toHaveLength(1);
+  });
+
+  it("레일 모드(AC-DS-03): 메뉴는 아이콘 링크이며 이름과 툴팁을 가진다", () => {
+    render(<AppShell mode="workspace">본문</AppShell>);
+    const nav = screen.getByRole("navigation", { name: "주 메뉴" });
+    const link = within(nav).getByRole("link", { name: "프로젝트" });
+    expect(link).toHaveAttribute("aria-current", "page");
+    expect(link.textContent).toBe("");
+    // 툴팁은 이름과 같은 문구이며 화면 읽기 프로그램에는 숨긴다(중복 낭독 방지).
+    const tip = link.parentElement!.querySelector("[aria-hidden='true']:not(svg)");
+    expect(tip).toHaveTextContent("프로젝트");
+    expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
+  });
+
+  it("집중 모드(AC-DS-04): 데스크톱 사이드바 없이 모바일 메뉴만 둔다", () => {
+    render(<AppShell mode="focus">본문</AppShell>);
+    expect(screen.queryByRole("navigation", { name: "주 메뉴" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "메뉴 열기" }));
+    expect(screen.getByRole("navigation", { name: "주 메뉴" })).toBeInTheDocument();
+    expect(screen.getByText("본문")).toBeInTheDocument();
   });
 
   it("로그인하지 않았으면 본문을 표시하지 않는다", () => {

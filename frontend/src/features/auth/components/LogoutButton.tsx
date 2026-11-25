@@ -3,9 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { IconButton } from "@/components/ui/IconButton";
+import { LogoutIcon } from "@/components/ui/icons";
+
 import { useAuth } from "../AuthProvider";
 
-export function LogoutButton() {
+/** `compact`: 작업 공간 레일용 아이콘 버튼(이름·툴팁 포함). */
+export function LogoutButton({ compact = false }: { compact?: boolean }) {
   const { signOut } = useAuth();
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -22,6 +26,21 @@ export function LogoutButton() {
     } finally {
       setPending(false);
     }
+  }
+
+  if (compact) {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <IconButton
+          label={pending ? "로그아웃 중..." : failed ? "로그아웃 실패 · 다시 시도" : "로그아웃"}
+          icon={<LogoutIcon />}
+          tooltipSide="right"
+          onClick={() => void handleClick()}
+          disabled={pending}
+          className={failed ? "text-danger-700" : undefined}
+        />
+      </div>
+    );
   }
 
   return (
